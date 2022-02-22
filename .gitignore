@@ -34,4 +34,4 @@
 code/build/*
 !code/build/do_cmake_openMP.sh
 !code/build/do_cmake_*.sh
-
+/build

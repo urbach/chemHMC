@@ -7,9 +7,9 @@ At this stage is this directory is just a template for a project with kokkos
 In order to fetch the code:
 ```
     git clone git@github.com:urbach/chemHMC.git
-   cd chemHMC
+    cd chemHMC
     cd code
-   git submodule update --init --recursive
+    git submodule update --init --recursive
 ```
 
 # Building

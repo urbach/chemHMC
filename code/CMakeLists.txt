@@ -39,21 +39,10 @@ add_subdirectory(include  include)
 
 ######################### git version ################
 ######################################################
-execute_process(
-    COMMAND git rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-# Get the latest commit hash
-execute_process(
-    COMMAND git rev-parse HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_COMMIT_HASH
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    
-## this in not the end, you need to  target_compile_definitions for the executable to build
-## see the macro add_target_with_lib  
+include(cmake/CheckGit.cmake)
+CheckGitSetup()
+
 ######################################################
 ######################################################
 
@@ -62,10 +51,11 @@ macro(add_target_with_lib TARGETNAME)
   # Make the executable
   add_executable(${TARGETNAME} ${ARGN})
   target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
+  target_link_libraries(${TARGETNAME} PUBLIC read_infile)
   #target_link_libraries(${TARGETNAME} PUBLIC extra_library)
   
-  target_compile_definitions(${TARGETNAME} PRIVATE
-    "-DGIT_COMMIT_HASH=\"${GIT_COMMIT_HASH}\"")
+  target_link_libraries(${TARGETNAME} PUBLIC git_version)
+
  
 endmacro()
 
