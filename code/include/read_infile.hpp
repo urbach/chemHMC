@@ -3,7 +3,7 @@
 
 #include "global.hpp"
 
-struct DataContainer { // Just the thing that holds all variables
+struct params_class { // Just the thing that holds all variables
   
   double L[dim_space];
   int Nathoms;
@@ -17,7 +17,7 @@ struct DataContainer { // Just the thing that holds all variables
   int measure_every_X_updates;
 
 
-  DataContainer(int argc, char** argv );// constructor declaration
+  params_class(int argc, char** argv );// constructor declaration
 
 };
 

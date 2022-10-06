@@ -33,10 +33,6 @@ MESSAGE("CMAKE_CXX_FLAGS   ${CMAKE_CXX_FLAGS}")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/kokkos" "external/kokkos")
 
-add_subdirectory(include  include)
-
-
-
 ######################### git version ################
 ######################################################
 
@@ -44,7 +40,25 @@ include(cmake/CheckGit.cmake)
 CheckGitSetup()
 
 ######################################################
+###################### yaml-cpp ######################
+
+find_package(yaml-cpp)
+
+include_directories(${YAML_CPP_INCLUDE_DIR})
+
+MESSAGE("YAML INCLUDE_DIR: ${YAML_CPP_INCLUDE_DIR}")
+MESSAGE("YAML LIBRARIES: ${YAML_CPP_LIBRARIES}")
+MESSAGE("YAML LIBRARY_DIR: ${YAML_CPP_LIBRARY_DIR}")
+IF(NOT yaml-cpp_FOUND)
+    MESSAGE("find_package faild to find yaml-cpp: you need to do it manually")
+    MESSAGE("hint:  yaml-cpp_DIR or CMAKE_PREFIX_PATH need to be global path or relative to the source dir")
+    MESSAGE(FATAL_ERROR)
+ENDIF()
+
 ######################################################
+######################################################
+
+add_subdirectory(include  include)
 
 
 macro(add_target_with_lib TARGETNAME)
