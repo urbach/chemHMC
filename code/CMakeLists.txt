@@ -66,6 +66,8 @@ macro(add_target_with_lib TARGETNAME)
   add_executable(${TARGETNAME} ${ARGN})
   target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
   target_link_libraries(${TARGETNAME} PUBLIC read_infile)
+  target_link_libraries(${TARGETNAME} PUBLIC particles)
+  target_link_libraries(${TARGETNAME} PUBLIC HMC)
   #target_link_libraries(${TARGETNAME} PUBLIC extra_library)
   
   target_link_libraries(${TARGETNAME} PUBLIC git_version)

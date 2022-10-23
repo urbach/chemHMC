@@ -2,12 +2,12 @@
 #define READ_INFILE_H
 
 #include "global.hpp"
+#include "yaml-cpp/yaml.h"
 
 struct params_class { // Just the thing that holds all variables
   
   double L[dim_space];
-  int Nathoms;
-  
+  std::string StartCondition;
   
   // run parameter
   int seed;
@@ -16,9 +16,11 @@ struct params_class { // Just the thing that holds all variables
   int total_measure;
   int measure_every_X_updates;
 
-
-  params_class(int argc, char** argv );// constructor declaration
+  YAML::Node read_params(int argc, char** argv );// function that reads the infile
 
 };
+
+
+template<class T> T check_and_assign_value(YAML::Node doc, const char *tag);
 
 #endif

@@ -3,7 +3,7 @@
 # remove chache
 rm -r CMakeFiles CMakeCache.txt cmake_install.cmake
 
-CXXFLAGS="-O2 -fopenmp" \
+CXXFLAGS="-O2 -fopenmp -g" \
 cmake .. \
   -DCMAKE_CXX_COMPILER=g++ \
   -DCMAKE_BUILD_TYPE=RELEASE \
