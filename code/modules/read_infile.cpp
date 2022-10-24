@@ -18,7 +18,7 @@
 template<class T>
 T check_and_assign_value(YAML::Node doc, const char* tag) {
     if (doc[tag]){
-        std::cout<<doc[tag].as<T>()<< std::endl;
+        // std::cout<<doc[tag].as<T>()<< std::endl;
         return doc[tag].as<T>();
     }
     else {

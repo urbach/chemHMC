@@ -14,18 +14,20 @@ public:
     int N;
     double mass;
     double beta;
-    
+    params_class params;
     Kokkos::View<double* [dim_space]>  x;
-    Kokkos::View<double* [dim_space]>::HostMirror h_x;
     Kokkos::View<double* [dim_space]>  p;
+    bool initHostMirror;
+    Kokkos::View<double* [dim_space]>::HostMirror h_x;
     Kokkos::View<double* [dim_space]>::HostMirror h_p;
 
     RandPoolType rand_pool;
-    void InitX(params_class params);
+    // constructor
+    particles_type(YAML::Node doc, params_class params_to_copy);
+    void InitX();
     KOKKOS_INLINE_FUNCTION
         void operator() (cold, const int& i) const;
-    // KOKKOS_INLINE_FUNCTION void operator() (hot, const int i) const;
-    // virtual void hb() = 0; // virtual heat-bath routine
+    void printx();
 
 };
 
@@ -34,9 +36,9 @@ class identical_particles : public particles_type {
 public:
     struct hbTag {};
     const std::string name = "identical_particles";
-    identical_particles(YAML::Node doc);
+    // constructor
+    identical_particles(YAML::Node doc, params_class params_to_copy);
     void hb();
-    // KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     ~identical_particles() {};
 };
 

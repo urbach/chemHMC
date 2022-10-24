@@ -14,10 +14,8 @@ int main(int argc, char** argv) {
 
         HMC_class HMC;
         HMC.init(argc, argv);
-        // init random pool
-
         
-
+        HMC.particles->printx();
 
 
         printf("total kokkos time = %f s\n", timer.seconds());
