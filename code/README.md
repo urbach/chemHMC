@@ -66,14 +66,20 @@ cd build
 bash do_cmake_cuda.sh
 make
 ```
+# Infile 
+
+the infile is written in the yaml format, an example is in 
+```
+/build/test.yaml
+```
 
 # Test and tutorial
 
-so far the only executaprogramble present is
+The executable 
 ```
-test/kokkos_tutorial4.cpp
+build/main/main
 ```
-that after building and compilation there will be the executable  
+will be generated in the compilation, assuming you are in the directory `build/main/`, it can be executed as
 ```
-build/test/kokkos_tutorial4
+./main -i ../test.yaml
 ```

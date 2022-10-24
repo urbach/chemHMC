@@ -58,7 +58,6 @@ void particles_type::InitX() {
             int iy = (int)(i - iz * N3 * N3) / (N3);
             int ix = (int)(i - iz * N3 * N3 - iy * N3);
 
-            printf("i=%d  =(%d,%d,%d) \n", i, ix, iy, iz);
             x(i, 0) = params.L[0] * (ix / N3);
             x(i, 1) = params.L[1] * (iy / N3);
             x(i, 2) = params.L[2] * (iz / N3);
