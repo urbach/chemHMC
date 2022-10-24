@@ -24,10 +24,16 @@ public:
     RandPoolType rand_pool;
     // constructor
     particles_type(YAML::Node doc, params_class params_to_copy);
+
     void InitX();
+
     KOKKOS_INLINE_FUNCTION
         void operator() (cold, const int& i) const;
+
     void printx();
+    void printp();
+
+    virtual void hb() = 0;
 
 };
 
@@ -38,7 +44,7 @@ public:
     const std::string name = "identical_particles";
     // constructor
     identical_particles(YAML::Node doc, params_class params_to_copy);
-    void hb();
+    void hb()override;
     ~identical_particles() {};
 };
 

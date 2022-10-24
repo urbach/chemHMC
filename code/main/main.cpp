@@ -17,6 +17,8 @@ int main(int argc, char** argv) {
         
         HMC.particles->printx();
 
+        HMC.run();
+
 
         printf("total kokkos time = %f s\n", timer.seconds());
     }

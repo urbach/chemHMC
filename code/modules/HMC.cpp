@@ -15,3 +15,8 @@ void HMC_class::init(int argc, char** argv) {
     particles->InitX();
     
 }
+
+void HMC_class::run() {
+    particles->hb();
+    particles->printp();
+}
