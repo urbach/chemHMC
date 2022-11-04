@@ -12,8 +12,7 @@ public:
     struct cold {};
     struct hot {};
     int N;
-    double mass;
-    double beta;
+
     params_class params;
     Kokkos::View<double* [dim_space]>  x;
     Kokkos::View<double* [dim_space]>  p;
@@ -42,11 +41,14 @@ class identical_particles : public particles_type {
 public:
     struct hbTag {};
     const std::string name = "identical_particles";
+    double mass;
+    double beta;
     // constructor
     identical_particles(YAML::Node doc, params_class params_to_copy);
     void hb()override;
     ~identical_particles() {};
 };
+
 
 
 

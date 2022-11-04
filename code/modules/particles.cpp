@@ -19,8 +19,6 @@
 particles_type::particles_type(YAML::Node doc, params_class params_to_copy) {
 
     N = check_and_assign_value<int>(doc, "N");
-    mass = check_and_assign_value<double>(doc, "mass");
-    beta = check_and_assign_value<double>(doc, "beta");
 
     std::cout << "constructor particles_type" << std::endl;
     params = params_to_copy;
@@ -28,8 +26,6 @@ particles_type::particles_type(YAML::Node doc, params_class params_to_copy) {
     std::cout << "random pool initialised" << std::endl;
 
     std::cout << "N:" << N << std::endl;
-    std::cout << "mass:" << mass << std::endl;
-    std::cout << "beta:" << beta << std::endl;
 
     initHostMirror = false;
 }
@@ -89,6 +85,10 @@ void particles_type::printp() {
 // contructor
 identical_particles::identical_particles(YAML::Node doc, params_class params_to_copy) :
     particles_type(doc, params_to_copy) {
+    mass = check_and_assign_value<double>(doc, "mass");
+    beta = check_and_assign_value<double>(doc, "beta");
+    std::cout << "mass:" << mass << std::endl;
+    std::cout << "beta:" << beta << std::endl;
 
     std::cout << "partilces_type:" << std::endl;
     std::cout << "name:" << name << std::endl;
@@ -99,7 +99,7 @@ void identical_particles::hb() {
     double sbeta = sqrt(beta);
     Kokkos::parallel_for("hb-identical_particles", N, KOKKOS_LAMBDA(int i){
         gen_type rgen = rand_pool.get_state(i);
-        p(i, 0) = rgen.normal(0, mass / sbeta);
+        p(i, 0) = rgen.normal(0, mass / sbeta);// exp(- beta p^2/(2m^2))
         p(i, 1) = rgen.normal(0, mass / sbeta);
         p(i, 2) = rgen.normal(0, mass / sbeta);
         rand_pool.free_state(rgen);
