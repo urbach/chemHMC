@@ -21,7 +21,7 @@ target_include_directories(read_infile PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_library(
     HMC STATIC
-    HMC.h
+    HMC.hpp
     ../modules/HMC.cpp
 ) 
 

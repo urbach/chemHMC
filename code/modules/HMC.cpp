@@ -1,4 +1,4 @@
-#include "HMC.h"
+#include "HMC.hpp"
 
 void HMC_class::init(int argc, char** argv) {
     params = new params_class();

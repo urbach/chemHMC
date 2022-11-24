@@ -2,7 +2,7 @@
 
 #include <Kokkos_Core.hpp>
 #include "git_version.h"
-#include "HMC.h"
+#include "HMC.hpp"
 
 int main(int argc, char** argv) {
 
