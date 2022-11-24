@@ -87,17 +87,20 @@ identical_particles::identical_particles(YAML::Node doc, params_class params_to_
     particles_type(doc, params_to_copy) {
     mass = check_and_assign_value<double>(doc, "mass");
     beta = check_and_assign_value<double>(doc, "beta");
+    cutoff = check_and_assign_value<double>(doc, "cutoff");
+    eps = check_and_assign_value<double>(doc, "eps");
+    sigma = check_and_assign_value<double>(doc, "sigma");
+    std::cout << "partilces_type:" << std::endl;
+    std::cout << "name:" << name << std::endl;
     std::cout << "mass:" << mass << std::endl;
     std::cout << "beta:" << beta << std::endl;
 
-    std::cout << "partilces_type:" << std::endl;
-    std::cout << "name:" << name << std::endl;
 }
 
 
 void identical_particles::hb() {
     double sbeta = sqrt(beta);
-    Kokkos::parallel_for("hb-identical_particles", N, KOKKOS_LAMBDA(int i){
+    Kokkos::parallel_for("hb-identical_particles", N, KOKKOS_LAMBDA(const int& i){
         gen_type rgen = rand_pool.get_state(i);
         p(i, 0) = rgen.normal(0, mass / sbeta);// exp(- beta p^2/(2m^2))
         p(i, 1) = rgen.normal(0, mass / sbeta);
@@ -105,4 +108,21 @@ void identical_particles::hb() {
         rand_pool.free_state(rgen);
     });
 
+}
+
+double identical_particles::compute_potential() {
+    double result;
+    Kokkos::parallel_reduce("identical_particles-LJ-potential", N, KOKKOS_LAMBDA(const int& i, double& V){
+        for (int j = 0;j < N; j++) {
+            double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
+                     + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
+                     + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
+            r = sqrt(r);
+            if (r < cutoff && i != j) {
+                V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
+            }
+        }
+    }, result);
+
+    return result;
 }

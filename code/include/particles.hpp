@@ -33,6 +33,7 @@ public:
     void printp();
 
     virtual void hb() = 0;
+    virtual double compute_potential() = 0;
 
 };
 
@@ -43,9 +44,13 @@ public:
     const std::string name = "identical_particles";
     double mass;
     double beta;
+    double sigma;
+    double eps;
+    double cutoff;
     // constructor
     identical_particles(YAML::Node doc, params_class params_to_copy);
     void hb()override;
+    double compute_potential() override;
     ~identical_particles() {};
 };
 

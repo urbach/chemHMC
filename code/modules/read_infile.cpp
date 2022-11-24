@@ -22,10 +22,10 @@ T check_and_assign_value(YAML::Node doc, const char* tag) {
         return doc[tag].as<T>();
     }
     else {
-        printf("tag: %s is not present in the input file", tag);
+        printf("tag: %s is not present in the input file\n", tag);
         std::cout << "infile structure:" << std::endl;
         std::cout << doc << std::endl;
-        exit(1);
+        Kokkos::abort("params not found");
     }
 }
 template double check_and_assign_value<double>(YAML::Node, const char*);

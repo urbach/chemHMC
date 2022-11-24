@@ -19,4 +19,7 @@ void HMC_class::init(int argc, char** argv) {
 void HMC_class::run() {
     particles->hb();
     particles->printp();
+
+    double V=particles->compute_potential();
+    printf("the potential is: %f\n",V);
 }
