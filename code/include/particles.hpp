@@ -9,8 +9,7 @@
 class particles_type { // Just the thing that holds all variables
 
 public:
-    struct cold {};
-    struct hot {};
+
     int N;
 
     params_class params;
@@ -24,10 +23,9 @@ public:
     // constructor
     particles_type(YAML::Node doc, params_class params_to_copy);
 
-    void InitX();
+    virtual void InitX() = 0;
 
-    KOKKOS_INLINE_FUNCTION
-        void operator() (cold, const int& i) const;
+
 
     void printx();
     void printp();
@@ -40,20 +38,32 @@ public:
 class identical_particles : public particles_type {
 
 public:
+    struct cold {};
+    struct hot {};
     struct hbTag {};
     const std::string name = "identical_particles";
     double mass;
     double beta;
+    double sbeta;
     double sigma;
     double eps;
     double cutoff;
     // constructor
     identical_particles(YAML::Node doc, params_class params_to_copy);
+
+    void InitX() override;
     void hb()override;
     double compute_potential() override;
+    
+    KOKKOS_FUNCTION void operator() (cold, const int i) const;
+    KOKKOS_FUNCTION void operator() (hot, const int i) const;
+
+    KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
+    // functor to compute the potential
+    KOKKOS_FUNCTION void operator() ( const int i, double& V) const;
+
     ~identical_particles() {};
 };
-
 
 
 

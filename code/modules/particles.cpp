@@ -1,6 +1,5 @@
 #include "particles.hpp"
 
-
 #include <array>
 #include <cstdlib>
 #include <cstring>
@@ -13,8 +12,6 @@
 
 #include "global.hpp"
 #include "read_infile.hpp"
-#include "read_infile.hpp"
-
 
 particles_type::particles_type(YAML::Node doc, params_class params_to_copy) {
 
@@ -30,33 +27,39 @@ particles_type::particles_type(YAML::Node doc, params_class params_to_copy) {
     initHostMirror = false;
 }
 
-
-void particles_type::InitX() {
+void identical_particles::InitX() {
     x = Kokkos::View<double* [dim_space]>("x", N);
     p = Kokkos::View<double* [dim_space]>("p", N);
+
     if (params.StartCondition == "cold") {
-        // we define a cold setput when 
-        Kokkos::parallel_for("cold initialization", N, KOKKOS_LAMBDA(int i){
-
-            double N3 = pow(N, 1. / 3.);
-            int iz = (int)i / (N3 * N3);
-            int iy = (int)(i - iz * N3 * N3) / (N3);
-            int ix = (int)(i - iz * N3 * N3 - iy * N3);
-
-            x(i, 0) = params.L[0] * (ix / N3);
-            x(i, 1) = params.L[1] * (iy / N3);
-            x(i, 2) = params.L[2] * (iz / N3);
-        });
+        Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<cold>(0, N), *this);
     }
     if (params.StartCondition == "hot") {
-        Kokkos::parallel_for("hot initialization", N, KOKKOS_LAMBDA(int i){
-            gen_type rgen = rand_pool.get_state(i);
-            x(i, 0) = rgen.drand() * params.L[0];
-            x(i, 1) = rgen.drand() * params.L[1];
-            x(i, 2) = rgen.drand() * params.L[2];
-            rand_pool.free_state(rgen);
-        });
+        Kokkos::parallel_for("hot initialization", Kokkos::RangePolicy<hot>(0, N), *this);
     }
+    Kokkos::fence();
+    printf("particle initialized\n");
+};
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (cold, const int i) const {
+    double N3 = pow(N, 1. / 3.);
+    int iz = (int)i / (N3 * N3);
+    int iy = (int)(i - iz * N3 * N3) / (N3);
+    int ix = (int)(i - iz * N3 * N3 - iy * N3);
+
+    x(i, 0) = params.L[0] * (ix / N3);
+    x(i, 1) = params.L[1] * (iy / N3);
+    x(i, 2) = params.L[2] * (iz / N3);
+};
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (hot, const int i) const {
+    gen_type rgen = rand_pool.get_state(i);
+    x(i, 0) = rgen.drand() * params.L[0];
+    x(i, 1) = rgen.drand() * params.L[1];
+    x(i, 2) = rgen.drand() * params.L[2];
+    rand_pool.free_state(rgen);
 };
 
 void particles_type::printx() {
@@ -66,7 +69,7 @@ void particles_type::printx() {
         initHostMirror = true;
     }
     Kokkos::deep_copy(h_x, x);
-    for (int i = 0; i < N;i++)
+    for (int i = 0; i < N; i++)
         printf("particle(%d)=%-20.12g %-20.12g %-20.12g\n", i, h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 void particles_type::printp() {
@@ -76,17 +79,15 @@ void particles_type::printp() {
         initHostMirror = true;
     }
     Kokkos::deep_copy(h_p, p);
-    for (int i = 0; i < N;i++)
+    for (int i = 0; i < N; i++)
         printf("momentum(%d)=%-20.12g %-20.12g %-20.12g\n", i, h_p(i, 0), h_p(i, 1), h_p(i, 2));
 }
 
-
-
 // contructor
-identical_particles::identical_particles(YAML::Node doc, params_class params_to_copy) :
-    particles_type(doc, params_to_copy) {
+identical_particles::identical_particles(YAML::Node doc, params_class params_to_copy) : particles_type(doc, params_to_copy) {
     mass = check_and_assign_value<double>(doc, "mass");
     beta = check_and_assign_value<double>(doc, "beta");
+    sbeta=sqrt(beta);
     cutoff = check_and_assign_value<double>(doc, "cutoff");
     eps = check_and_assign_value<double>(doc, "eps");
     sigma = check_and_assign_value<double>(doc, "sigma");
@@ -94,35 +95,36 @@ identical_particles::identical_particles(YAML::Node doc, params_class params_to_
     std::cout << "name:" << name << std::endl;
     std::cout << "mass:" << mass << std::endl;
     std::cout << "beta:" << beta << std::endl;
-
 }
 
-
 void identical_particles::hb() {
-    double sbeta = sqrt(beta);
-    Kokkos::parallel_for("hb-identical_particles", N, KOKKOS_LAMBDA(const int& i){
-        gen_type rgen = rand_pool.get_state(i);
-        p(i, 0) = rgen.normal(0, mass / sbeta);// exp(- beta p^2/(2m^2))
-        p(i, 1) = rgen.normal(0, mass / sbeta);
-        p(i, 2) = rgen.normal(0, mass / sbeta);
-        rand_pool.free_state(rgen);
-    });
+    Kokkos::parallel_for("hot initialization", Kokkos::RangePolicy<hbTag>(0, N), *this);
+}
 
+KOKKOS_FUNCTION
+void identical_particles::operator() (hbTag, const int i) const {
+    gen_type rgen = rand_pool.get_state(i);
+    p(i, 0) = rgen.normal(0, mass / sbeta); // exp(- beta p^2/(2m^2))
+    p(i, 1) = rgen.normal(0, mass / sbeta);
+    p(i, 2) = rgen.normal(0, mass / sbeta);
+    rand_pool.free_state(rgen);
 }
 
 double identical_particles::compute_potential() {
     double result;
-    Kokkos::parallel_reduce("identical_particles-LJ-potential", N, KOKKOS_LAMBDA(const int& i, double& V){
-        for (int j = 0;j < N; j++) {
-            double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
-                     + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
-                     + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
-            r = sqrt(r);
-            if (r < cutoff && i != j) {
-                V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
-            }
-        }
-    }, result);
-
+    Kokkos::parallel_reduce("identical_particles-LJ-potential", N, *this, result);
     return result;
 }
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (const int i, double& V) const {
+    for (int j = 0; j < N; j++) {
+        double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
+            + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
+            + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
+        r = sqrt(r);
+        if (r < cutoff && i != j) {
+            V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
+        }
+    }
+};

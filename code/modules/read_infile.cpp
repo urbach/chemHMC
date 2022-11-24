@@ -17,16 +17,14 @@
 
 template<class T>
 T check_and_assign_value(YAML::Node doc, const char* tag) {
-    if (doc[tag]){
-        // std::cout<<doc[tag].as<T>()<< std::endl;
-        return doc[tag].as<T>();
-    }
-    else {
-        printf("tag: %s is not present in the input file\n", tag);
+    if (!doc[tag]){
+        printf("error: tag %s is not present in the input file\n", tag);
         std::cout << "infile structure:" << std::endl;
         std::cout << doc << std::endl;
         Kokkos::abort("params not found");
     }
+
+    return doc[tag].as<T>();
 }
 template double check_and_assign_value<double>(YAML::Node, const char*);
 template int check_and_assign_value<int>(YAML::Node, const char*);
