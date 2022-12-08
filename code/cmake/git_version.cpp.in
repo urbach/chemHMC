@@ -1,2 +1,2 @@
-#include "git_version.h"
+#include "git_version.hpp"
 const char *kGitHash = "@GIT_HASH@";
