@@ -118,13 +118,24 @@ double identical_particles::compute_potential() {
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (const int i, double& V) const {
-    for (int j = 0; j < N; j++) {
-        double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
-            + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
-            + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
+   // for (int j = 0; j < N; j++) {
+      //  double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
+      //      + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
+      //      + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
+      
+    for (int j = 0; j < N; j++){   //loop over all distinict pairs i,j
+     
+     double rij    //relative position of i to j 
+     rij = 0;
+
+       for(k=0; k<3; k++){      //component-by-component position of i relative to j
+         rij[k]=r[i][k] - r[j][k];
+         sqrt(r) = rij[k] * rij[k];
+       }
+    } 
         r = sqrt(r);
         if (r < cutoff && i != j) {
-            V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
+            V += 4 * eps * (pow(sigma / rij, 12) - pow(sigma / rij, 6));
         }
     }
 };

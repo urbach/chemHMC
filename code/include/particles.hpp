@@ -61,6 +61,7 @@ public:
     KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     // functor to compute the potential
     KOKKOS_FUNCTION void operator() ( const int i, double& V) const;
+    KOKKOS_FUNCTION void operator() ( const int j, int k, double& rij) const;
 
     ~identical_particles() {};
 };
