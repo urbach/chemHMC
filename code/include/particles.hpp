@@ -15,6 +15,7 @@ public:
     params_class params;
     Kokkos::View<double* [dim_space]>  x;
     Kokkos::View<double* [dim_space]>  p;
+    Kokkos::View<double* [dim_space]>  f;
     bool initHostMirror;
     Kokkos::View<double* [dim_space]>::HostMirror h_x;
     Kokkos::View<double* [dim_space]>::HostMirror h_p;
@@ -32,15 +33,17 @@ public:
 
     virtual void hb() = 0;
     virtual double compute_potential() = 0;
-
+    virtual void compute_force() = 0;
 };
 
-class identical_particles : public particles_type {
+class identical_particles: public particles_type {
 
 public:
     struct cold {};
     struct hot {};
     struct hbTag {};
+    struct potential {};
+    struct force {};
     const std::string name = "identical_particles";
     double mass;
     double beta;
@@ -54,14 +57,17 @@ public:
     void InitX() override;
     void hb()override;
     double compute_potential() override;
-    
+    void compute_force() override;  //declaration of the function
+
     KOKKOS_FUNCTION void operator() (cold, const int i) const;
     KOKKOS_FUNCTION void operator() (hot, const int i) const;
 
     KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     // functor to compute the potential
-    KOKKOS_FUNCTION void operator() ( const int i, double& V) const;
+    KOKKOS_FUNCTION void operator() (potential, const int i, double& V) const;
 
+    // functor to compute the forces
+    KOKKOS_FUNCTION void operator() (force, const int i) const; //declaration of functor
     ~identical_particles() {};
 };
 

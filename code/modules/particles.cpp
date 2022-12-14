@@ -112,16 +112,17 @@ void identical_particles::operator() (hbTag, const int i) const {
 
 double identical_particles::compute_potential() {
     double result;
-    Kokkos::parallel_reduce("identical_particles-LJ-potential", N, *this, result);
+    Kokkos::parallel_reduce("identical_particles-LJ-potential", Kokkos::RangePolicy<potential>(0, N), *this, result);
+
     return result;
 }
 
+
+
 KOKKOS_FUNCTION
-void identical_particles::operator() (const int i, double& V) const {
-    // for (int j = 0; j < N; j++) {
-       //  double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
-       //      + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
-       //      + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
+void identical_particles::operator() (potential, const int i, double& V) const {
+
+
     for (int bx = -1; bx < 2; bx++) {
         for (int by = -1; by < 2; by++) {
             for (int bz = -1; bz < 2; bz++) {
@@ -138,7 +139,7 @@ void identical_particles::operator() (const int i, double& V) const {
                     //printf("%g\n",rij);
 
                     r = sqrt(r);
-                    if (r < cutoff && !( i == j && bx==0 && by==0 && bz==0)) {
+                    if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
                         V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
                     }
                 }
@@ -147,3 +148,41 @@ void identical_particles::operator() (const int i, double& V) const {
     }
 
 };
+
+
+
+void identical_particles::compute_force() {
+    Kokkos::parallel_for("identical_particles-LJ-force", Kokkos::RangePolicy<force>(0, N), *this);
+}
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (force, const int i) const {
+
+    for (int bx = -1; bx < 2; bx++) {
+        for (int by = -1; by < 2; by++) {
+            for (int bz = -1; bz < 2; bz++) {
+                for (int j = 0; j < N; j++) {   //loop over all distinict pairs i,j
+
+                    double r = 0;
+
+                    double  rij = x(i, 0) - (x(j, 0) + bx);
+                    r = r + rij * rij;
+                    rij = x(i, 1) - (x(j, 1) + by);
+                    r = r + rij * rij;
+                    rij = x(i, 2) - (x(j, 2) + bz);
+                    r = r + rij * rij;
+                    //printf("%g\n",rij);
+
+                    r = sqrt(r);
+                    if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
+                        f(i, 0) += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
+                        f(i, 1) += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
+                        f(i, 2) += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
+                    }
+                }
+            }
+        }
+    }
+
+
+}
