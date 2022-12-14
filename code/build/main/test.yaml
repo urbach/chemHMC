@@ -11,7 +11,7 @@ particles:
   N: 8
   mass: 0.1
   beta: 0.5
-  cutoff: 1
+  cutoff: 0.5
   eps: 0.1
   sigma: 0.1
 

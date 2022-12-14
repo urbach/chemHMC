@@ -84,10 +84,10 @@ void particles_type::printp() {
 }
 
 // contructor
-identical_particles::identical_particles(YAML::Node doc, params_class params_to_copy) : particles_type(doc, params_to_copy) {
+identical_particles::identical_particles(YAML::Node doc, params_class params_to_copy): particles_type(doc, params_to_copy) {
     mass = check_and_assign_value<double>(doc, "mass");
     beta = check_and_assign_value<double>(doc, "beta");
-    sbeta=sqrt(beta);
+    sbeta = sqrt(beta);
     cutoff = check_and_assign_value<double>(doc, "cutoff");
     eps = check_and_assign_value<double>(doc, "eps");
     sigma = check_and_assign_value<double>(doc, "sigma");
@@ -118,24 +118,32 @@ double identical_particles::compute_potential() {
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (const int i, double& V) const {
-   // for (int j = 0; j < N; j++) {
-      //  double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
-      //      + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
-      //      + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
-      
-    for (int j = 0; j < N; j++){   //loop over all distinict pairs i,j
-     
-     double rij    //relative position of i to j 
-     rij = 0;
+    // for (int j = 0; j < N; j++) {
+       //  double r = (x(i, 0) - x(j, 0)) * (x(i, 0) - x(j, 0))
+       //      + (x(i, 1) - x(j, 1)) * (x(i, 1) - x(j, 1))
+       //      + (x(i, 2) - x(j, 2)) * (x(i, 2) - x(j, 2));
+    for (int bx = -1; bx < 2; bx++) {
+        for (int by = -1; by < 2; by++) {
+            for (int bz = -1; bz < 2; bz++) {
+                for (int j = 0; j < N; j++) {   //loop over all distinict pairs i,j
 
-       for(k=0; k<3; k++){      //component-by-component position of i relative to j
-         rij[k]=r[i][k] - r[j][k];
-         sqrt(r) = rij[k] * rij[k];
-       }
-    } 
-        r = sqrt(r);
-        if (r < cutoff && i != j) {
-            V += 4 * eps * (pow(sigma / rij, 12) - pow(sigma / rij, 6));
+                    double r = 0;
+
+                    double  rij = x(i, 0) - (x(j, 0) + bx);
+                    r = r + rij * rij;
+                    rij = x(i, 1) - (x(j, 1) + by);
+                    r = r + rij * rij;
+                    rij = x(i, 2) - (x(j, 2) + bz);
+                    r = r + rij * rij;
+                    //printf("%g\n",rij);
+
+                    r = sqrt(r);
+                    if (r < cutoff && !( i == j && bx==0 && by==0 && bz==0)) {
+                        V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
+                    }
+                }
+            }
         }
     }
+
 };
