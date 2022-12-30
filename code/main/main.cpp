@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
         HMC_class HMC;
         HMC.init(argc, argv);
         
-        HMC.particles->printx();
+        HMC.integrator->particles->printx();
 
         HMC.run();
 

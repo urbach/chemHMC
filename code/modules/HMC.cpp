@@ -1,25 +1,30 @@
 #include "HMC.hpp"
+#include "read_infile.hpp"
 
 void HMC_class::init(int argc, char** argv) {
-    params = new params_class();
-    YAML::Node doc = params->read_params(argc, argv);
 
-    if (doc["particles"]["name"].as<std::string>() == "identical_particles")
-        particles = new identical_particles(doc["particles"], *params);
-    else {
-        printf("no valid name for particles: ");
-        std::cout << doc["particles"].as<std::string>() << std::endl;
-        exit(1);
+    YAML::Node doc = read_params(argc, argv);
+
+    if (doc["integrator"]) {
+        std::string name = check_and_assign_value<std::string>(doc["integrator"], "name");
+        if (name == "LEAP")
+            integrator = new LEAP(doc);
+        else {
+            printf("no valid integrator name: ");
+            std::cout << doc["integrator"].as<std::string>() << std::endl;
+            exit(1);
+        }
     }
-    
-    particles->InitX();
-    
+    else {
+        Kokkos::abort("no itegrator in input file");
+    }
+
 }
 
 void HMC_class::run() {
-    particles->hb();
-    particles->printp();
+    integrator->particles->hb();
+    integrator->particles->printp();
 
-    double V=particles->compute_potential();
-    printf("the potential is: %f\n",V);
+    double V = integrator->particles->compute_potential();
+    printf("the potential is: %f\n", V);
 }

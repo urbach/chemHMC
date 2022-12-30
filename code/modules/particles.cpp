@@ -13,12 +13,14 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 
-particles_type::particles_type(YAML::Node doc, params_class params_to_copy) {
+particles_type::particles_type(YAML::Node doc): params(doc) {
 
-    N = check_and_assign_value<int>(doc, "N");
+
+    N = check_and_assign_value<int>(doc["particles"], "N");
 
     std::cout << "constructor particles_type" << std::endl;
-    params = params_to_copy;
+
+
     rand_pool.init(params.seed, N);
     std::cout << "random pool initialised" << std::endl;
 
@@ -28,8 +30,8 @@ particles_type::particles_type(YAML::Node doc, params_class params_to_copy) {
 }
 
 void identical_particles::InitX() {
-    x = Kokkos::View<double* [dim_space]>("x", N);
-    p = Kokkos::View<double* [dim_space]>("p", N);
+    x = type_x("x", N);
+    p = type_p("p", N);
 
     if (params.StartCondition == "cold") {
         Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<cold>(0, N), *this);
@@ -84,13 +86,13 @@ void particles_type::printp() {
 }
 
 // contructor
-identical_particles::identical_particles(YAML::Node doc, params_class params_to_copy): particles_type(doc, params_to_copy) {
-    mass = check_and_assign_value<double>(doc, "mass");
-    beta = check_and_assign_value<double>(doc, "beta");
+identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
+    mass = check_and_assign_value<double>(doc["particles"], "mass");
+    beta = check_and_assign_value<double>(doc["particles"], "beta");
     sbeta = sqrt(beta);
-    cutoff = check_and_assign_value<double>(doc, "cutoff");
-    eps = check_and_assign_value<double>(doc, "eps");
-    sigma = check_and_assign_value<double>(doc, "sigma");
+    cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
+    eps = check_and_assign_value<double>(doc["particles"], "eps");
+    sigma = check_and_assign_value<double>(doc["particles"], "sigma");
     std::cout << "partilces_type:" << std::endl;
     std::cout << "name:" << name << std::endl;
     std::cout << "mass:" << mass << std::endl;

@@ -67,6 +67,7 @@ macro(add_target_with_lib TARGETNAME)
   target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
   target_link_libraries(${TARGETNAME} PUBLIC read_infile)
   target_link_libraries(${TARGETNAME} PUBLIC particles)
+  target_link_libraries(${TARGETNAME} PUBLIC integrator)
   target_link_libraries(${TARGETNAME} PUBLIC HMC)
   #target_link_libraries(${TARGETNAME} PUBLIC extra_library)
   

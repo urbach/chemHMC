@@ -13,20 +13,18 @@ public:
     int N;
 
     params_class params;
-    Kokkos::View<double* [dim_space]>  x;
-    Kokkos::View<double* [dim_space]>  p;
-    Kokkos::View<double* [dim_space]>  f;
+    type_x  x;
+    type_p  p;
+    type_f  f;
     bool initHostMirror;
-    Kokkos::View<double* [dim_space]>::HostMirror h_x;
-    Kokkos::View<double* [dim_space]>::HostMirror h_p;
+    type_x::HostMirror h_x;
+    type_p::HostMirror h_p;
 
     RandPoolType rand_pool;
     // constructor
-    particles_type(YAML::Node doc, params_class params_to_copy);
+    particles_type(YAML::Node doc);
 
     virtual void InitX() = 0;
-
-
 
     void printx();
     void printp();
@@ -52,7 +50,7 @@ public:
     double eps;
     double cutoff;
     // constructor
-    identical_particles(YAML::Node doc, params_class params_to_copy);
+    identical_particles(YAML::Node doc);
 
     void InitX() override;
     void hb()override;

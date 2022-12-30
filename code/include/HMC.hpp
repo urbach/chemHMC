@@ -2,15 +2,15 @@
 #define HMC_H
 #include "read_infile.hpp"
 #include "particles.hpp"
+#include "integrator.hpp"
 
 class HMC_class {
 public:
-    params_class *params;
-    particles_type *particles;
+    integrator_type *integrator;
 
     HMC_class(){};
 
-    void init(int argc,char** argv);
+    void init(int argc, char** argv);
        
     void run();
 

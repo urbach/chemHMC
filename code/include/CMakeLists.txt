@@ -27,3 +27,14 @@ add_library(
 
 target_link_libraries(HMC PUBLIC ${YAML_CPP_LIBRARIES} read_infile Kokkos::kokkos)
 target_include_directories(HMC PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+
+
+
+add_library(
+    integrator STATIC
+    integrator.hpp
+    ../modules/integrator.cpp
+) 
+
+target_link_libraries(integrator PUBLIC ${YAML_CPP_LIBRARIES} read_infile Kokkos::kokkos)
+target_include_directories(integrator PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
