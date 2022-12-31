@@ -19,12 +19,24 @@ void HMC_class::init(int argc, char** argv) {
         Kokkos::abort("no itegrator in input file");
     }
 
+    Ntrajectories= check_and_assign_value<int>(doc, "Ntrajectories");
+    std::cout << "Ntrajectories:" << Ntrajectories << std::endl;
 }
 
 void HMC_class::run() {
-    integrator->particles->hb();
+    
+    integrator->particles->printx();
     integrator->particles->printp();
-
     double V = integrator->particles->compute_potential();
+    printf("the potential is: %f\n", V);
+    Kokkos::fence();
+    for (int i =0 ; i< Ntrajectories; i++){
+        integrator->particles->hb();
+        integrator->integrate();
+    }
+    Kokkos::fence();
+    integrator->particles->printx();
+    integrator->particles->printp();
+    V = integrator->particles->compute_potential();
     printf("the potential is: %f\n", V);
 }

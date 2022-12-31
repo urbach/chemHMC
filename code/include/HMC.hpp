@@ -7,6 +7,7 @@
 class HMC_class {
 public:
     integrator_type *integrator;
+    int Ntrajectories;
 
     HMC_class(){};
 

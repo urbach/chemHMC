@@ -1,5 +1,6 @@
 StartCondition: hot
 seed: 123
+Ntrajectories: 1
 
 geometry: 
   Lx: 1
@@ -17,4 +18,6 @@ particles:
 
 integrator:
   name: LEAP
+  dt: 0.1
+  steps: 5
 

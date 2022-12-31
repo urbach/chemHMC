@@ -20,7 +20,6 @@ particles_type::particles_type(YAML::Node doc): params(doc) {
 
     std::cout << "constructor particles_type" << std::endl;
 
-
     rand_pool.init(params.seed, N);
     std::cout << "random pool initialised" << std::endl;
 
@@ -32,6 +31,7 @@ particles_type::particles_type(YAML::Node doc): params(doc) {
 void identical_particles::InitX() {
     x = type_x("x", N);
     p = type_p("p", N);
+    f = type_f("f", N);
 
     if (params.StartCondition == "cold") {
         Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<cold>(0, N), *this);
@@ -100,7 +100,7 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
 }
 
 void identical_particles::hb() {
-    Kokkos::parallel_for("hot initialization", Kokkos::RangePolicy<hbTag>(0, N), *this);
+    Kokkos::parallel_for("hb_momenta", Kokkos::RangePolicy<hbTag>(0, N), *this);
 }
 
 KOKKOS_FUNCTION

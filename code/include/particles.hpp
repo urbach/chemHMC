@@ -13,6 +13,12 @@ public:
     int N;
 
     params_class params;
+    double mass;
+    double beta;
+    double sbeta;
+    double sigma;
+    double eps;
+    double cutoff;
     type_x  x;
     type_p  p;
     type_f  f;
@@ -43,12 +49,7 @@ public:
     struct potential {};
     struct force {};
     const std::string name = "identical_particles";
-    double mass;
-    double beta;
-    double sbeta;
-    double sigma;
-    double eps;
-    double cutoff;
+    
     // constructor
     identical_particles(YAML::Node doc);
 
