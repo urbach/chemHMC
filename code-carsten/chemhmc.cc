@@ -22,7 +22,8 @@ int main(int ac, char* av[]) {
   size_t exponent;
   double tau;
   size_t integs;
-
+  unsigned int N = 10;
+  
   cout << "## chemHMC" << endl;
   cout << "## (C) Carsten Urbach <urbach@hiskp.uni-bonn.de> (2023)" << endl;
   cout << "## GIT branch " << GIT_BRANCH << " on commit " << GIT_COMMIT_HASH << endl << endl;  
@@ -43,7 +44,7 @@ int main(int ac, char* av[]) {
   //    return err;
   //  }
 
-  config<coordinate> U(10, 3);
+  config<coordinate> U(N, 3);
   if(gparams.restart*0) {
     int err = U.load(gparams.configfilename);
     if(err != 0) {
@@ -53,10 +54,14 @@ int main(int ac, char* av[]) {
   else{
     hotstart(U, gparams.seed);
   }
-
+  config<coordinate> momenta(N, 3);
+  
   double E = potential_energy(U);
 
   std::cout << "Energy is " << E << std::endl;
-  
+
+  for(size_t i = 0; i < N; i++) {
+    std::cout << i << ' ' << U[i][0] << std::endl;
+  }
   return(0);
 }
