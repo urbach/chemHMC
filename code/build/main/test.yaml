@@ -1,0 +1,23 @@
+StartCondition: hot
+seed: 123
+Ntrajectories: 1
+
+geometry: 
+  Lx: 1
+  Ly: 1
+  Lz: 1
+
+particles:
+  name: identical_particles
+  N: 8
+  mass: 0.1
+  beta: 0.5
+  cutoff: 0.5
+  eps: 0.1
+  sigma: 0.1
+
+integrator:
+  name: LEAP
+  dt: 0.1
+  steps: 5
+
