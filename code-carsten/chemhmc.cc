@@ -1,4 +1,5 @@
 #include"config.hh"
+#include"potential_energy.hh"
 #include"coordinate.hh"
 #include"parse_commandline.hh"
 #include"version.hh"
@@ -43,14 +44,19 @@ int main(int ac, char* av[]) {
   //  }
 
   config<coordinate> U(10, 3);
-  if(gparams.restart) {
+  if(gparams.restart*0) {
     int err = U.load(gparams.configfilename);
     if(err != 0) {
       return err;
     }
   }
+  else{
+    hotstart(U, gparams.seed);
+  }
 
+  double E = potential_energy(U);
 
-
+  std::cout << "Energy is " << E << std::endl;
+  
   return(0);
 }

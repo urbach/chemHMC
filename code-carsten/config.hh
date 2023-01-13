@@ -1,7 +1,7 @@
 #pragma once
 
 
-//#include"random_element.hh"
+#include"random_element.hh"
 #include<random>
 #include<vector>
 #include<cmath>
@@ -48,19 +48,19 @@ public:
       data[i] = U[i];
     }
   }
-
+  
   //  value_type &operator()(size_t const index) {
   //    return data[ index ];
   //  }
-
+  
   //  const value_type &operator()(size_t const index) {
   //    return data[ index ];
   //  }
-
+  
   value_type &operator[](size_t const index) {
     return data[ index ];
   }
-
+  
   const value_type &operator[](size_t const index) const {
     return data[index];
   }

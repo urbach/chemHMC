@@ -1,6 +1,6 @@
 #pragma once
 
-#include<math>
+#include<cmath>
 
 inline double LennardJones(const double r, const int n=12,
                            const double a=1, const double b=1) {
