@@ -40,6 +40,8 @@ public:
     virtual void compute_force() = 0;
     virtual void compute_coeff_momenta() = 0;
     virtual void compute_coeff_position() = 0;
+    virtual void update_momenta(const double dt_) = 0;
+    virtual void update_positions(const double dt_) = 0;
 };
 
 class identical_particles: public particles_type {
@@ -84,6 +86,8 @@ public:
 
     void compute_coeff_momenta() override;
     void compute_coeff_position() override;
+     void update_momenta(const double dt_) override ;
+    void update_positions(const double dt_) override;
 };
 
 

@@ -14,13 +14,11 @@ public:
     particles_type* particles;
     int steps;
     double dt;
-    int N;
 
     integrator_type() {};
     integrator_type(YAML::Node doc);
     virtual void integrate() = 0;
-    virtual void update_momenta(const double dt_) = 0;
-    virtual void update_positions(const double dt_) = 0;
+    
 };
 
 
@@ -30,8 +28,7 @@ public:
     LEAP() {};
     LEAP(YAML::Node doc);
     void integrate() override;
-    void update_momenta(const double dt_) override ;
-    void update_positions(const double dt_) override;
+   
 };
 
 class OMF2: public integrator_type {
@@ -42,8 +39,7 @@ public:
     OMF2() = delete;
     OMF2(YAML::Node doc);
     void integrate() override;
-    void update_momenta(const double dt_) override ;
-    void update_positions(const double dt_) override;
+
 };
 
 #endif

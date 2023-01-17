@@ -28,6 +28,23 @@ particles_type::particles_type(YAML::Node doc): params(doc) {
     initHostMirror = false;
 }
 
+// contructor
+identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
+    mass = check_and_assign_value<double>(doc["particles"], "mass");
+    beta = check_and_assign_value<double>(doc["particles"], "beta");
+    sbeta = sqrt(beta);
+    cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
+    eps = check_and_assign_value<double>(doc["particles"], "eps");
+    sigma = check_and_assign_value<double>(doc["particles"], "sigma");
+    std::cout << "partilces_type:" << std::endl;
+    std::cout << "name:" << name << std::endl;
+    std::cout << "mass:" << mass << std::endl;
+    std::cout << "beta:" << beta << std::endl;
+    compute_coeff_momenta();
+    compute_coeff_position();
+}
+
+
 void identical_particles::InitX() {
     x = type_x("x", N);
     x_old = type_x("x_old", N);
@@ -37,8 +54,11 @@ void identical_particles::InitX() {
     if (params.StartCondition == "cold") {
         Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<cold>(0, N), *this);
     }
-    if (params.StartCondition == "hot") {
+    else if (params.StartCondition == "hot") {
         Kokkos::parallel_for("hot initialization", Kokkos::RangePolicy<hot>(0, N), *this);
+    }
+    else {
+        Kokkos::abort("StartCondition not implemented");
     }
     Kokkos::fence();
     printf("particle initialized\n");
@@ -86,21 +106,6 @@ void particles_type::printp() {
         printf("momentum(%d)=%-20.12g %-20.12g %-20.12g\n", i, h_p(i, 0), h_p(i, 1), h_p(i, 2));
 }
 
-// contructor
-identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
-    mass = check_and_assign_value<double>(doc["particles"], "mass");
-    beta = check_and_assign_value<double>(doc["particles"], "beta");
-    sbeta = sqrt(beta);
-    cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
-    eps = check_and_assign_value<double>(doc["particles"], "eps");
-    sigma = check_and_assign_value<double>(doc["particles"], "sigma");
-    std::cout << "partilces_type:" << std::endl;
-    std::cout << "name:" << name << std::endl;
-    std::cout << "mass:" << mass << std::endl;
-    std::cout << "beta:" << beta << std::endl;
-    compute_coeff_momenta();
-    compute_coeff_position();
-}
 
 void identical_particles::hb() {
     Kokkos::parallel_for("hb_momenta", Kokkos::RangePolicy<hbTag>(0, N), *this);
@@ -213,4 +218,46 @@ void identical_particles::compute_coeff_momenta() {
 
 void identical_particles::compute_coeff_position() {
     coeff_x = -beta / (mass * mass);
+}
+
+
+class functor_update_pos {
+public:
+    const double dt;
+    const double c;
+    type_x x;
+    type_const_p p;
+    functor_update_pos(double dt_, double c, type_x& x_, type_p& p_): dt(dt_), c(c), x(x_), p(p_) {};
+
+    KOKKOS_FUNCTION
+        void operator() (const int i) const {
+            for(int dir=0; dir<3;dir++){
+                x(i,  dir) += dt * c * p(i, 0);
+                // apply boundary condition
+                x(i,  dir) -=  floor(x(i, dir));
+            }
+    };
+};
+void  identical_particles::update_positions(const double dt_) {
+    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, coeff_x, x, p));
+}
+
+
+class functor_update_momenta {
+public:
+    const double dt;
+    type_p p;
+    type_const_f f;
+    functor_update_momenta(double dt_, type_p& p_, type_f& f_): dt(dt_), p(p_), f(f_) {};
+
+    KOKKOS_FUNCTION
+        void operator() (const int i) const {
+        p(i, 0) -= dt * f(i, 0);
+        p(i, 1) -= dt * f(i, 1);
+        p(i, 2) -= dt * f(i, 2);
+    };
+};
+void identical_particles::update_momenta(const double dt_) {
+    compute_force();
+    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, p, f));
 }
