@@ -30,6 +30,7 @@ particles_type::particles_type(YAML::Node doc): params(doc) {
 
 void identical_particles::InitX() {
     x = type_x("x", N);
+    x_old = type_x("x_old", N);
     p = type_p("p", N);
     f = type_f("f", N);
 
@@ -115,7 +116,7 @@ void identical_particles::operator() (hbTag, const int i) const {
 }
 
 double identical_particles::compute_potential() {
-    double result=0;
+    double result = 0;
     Kokkos::parallel_reduce("identical_particles-LJ-potential", Kokkos::RangePolicy<potential>(0, N), *this, result);
     return result;
 }
@@ -153,14 +154,14 @@ void identical_particles::operator() (potential, const int i, double& V) const {
 };
 
 double identical_particles::compute_kinetic_E() {
-    double K=0;
+    double K = 0;
     Kokkos::parallel_reduce("identical-particles-LJ-kinetic-E", Kokkos::RangePolicy<kinetic>(0, N), *this, K);
     return K;
 }
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (kinetic, const int i, double& K) const {
-    K += - (beta/(2 *mass*mass))* (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2));
+    K += -(beta / (2 * mass * mass)) * (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2));
 };
 
 
@@ -173,6 +174,9 @@ void identical_particles::compute_force() {
 KOKKOS_FUNCTION
 void identical_particles::operator() (force, const int i) const {
 
+    f(i, 0) = 0;
+    f(i, 1) = 0;
+    f(i, 2) = 0;
     for (int bx = -1; bx < 2; bx++) {
         for (int by = -1; by < 2; by++) {
             for (int bz = -1; bz < 2; bz++) {

@@ -64,10 +64,11 @@ public:
 
     KOKKOS_FUNCTION
         void operator() (const int i) const {
-        x(i, 0) += dt * c * p(i, 0);
-        x(i, 1) += dt * c * p(i, 1);
-        x(i, 2) += dt * c * p(i, 2);
-        printf("c=%g   dt=%g   p=%g  %g  %g\n", c, dt, p(i, 0), p(i, 1), p(i, 2));
+            for(int dir=0; dir<3;dir++){
+                x(i,  dir) += dt * c * p(i, 0);
+                // apply boundary condition
+                x(i,  dir) -=  floor(x(i, dir));
+            }
     };
 };
 void  LEAP::update_positions(const double dt_) {

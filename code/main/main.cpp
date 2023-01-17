@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
         
         HMC.run();
 
-
+        printf("acceptace = %f \n", HMC.acceptance / ((double)HMC.Ntrajectories));
         printf("total kokkos time = %f s\n", timer.seconds());
     }
     Kokkos::finalize();

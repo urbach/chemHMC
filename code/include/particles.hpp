@@ -6,7 +6,7 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 
-class particles_type { // Just the thing that holds all variables
+class particles_type { 
 
 public:
 
@@ -16,6 +16,7 @@ public:
     double coeff_x;
 
     type_x  x;
+    type_x  x_old;
     type_p  p;
     type_f  f;
     bool initHostMirror;
