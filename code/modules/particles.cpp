@@ -97,6 +97,8 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
     std::cout << "name:" << name << std::endl;
     std::cout << "mass:" << mass << std::endl;
     std::cout << "beta:" << beta << std::endl;
+    compute_coeff_momenta();
+    compute_coeff_position();
 }
 
 void identical_particles::hb() {
@@ -113,9 +115,8 @@ void identical_particles::operator() (hbTag, const int i) const {
 }
 
 double identical_particles::compute_potential() {
-    double result;
+    double result=0;
     Kokkos::parallel_reduce("identical_particles-LJ-potential", Kokkos::RangePolicy<potential>(0, N), *this, result);
-
     return result;
 }
 
@@ -150,6 +151,18 @@ void identical_particles::operator() (potential, const int i, double& V) const {
     }
 
 };
+
+double identical_particles::compute_kinetic_E() {
+    double K=0;
+    Kokkos::parallel_reduce("identical-particles-LJ-kinetic-E", Kokkos::RangePolicy<kinetic>(0, N), *this, K);
+    return K;
+}
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (kinetic, const int i, double& K) const {
+    K += - (beta/(2 *mass*mass))* (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2));
+};
+
 
 
 
@@ -187,4 +200,13 @@ void identical_particles::operator() (force, const int i) const {
     }
 
 
+}
+
+
+void identical_particles::compute_coeff_momenta() {
+    coeff_p = 1;
+}
+
+void identical_particles::compute_coeff_position() {
+    coeff_x = -beta / (mass * mass);
 }

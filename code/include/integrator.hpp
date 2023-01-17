@@ -33,4 +33,17 @@ public:
     void update_momenta(const double dt_) override ;
     void update_positions(const double dt_) override;
 };
+
+class OMF2: public integrator_type {
+
+public:
+    const double lambda;
+    const double oneminus2lambda ;
+    OMF2() = delete;
+    OMF2(YAML::Node doc);
+    void integrate() override;
+    void update_momenta(const double dt_) override ;
+    void update_positions(const double dt_) override;
+};
+
 #endif

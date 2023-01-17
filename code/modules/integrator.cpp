@@ -67,17 +67,60 @@ public:
         x(i, 0) += dt * c * p(i, 0);
         x(i, 1) += dt * c * p(i, 1);
         x(i, 2) += dt * c * p(i, 2);
-        printf("c=%g   dt=%g   p=%g  %g  %g\n",c, dt, p(i, 0), p(i, 1), p(i, 2));
+        printf("c=%g   dt=%g   p=%g  %g  %g\n", c, dt, p(i, 0), p(i, 1), p(i, 2));
     };
 };
 void  LEAP::update_positions(const double dt_) {
-    double c = -particles->beta / (particles->mass * particles->mass);
-    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, c, particles->x, particles->p));
+    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, particles->coeff_x, particles->x, particles->p));
 }
 
 
 void LEAP::integrate() {
-    update_momenta(dt / 2);
+
+    // initial half-step for the  momenta
+    update_momenta(dt / 2.);
+    // first full step for the position
     update_positions(dt);
-    update_momenta(dt / 2);
+    // nsteps-1 full steps
+    for (size_t i = 0; i < steps - 1; i++) {
+        update_momenta(dt);
+        update_positions(dt);
+    }
+    // final half-step for the momenta
+    update_momenta(dt / 2.);
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// OMF2
+//////////////////////////////////////////////////////////////////////////////
+OMF2::OMF2(YAML::Node doc): integrator_type(doc), lambda(0.1938), oneminus2lambda(1. - 2. * lambda) {
+}
+
+void OMF2::update_momenta(const double dt_) {
+    particles->compute_force();
+    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, particles->p, particles->f));
+}
+void  OMF2::update_positions(const double dt_) {
+    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, particles->coeff_x, particles->x, particles->p));
+}
+
+
+void OMF2::integrate() {
+
+    // initial half-step for the  momenta
+    update_momenta(lambda * dt);
+
+    // nsteps-1 full steps
+    for (size_t i = 0; i < steps - 1; i++) {
+        update_positions(dt / 2.);
+        update_momenta(oneminus2lambda * dt);
+        update_positions(dt / 2.);
+        update_momenta(2. * lambda * dt);
+    }
+    // final step
+    update_positions(dt / 2.);
+    update_momenta(oneminus2lambda * dt);
+    update_positions(dt / 2.);
+    update_momenta( lambda * dt);
 }

@@ -12,19 +12,17 @@ public:
 
     int N;
 
-    params_class params;
-    double mass;
-    double beta;
-    double sbeta;
-    double sigma;
-    double eps;
-    double cutoff;
+    double coeff_p;
+    double coeff_x;
+
     type_x  x;
     type_p  p;
     type_f  f;
     bool initHostMirror;
     type_x::HostMirror h_x;
     type_p::HostMirror h_p;
+
+    params_class params;
 
     RandPoolType rand_pool;
     // constructor
@@ -37,7 +35,10 @@ public:
 
     virtual void hb() = 0;
     virtual double compute_potential() = 0;
+    virtual double compute_kinetic_E() = 0;
     virtual void compute_force() = 0;
+    virtual void compute_coeff_momenta() = 0;
+    virtual void compute_coeff_position() = 0;
 };
 
 class identical_particles: public particles_type {
@@ -47,7 +48,14 @@ public:
     struct hot {};
     struct hbTag {};
     struct potential {};
+    struct kinetic {};
     struct force {};
+    double mass;
+    double beta;
+    double sbeta;
+    double sigma;
+    double eps;
+    double cutoff;
     const std::string name = "identical_particles";
     
     // constructor
@@ -56,6 +64,7 @@ public:
     void InitX() override;
     void hb()override;
     double compute_potential() override;
+    double compute_kinetic_E() override;
     void compute_force() override;  //declaration of the function
 
     KOKKOS_FUNCTION void operator() (cold, const int i) const;
@@ -64,10 +73,16 @@ public:
     KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     // functor to compute the potential
     KOKKOS_FUNCTION void operator() (potential, const int i, double& V) const;
+    // functor to compute the kinetic energy
+    KOKKOS_FUNCTION void operator() (kinetic, const int i, double& K) const;
+
 
     // functor to compute the forces
     KOKKOS_FUNCTION void operator() (force, const int i) const; //declaration of functor
     ~identical_particles() {};
+
+    void compute_coeff_momenta() override;
+    void compute_coeff_position() override;
 };
 
 
