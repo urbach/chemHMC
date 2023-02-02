@@ -39,7 +39,7 @@ void HMC_class::run() {
 #endif // DEBUG
 
         // copy the configuration before the MD
-        Kokkos::deep_copy(integrator->particles->x_old, integrator->particles->x);
+        Kokkos::deep_copy(integrator->particles->x_old, integrator->particles->x);// x_old=x;
         integrator->particles->hb();
 #ifdef DEBUG
         integrator->particles->printx();
@@ -49,7 +49,7 @@ void HMC_class::run() {
 
         // accept/reject
         double Vf = integrator->particles->compute_potential();
-        double r = (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));
+        double r = (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));// random number from 0 to 1
 #ifdef DEBUG
         printf("the potential after the MD evolution is: %f\n", Vf);
 #endif //DEBUG

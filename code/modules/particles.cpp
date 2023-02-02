@@ -239,7 +239,7 @@ public:
     };
 };
 void  identical_particles::update_positions(const double dt_) {
-    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, coeff_x, x, p));
+    Kokkos::parallel_for("update_position", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, coeff_x, x, p));
 }
 
 

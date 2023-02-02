@@ -15,7 +15,7 @@ public:
     int steps;
     double dt;
 
-    integrator_type() {};
+    integrator_type() = delete;
     integrator_type(YAML::Node doc);
     virtual void integrate() = 0;
     
@@ -25,7 +25,7 @@ public:
 class LEAP: public integrator_type {
 
 public:
-    LEAP() {};
+    LEAP() = delete;
     LEAP(YAML::Node doc);
     void integrate() override;
    

@@ -55,7 +55,7 @@ public:
     struct force {};
     double mass;
     double beta;
-    double sbeta;
+    double sbeta;// sqrt(beta)
     double sigma;
     double eps;
     double cutoff;
@@ -65,7 +65,7 @@ public:
     identical_particles(YAML::Node doc);
 
     void InitX() override;
-    void hb()override;
+    void hb() override; // heatbath for the momenta
     double compute_potential() override;
     double compute_kinetic_E() override;
     void compute_force() override;  //declaration of the function
@@ -86,7 +86,7 @@ public:
 
     void compute_coeff_momenta() override;
     void compute_coeff_position() override;
-     void update_momenta(const double dt_) override ;
+    void update_momenta(const double dt_) override ;
     void update_positions(const double dt_) override;
 };
 

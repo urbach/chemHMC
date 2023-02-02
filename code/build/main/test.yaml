@@ -1,6 +1,6 @@
 StartCondition: hot
 seed: 123
-Ntrajectories: 1
+Ntrajectories: 100
 
 geometry: 
   Lx: 1
@@ -17,7 +17,7 @@ particles:
   sigma: 0.1
 
 integrator:
-  name: LEAP
+  name: OMF2
   dt: 0.1
   steps: 5
 
