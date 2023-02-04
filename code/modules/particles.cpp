@@ -47,7 +47,7 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
 
 void identical_particles::InitX() {
     x = type_x("x", N);
-    x_old = type_x("x_old", N);
+    h_x = create_mirror(x); 
     p = type_p("p", N);
     f = type_f("f", N);
 

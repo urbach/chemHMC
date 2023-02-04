@@ -18,6 +18,7 @@ public:
     void init(int argc, char** argv);
        
     void run();
+    double gen_random();
 
 };
 #endif // !HMC_H

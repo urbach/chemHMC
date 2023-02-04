@@ -28,18 +28,21 @@ void HMC_class::init(int argc, char** argv) {
     acceptance = 0;
 }
 
+double HMC_class::gen_random(){
+    return (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));// random number from 0 to 1
+};
+
 void HMC_class::run() {
 
-
-    for (int i = 0; i < Ntrajectories; i++) {
-        double Vi = integrator->particles->compute_potential();
+    double Vi = integrator->particles->compute_potential();
 #ifdef DEBUG
-        printf("the potential is: %f\n", Vi);
-        Kokkos::fence();
+    printf("the potential is: %f\n", Vi);
+    Kokkos::fence();
 #endif // DEBUG
-
-        // copy the configuration before the MD
-        Kokkos::deep_copy(integrator->particles->x_old, integrator->particles->x);// x_old=x;
+    // copy the configuration before the MD
+    Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
+    for (int i = 0; i < Ntrajectories; i++) {
+        
         integrator->particles->hb();
 #ifdef DEBUG
         integrator->particles->printx();
@@ -49,19 +52,21 @@ void HMC_class::run() {
 
         // accept/reject
         double Vf = integrator->particles->compute_potential();
-        double r = (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));// random number from 0 to 1
+        double r = gen_random();// random number from 0 to 1
 #ifdef DEBUG
         printf("the potential after the MD evolution is: %f\n", Vf);
 #endif //DEBUG
         Kokkos::fence();
         if (r < exp(-(Vf - Vi))) {
             acceptance++;
+            Vi = Vf;
+            Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
 #ifdef DEBUG
             printf("accepting the configuration\n");
 #endif //DEBUG
         }
         else {
-            Kokkos::deep_copy(integrator->particles->x, integrator->particles->x_old);
+            Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
 #ifdef DEBUG
             printf("rejecting the configuration\n");
 #endif //DEBUG

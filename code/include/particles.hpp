@@ -16,10 +16,10 @@ public:
     double coeff_x;
 
     type_x  x;
-    type_x  x_old;
     type_p  p;
     type_f  f;
     bool initHostMirror;
+    // the host mirror of x is used to restore the position before the MD in case of a rejection
     type_x::HostMirror h_x;
     type_p::HostMirror h_p;
 
