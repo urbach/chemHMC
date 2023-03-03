@@ -47,6 +47,8 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
 
 void identical_particles::InitX() {
     x = type_x("x", N);
+    // create_mirror will() always allocate a new view,
+    // create_mirror_view() will only create a new view if the original one is not in HostSpace
     h_x = create_mirror(x); 
     p = type_p("p", N);
     f = type_f("f", N);
@@ -85,19 +87,14 @@ void identical_particles::operator() (hot, const int i) const {
     rand_pool.free_state(rgen);
 };
 
+// since we are using the hostMirror to store the starting point we don't whant to 
+// deep_copy it here 
 void particles_type::printx() {
-    if (!initHostMirror) {
-        h_x = Kokkos::create_mirror_view(x);
-        h_p = Kokkos::create_mirror_view(p);
-        initHostMirror = true;
-    }
-    Kokkos::deep_copy(h_x, x);
     for (int i = 0; i < N; i++)
         printf("particle(%d)=%-20.12g %-20.12g %-20.12g\n", i, h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 void particles_type::printp() {
     if (!initHostMirror) {
-        h_x = Kokkos::create_mirror_view(x);
         h_p = Kokkos::create_mirror_view(p);
         initHostMirror = true;
     }
