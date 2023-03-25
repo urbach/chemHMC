@@ -1,5 +1,6 @@
 #include "integrator.hpp"
 #include "read_infile.hpp"
+#include "identical_particles.hpp"
 
 
 integrator_type::integrator_type(YAML::Node doc) {

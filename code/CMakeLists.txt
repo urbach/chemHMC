@@ -17,13 +17,14 @@ project(chemHMC  CXX)
 #INCLUDE_DIRECTORIES ( "${EIGEN3_INCLUDE_DIR}" )
 
 set(Kokkos_ENABLE_COMPILER_WARNINGS ON)
-set(Kokkos_CXX_STANDARD 14)
+# set(Kokkos_CXX_STANDARD 14)
 
 IF(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   set(CMAKE_CXX_FLAGS  " ${CMAKE_CXX_FLAGS} ${CXXFLAGS} -DDEBUG  -g   -lm  ")
-  set(Kokkos_ENABLE_DEBUG ON)
-  set(Kokkos_ENABLE_DEBUG_BOUNDS_CHECK ON)
-  set(Kokkos_ENABLE_DEBUG_DUALVIEW_MODIFY_CHECK ON)
+  # The following need to be set from the command line
+  # set(Kokkos_ENABLE_DEBUG ON)
+  # set(Kokkos_ENABLE_DEBUG_BOUNDS_CHECK ON)
+  # set(Kokkos_ENABLE_DEBUG_DUALVIEW_MODIFY_CHECK ON)
   MESSAGE("DEBUG mode ON")
   MESSAGE("Kokkos_ENABLE_DEBUG = ${Kokkos_ENABLE_DEBUG}")
   MESSAGE("Kokkos_ENABLE_DEBUG_BOUNDS_CHECK = ${Kokkos_ENABLE_DEBUG_BOUNDS_CHECK}")
@@ -32,6 +33,7 @@ ENDIF()
 MESSAGE("CMAKE_CXX_FLAGS   ${CMAKE_CXX_FLAGS}")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/kokkos" "external/kokkos")
+include_directories(${Kokkos_INCLUDE_DIRS_RET})
 
 ######################### git version ################
 ######################################################
@@ -60,22 +62,24 @@ ENDIF()
 
 add_subdirectory(include  include)
 
+#######################################################
+
+target_include_directories(chemHMC 
+PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+PRIVATE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
+) 
+#######################################################
 
 macro(add_target_with_lib TARGETNAME)
   # Make the executable
   add_executable(${TARGETNAME} ${ARGN})
   target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
-  target_link_libraries(${TARGETNAME} PUBLIC read_infile)
-  target_link_libraries(${TARGETNAME} PUBLIC particles)
-  target_link_libraries(${TARGETNAME} PUBLIC integrator)
-  target_link_libraries(${TARGETNAME} PUBLIC HMC)
-  #target_link_libraries(${TARGETNAME} PUBLIC extra_library)
-  
+  target_link_libraries(${TARGETNAME} PUBLIC chemHMC)
   target_link_libraries(${TARGETNAME} PUBLIC git_version)
-
- 
 endmacro()
 
 add_subdirectory(main)
 add_subdirectory(test)
-
