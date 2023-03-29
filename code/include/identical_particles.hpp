@@ -41,24 +41,28 @@ public:
         return potential_strategy();
     };
 
+    // function to define the domains
     std::function<void()>  binning_geometry_strategy;
     void cutoff_binning();
     void binning_geometry() override {
         return binning_geometry_strategy();
     };
 
+    // binning strategy functions and related
     std::function<void()>  binning_strategy;
     void serial_binning_init();
-    void serial_binning();
+    void serial_binning();//<-- can be a binning_strategy
 
     void quick_sort_init();
-    // KOKKOS_FUNCTION bool compare(int j, int pi);
     int partition(int low, int high);
     int partition_middle(int low, int high);
     int partition_high(int low, int high);
-    // KOKKOS_FUNCTION void operator() (Tag_quicksort_compare,  const int j, int& update) const;
     void quickSort(int low, int high);
-    void create_quick_sort();
+    void create_quick_sort();//<-- can be a binning_strategy
+    void create_quick_sort_v1();//<-- can be a binning_strategy
+
+    void parallel_binning_init();
+    void parallel_binning();//<-- can be a binning_strategy
 
     void create_binning() override {
         return binning_strategy();
@@ -87,7 +91,6 @@ public:
     void update_momenta(const double dt_) override;
     void update_positions(const double dt_) override;
 };
-
 
 
 

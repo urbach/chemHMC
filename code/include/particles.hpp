@@ -6,7 +6,7 @@
 #include <Kokkos_Core.hpp>
 #include "global.hpp"
 #include "read_infile.hpp"
-#include "binning.hpp"
+
 typedef Kokkos::View<int*> t_bincount;
 typedef Kokkos::View<int*> t_binoffsets;
 typedef Kokkos::View<int*> t_permute_vector;
@@ -46,9 +46,6 @@ public:
 
     t_bool before;
     t_bool after;
-
-    t_prefix sb;
-    t_prefix sa;
 
     RandPoolType rand_pool;
     // constructor

@@ -48,10 +48,14 @@ int main(int argc, char** argv) {
         particles2 = new identical_particles(doc);
         doc["particles"]["algorithm"] = "quick_sort";
         particles_type* particles3 = new identical_particles(doc);
+        doc["particles"]["algorithm"] = "parallel_binning";
+        particles_type* particles4 = new identical_particles(doc);
+
         //// init the positions
         particles1->InitX();
         particles2->InitX();
         particles3->InitX();
+        particles4->InitX();
 
         int sum = 0;
         type_x x1 = particles1->x;
@@ -70,32 +74,49 @@ int main(int argc, char** argv) {
         if (sum > 0)Kokkos::abort("Initial position do not match");
         else printf("the initial positon of the two ensambles is the same\n");
 
+        printf("############################# timing potential calculation #########################################\n");
         Kokkos::Timer timer1;
         double V1 = particles1->compute_potential();
-        printf("time in1 = %f s\n", timer1.seconds());
+        Kokkos::fence();
+        printf("time all_neighbour = %f s\n", timer1.seconds());
         Kokkos::Timer timer2;
         double V2 = particles2->compute_potential();
-        printf("time in2 = %f s\n", timer2.seconds());
+        Kokkos::fence();
+        printf("time binning_serial = %f s\n", timer2.seconds());
+        Kokkos::Timer timer3;
+        double V3 = particles3->compute_potential();
+        Kokkos::fence();
+        printf("total time quick_sort = %gs   \n", timer3.seconds());
+        Kokkos::Timer timer4;
+        double V4 = particles4->compute_potential();
+        Kokkos::fence();
+        printf("total time parallel_binning = %gs   \n", timer4.seconds());
+        if (fabs((V1 - V2) / V1) > 1e-6)Kokkos::abort("error: the potential all_neighbour does not match binning_serial");
+        else printf("Test passed: the potential is the same\n");
+        if (fabs((V1 - V3) / V1) > 1e-6)Kokkos::abort("error: the potential all_neighbour does not match quick_sort");
+        else printf("Test passed: the potential is the same\n");
+        if (fabs((V1 - V4) / V1) > 1e-6)Kokkos::abort("error: the potential all_neighbour does not match parallel_binning");
+        else printf("Test passed: the potential is the same\n");
+        printf("###################################################################################################\n");
+
         timer2.reset();
         particles2->create_binning();
-        printf("to bin2 in2 = %f s\n", timer2.seconds());
-        printf("V1=%g  V2=%g\n", V1, V2);
-        if (fabs(V1 - V2) > 1e-8)Kokkos::abort("error: the potential is not the same");
-        else printf("Test passed\n");
-
-
-
+        Kokkos::fence();
+        printf("time to bin  serial = %g s\n", timer2.seconds());
         /////////////////////
         Kokkos::Timer t3b;
         particles3->create_binning();
-        double tb = t3b.seconds();
-        Kokkos::Timer timer3;
-        double V3 = particles3->compute_potential();
-        printf("total time quicksort = %gs  of which binning =%gs \n", timer3.seconds(), tb);
-        printf("V1=%g  V3=%g\n", V1, V3);
-        if (fabs(V1 - V3) > 1e-8)Kokkos::abort("error: the potential is not the same");
-        else printf("Test passed\n");
-
+        Kokkos::fence();
+        printf("time to bin quick_sort  %gs\n", t3b.seconds());
+        Kokkos::Timer t3bb;
+        particles3->create_binning();
+        Kokkos::fence();
+        printf("time to bin quick_sort  %gs\n", t3bb.seconds());
+        ////////////////////////////
+        Kokkos::Timer t4b;
+        particles4->create_binning();
+        Kokkos::fence();
+        printf("time to bin parallel_sort  %gs\n", t4b.seconds());
         Kokkos::fence();
 
 
@@ -131,9 +152,18 @@ int main(int argc, char** argv) {
 
 
         }, sum);
+        Kokkos::fence();
 
         if (sum > 0)Kokkos::abort("binnings do not match");
         else printf("Test passed:  binning match\n");
+
+        if (fabs((V1 - V3) / V1) > 1e-6)Kokkos::abort("error: the potential is not the same");
+        else printf("Test passed\n");
+
+
+
+
+
     }
     Kokkos::finalize();
 }

@@ -34,6 +34,13 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
         serial_binning_init();
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
     }
+    if (algorithm.compare("parallel_binning") == 0) {
+        binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
+        binning_geometry();
+        binning_strategy = std::bind(&identical_particles::parallel_binning, this);
+        parallel_binning_init();
+        potential_strategy = std::bind(&identical_particles::potential_binning, this);
+    }
     if (algorithm.compare("quick_sort") == 0) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
         binning_geometry();
@@ -41,11 +48,11 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
         quick_sort_init();
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
     }
-
     std::cout << "partilces_type:" << std::endl;
     std::cout << "name:" << name << std::endl;
     std::cout << "mass:" << mass << std::endl;
     std::cout << "beta:" << beta << std::endl;
+
     compute_coeff_momenta();
     compute_coeff_position();
 }
@@ -216,8 +223,8 @@ void identical_particles::operator() (Tag_potential_binning, const member_type& 
                         }
                         }, tempM);
                     // Kokkos::single(Kokkos::PerThread(teamMember), [=]() {
-                        innerUpdateN += tempM;
-                        // });
+                    innerUpdateN += tempM;
+                    // });
                 }
             }
         }
