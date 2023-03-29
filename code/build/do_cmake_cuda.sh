@@ -14,6 +14,7 @@ cmake .. \
   -DKokkos_ENABLE_OPENMP=OFF \
   -DKokkos_ENABLE_CUDA=ON \
   -DKokkos_ENABLE_CUDA_LAMBDA=ON \
+  -DKokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE=ON \
   -DKokkos_ENABLE_DEBUG=ON \
   -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=ON \
   -DKokkos_ENABLE_COMPILER_WARNINGS=ON \
@@ -25,3 +26,4 @@ cmake .. \
   -DCMAKE_PREFIX_PATH="/hiskp4/garofalo/yaml-cpp/install_dir" \
   -DCMAKE_CXX_COMPILER=${projectHOME}/external/kokkos/bin/nvcc_wrapper 
 
+# -DKOKKOS_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE=ON \ # is necessary to use tasks
