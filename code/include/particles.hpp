@@ -7,6 +7,11 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 #include "binning.hpp"
+typedef Kokkos::View<int*> t_bincount;
+typedef Kokkos::View<int*> t_binoffsets;
+typedef Kokkos::View<int*> t_permute_vector;
+typedef Kokkos::View<bool*> t_bool;
+typedef Kokkos::View<int*> t_prefix;
 
 class particles_type {
 
@@ -29,18 +34,21 @@ public:
     int nbin[dim_space], bintot;
     double sizebin[dim_space];
 
-    typedef Kokkos::View<int*> t_bincount;
-    typedef Kokkos::View<int*> t_binoffsets;
-    typedef Kokkos::View<int*> t_permute_vector;
 
     t_bincount bincount;
     t_binoffsets binoffsets;
     t_permute_vector permute_vector;
+    t_permute_vector permute_vector_temp;
 
     t_bincount::HostMirror h_bincount;
     t_binoffsets::HostMirror h_binoffsets;
     t_permute_vector::HostMirror h_permute_vector;
 
+    t_bool before;
+    t_bool after;
+
+    t_prefix sb;
+    t_prefix sa;
 
     RandPoolType rand_pool;
     // constructor
