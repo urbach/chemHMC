@@ -1,24 +1,25 @@
 #include "identical_particles.hpp"
 
 void identical_particles::cutoff_binning() {
-    bintot=1;
+    bintot = 1;
     for (int i = 0;i < dim_space;i++) {
         nbin[i] = (params.L[i] / cutoff);
         sizebin[i] = params.L[i] / ((double)nbin[i]);
-        bintot*=nbin[i];
+        bintot *= nbin[i];
     }
 
     bincount = t_bincount("bincount", bintot);
     binoffsets = t_binoffsets("t_binoffsets", bintot);
     permute_vector = t_permute_vector("permute_vector", N);
-    h_bincount = Kokkos::create_mirror_view(bincount);
-    h_binoffsets = Kokkos::create_mirror_view(binoffsets);
-    h_permute_vector = Kokkos::create_mirror_view(permute_vector);
-    printf("permute_ vector: %d  %d\n", permute_vector.is_allocated(), permute_vector.is_hostspace);
-    printf("h_permute_ vector: %d %d\n", h_permute_vector.is_allocated(), h_permute_vector.is_hostspace);
+
 }
 
 
+void identical_particles::serial_binning_init() {
+    h_bincount = Kokkos::create_mirror_view(bincount);
+    h_binoffsets = Kokkos::create_mirror_view(binoffsets);
+    h_permute_vector = Kokkos::create_mirror_view(permute_vector);
+}
 
 inline
 bool is_in_bin(type_x  x, int i, int bx, int by, int bz, const double sizebin[dim_space]) {
@@ -42,6 +43,8 @@ bool is_in_bin(type_x  x, int i, int bx, int by, int bz, const double sizebin[di
         return false;
     return false;
 }
+
+
 
 void identical_particles::serial_binning() {
     int count = 0;
@@ -85,7 +88,8 @@ void identical_particles::serial_binning() {
 }
 
 
-// void binning::create_binning(type_x  x) {
+
+// void binning::parallel_binning() {
 //     int count = 0;
 //     int N = x.extent(0);
 //     // for (int ib = 0; ib < bintot; ib++) {
@@ -93,18 +97,18 @@ void identical_particles::serial_binning() {
 //         bincount(ib) = 0;
 //     });
 
-// for (int i = 0; i < N;i++) {
-//     int bx = floor(x(i, 0) / sizebin[0]);
-//     int by = floor(x(i, 1) / sizebin[1]);
-//     int bz = floor(x(i, 2) / sizebin[2]);
-//     bincount(ctolex(bx, by, bz))++;
-// }
-// for (int ib = 1; ib < bintot; ib++) {
-//     binoffsets(ib) = binoffsets(ib - 1) + bincount(ib);
-// }
-// for (int i = 0; i < N;i++) {
-//     int ib = which_bin(x, i);
-//     int binncounter = 0;
-//     permute_vector(binoffsets(ib) + binncounter) = i;
-// }
+//     for (int i = 0; i < N;i++) {
+//         int bx = floor(x(i, 0) / sizebin[0]);
+//         int by = floor(x(i, 1) / sizebin[1]);
+//         int bz = floor(x(i, 2) / sizebin[2]);
+//         bincount(ctolex(bx, by, bz))++;
+//     }
+//     for (int ib = 1; ib < bintot; ib++) {
+//         binoffsets(ib) = binoffsets(ib - 1) + bincount(ib);
+//     }
+//     for (int i = 0; i < N;i++) {
+//         int ib = which_bin(x, i);
+//         int binncounter = 0;
+//         permute_vector(binoffsets(ib) + binncounter) = i;
+//     }
 // }
