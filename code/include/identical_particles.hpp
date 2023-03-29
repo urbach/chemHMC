@@ -18,6 +18,7 @@ public:
     struct Tag_potential_binning {};
     struct kinetic {};
     struct force {};
+    struct Tag_quicksort_compare {};
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     double mass;
     double beta;
@@ -47,7 +48,18 @@ public:
     };
 
     std::function<void()>  binning_strategy;
+    void serial_binning_init();
     void serial_binning();
+
+    void quick_sort_init();
+    // KOKKOS_FUNCTION bool compare(int j, int pi);
+    int partition(int low, int high);
+    int partition_middle(int low, int high);
+    int partition_high(int low, int high);
+    // KOKKOS_FUNCTION void operator() (Tag_quicksort_compare,  const int j, int& update) const;
+    void quickSort(int low, int high);
+    void create_quick_sort();
+
     void create_binning() override {
         return binning_strategy();
     };

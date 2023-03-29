@@ -31,6 +31,14 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
         binning_geometry();
         binning_strategy = std::bind(&identical_particles::serial_binning, this);
+        serial_binning_init();
+        potential_strategy = std::bind(&identical_particles::potential_binning, this);
+    }
+    if (algorithm.compare("quick_sort") == 0) {
+        binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
+        binning_geometry();
+        binning_strategy = std::bind(&identical_particles::create_quick_sort, this);
+        quick_sort_init();
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
     }
 

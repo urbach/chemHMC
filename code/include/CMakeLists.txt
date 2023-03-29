@@ -12,10 +12,10 @@ set(chemHMC_scr
     ../modules/particles.cpp
     ../modules/identical_particles.cpp
     ../modules/identical_particles_binning.cpp
+    ../modules/quick_sort.cpp
     ../modules/read_infile.cpp
     ../modules/HMC.cpp
     ../modules/integrator.cpp
-    # ../modules/quick_sort.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
 target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)
