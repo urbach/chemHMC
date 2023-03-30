@@ -3,7 +3,7 @@
 void identical_particles::quick_sort_init() {
     before = t_bool("before", N);
     after = t_bool("afater", N);
-   
+
     permute_vector_temp = t_prefix("permute_vector_temp", N);
     t_permute_vector& vec = permute_vector;
     Kokkos::parallel_for("init-permute-vector-quick-sort", N, KOKKOS_LAMBDA(const int i){
@@ -142,6 +142,14 @@ namespace arrayN2 {  // namespace helps with name resolution in reduction identi
             }
             return *this;
         }
+        KOKKOS_INLINE_FUNCTION   // add operator
+            array_type operator + (const array_type& src) const {
+            array_type lhs;
+            for (int i = 0; i < N; i++) {
+                lhs.the_array[i] = this->the_array[i] + src.the_array[i];
+            }
+            return lhs;
+        }
         KOKKOS_INLINE_FUNCTION   // constructor to convert from "int"
             array_type& operator = (int&& src) {
             for (int i = 0; i < N; i++) {
@@ -261,7 +269,7 @@ int identical_particles::partition_middle(int low, int high) {
     Kokkos::parallel_scan("prefix_and_set", Kokkos::RangePolicy(low, high + 1), functor_prefix_and_set(permute_vector_temp, permute_vector, before, after, low, pi_pos));
     Kokkos::parallel_for("set-pivot", Kokkos::RangePolicy(pi_pos, pi_pos + 1), functor_set_pivot(permute_vector_temp, permute_vector, pi));
 
-    Kokkos::parallel_for("copy-range", Kokkos::RangePolicy(low, high + 1), copy_range(permute_vector, permute_vector_temp));
+    // Kokkos::parallel_for("copy-range", Kokkos::RangePolicy(low, high + 1), copy_range(permute_vector, permute_vector_temp));
     return pi_pos;
 }
 
@@ -279,7 +287,7 @@ int identical_particles::partition_high(int low, int high) {
     pi_pos += low;
     Kokkos::parallel_scan("prefix_and_set", Kokkos::RangePolicy(low, high), functor_prefix_and_set(permute_vector_temp, permute_vector, before, after, low, pi_pos));
     Kokkos::parallel_for("set-pivot", Kokkos::RangePolicy(pi_pos, pi_pos + 1), functor_set_pivot(permute_vector_temp, permute_vector, pi));
-    Kokkos::parallel_for("copy-range", Kokkos::RangePolicy(low, high + 1), copy_range(permute_vector, permute_vector_temp));
+    // Kokkos::parallel_for("copy-range", Kokkos::RangePolicy(low, high + 1), copy_range(permute_vector, permute_vector_temp));
     return pi_pos;
 }
 
@@ -301,9 +309,9 @@ void identical_particles::quickSort(int low, int high) {
 }
 /* This routine does the quicksort algorithm, it parallelize alny the partitioning  */
 void identical_particles::create_quick_sort_v1() {
-    
+
     quickSort(0, N - 1);
-    
+
 
     Kokkos::parallel_for("quicksort-binncount", Kokkos::TeamPolicy<functor_count_bin::Tag_count_bin>(bintot, Kokkos::AUTO),
         functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
@@ -407,12 +415,12 @@ KOKKOS_INLINE_FUNCTION int partition_middleTask(TeamMember& member, int nbin[dim
         }
     );
 
-    Kokkos::parallel_for(//"copy-range",
-        //  Kokkos::RangePolicy(low, high + 1), copy_range(permute_vector, permute_vector_temp)
-        Kokkos::TeamThreadRange(member, low, high + 1),
-        [=](const int j) {
-            permute_vector(j) = permute_vector_temp(j);}
-    );
+    // Kokkos::parallel_for(//"copy-range",
+    //     //  Kokkos::RangePolicy(low, high + 1), copy_range(permute_vector, permute_vector_temp)
+    //     Kokkos::TeamThreadRange(member, low, high + 1),
+    //     [=](const int j) {
+    //         permute_vector(j) = permute_vector_temp(j);}
+    // );
     return pi_pos;
 }
 

@@ -91,11 +91,20 @@ int main(int argc, char** argv) {
         double V4 = particles4->compute_potential();
         Kokkos::fence();
         printf("total time parallel_binning = %gs   \n", timer4.seconds());
-        if (fabs((V1 - V2) / V1) > 1e-6)Kokkos::abort("error: the potential all_neighbour does not match binning_serial");
+        if (fabs((V1 - V2) / V1) > 1e-6) {
+            printf("%.12g   %.12g\n", V1, V2);
+            Kokkos::abort("error: the potential all_neighbour does not match binning_serial");
+        }
         else printf("Test passed: the potential is the same\n");
-        if (fabs((V1 - V3) / V1) > 1e-6)Kokkos::abort("error: the potential all_neighbour does not match quick_sort");
+        if (fabs((V1 - V3) / V1) > 1e-6) {
+            printf("%.12g   %.12g\n", V1, V3);
+            Kokkos::abort("error: the potential all_neighbour does not match quick_sort");
+        }
         else printf("Test passed: the potential is the same\n");
-        if (fabs((V1 - V4) / V1) > 1e-6)Kokkos::abort("error: the potential all_neighbour does not match parallel_binning");
+        if (fabs((V1 - V4) / V1) > 1e-6) {
+            printf("%.12g   %.12g\n", V1, V4);
+            Kokkos::abort("error: the potential all_neighbour does not match parallel_binning");
+        }
         else printf("Test passed: the potential is the same\n");
         printf("###################################################################################################\n");
 
