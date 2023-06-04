@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(chemHMC  CXX)
 
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES 86)
+endif()
 
 # no need to install Eigen with cmake and use find package
 #SET( EIGEN3_INCLUDE_DIR /home/marco/library/eigen )
@@ -54,6 +57,17 @@ MESSAGE("YAML LIBRARY_DIR: ${YAML_CPP_LIBRARY_DIR}")
 IF(NOT yaml-cpp_FOUND)
     MESSAGE("find_package faild to find yaml-cpp: you need to do it manually")
     MESSAGE("hint:  yaml-cpp_DIR or CMAKE_PREFIX_PATH need to be global path or relative to the source dir")
+    MESSAGE(FATAL_ERROR)
+ENDIF()
+
+######################################################
+###################### fmt: formating library ######################
+
+find_package(fmt)
+
+IF(NOT fmt_FOUND)
+    MESSAGE("find_package faild to find fmt: you need to do it manually")
+    MESSAGE("hint:  fmt_DIR or CMAKE_PREFIX_PATH need to be global path or relative to the source dir")
     MESSAGE(FATAL_ERROR)
 ENDIF()
 
