@@ -12,7 +12,7 @@ to install it you can try
 ```
 sudo apt-get install libyaml-cpp-dev
 ```
-or intall manually
+or install manually
 ```
 git clone https://github.com/jbeder/yaml-cpp
 cd yaml-cpp
@@ -59,7 +59,12 @@ you can use the script `do_cmake_cuda.sh` , you may need to set up the architect
 ```
 -DKokkos_ARCH_KEPLER35=ON
 ```
-a list of option can be found in https://kokkos.github.io/kokkos-core-wiki/keywords.html. Then build and compile with
+a list of option can be found in https://kokkos.github.io/kokkos-core-wiki/keywords.html.
+
+Make sure the `default_arch` in `code/external/kokkos/bin/nvcc_wrapper` matches the lowest supported version shown in `nvcc --list-gpu-arch`.
+By default `sm_35` is set there which is suitable for the above specified Kepler architecture.
+
+Then build and compile with
 
 ``` 
 cd build

@@ -20,5 +20,5 @@ set(chemHMC_scr
     ../modules/integrator.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
-target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)
+target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} fmt::fmt Kokkos::kokkos)
 set_target_properties(chemHMC PROPERTIES LINKER_LANGUAGE CXX)

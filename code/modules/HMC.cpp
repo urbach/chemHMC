@@ -13,8 +13,8 @@ void HMC_class::init(int argc, char** argv) {
             integrator = new OMF2(doc);
         else {
             printf("no valid integrator name: ");
-            std::cout << doc["integrator"].as<std::string>() << std::endl;
-            exit(1);
+            std::cout << doc["integrator"]["name"].as<std::string>() << std::endl;
+            exit(1); // TODO: call Kokkos::abort
         }
     }
     else {

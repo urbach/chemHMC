@@ -1,12 +1,17 @@
 #!/bin/bash
 # this line is a comment
 # remove chache
+set -x
 rm -r CMakeFiles CMakeCache.txt
 
 cd ..
 projectHOME=`pwd`
 cd -
 echo "project HOME:" $projectHOME
+
+
+# GPU_COMPUTE_CAPABILITY=KEPLER35
+GPU_COMPUTE_CAPABILITY=AMPERE86
 
 CXXFLAGS=" " \
 cmake .. \
@@ -20,7 +25,7 @@ cmake .. \
   -DKokkos_ENABLE_COMPILER_WARNINGS=ON \
   -DCMAKE_CXX_STANDARD=17 \
   -DKokkos_ENABLE_SERIAL=ON  \
-  -DKokkos_ARCH_KEPLER35=ON \
+  -DKokkos_ARCH_${GPU_COMPUTE_CAPABILITY}=ON \
   -DKokkos_ENABLE_CUDA_LAMBDA=ON \
   -DKokkos_ENABLE_TESTS=OFF \
   -DCMAKE_PREFIX_PATH="/hiskp4/garofalo/yaml-cpp/install_dir" \
