@@ -12,14 +12,13 @@
 #include "global.hpp"
 #include "yaml-cpp/yaml.h"
 #include "particles.hpp"
-#include "fmt/core.h"
 
 
 
 template<class T>
 T check_and_assign_value(YAML::Node doc, const char* tag) {
     if (!doc[tag]) {
-        fmt::print("error: tag '{}' is not present in the input file\n", tag);
+        printf("error: tag %s is not present in the input file\n", tag);
         std::cout << "infile structure:" << std::endl;
         std::cout << doc << std::endl;
         Kokkos::abort("params not found");
@@ -28,7 +27,8 @@ T check_and_assign_value(YAML::Node doc, const char* tag) {
     try {
         return doc[tag].as<T>();
     } catch (YAML::TypedBadConversion<T>) {
-        Kokkos::abort(fmt::format ("Incorrect input type for '{}'.", tag).c_str());
+        printf("error: impossible to read tag %s\n", tag);
+        Kokkos::abort("Incorrect input type");
     }
 }
 template double check_and_assign_value<double>(YAML::Node, const char*);

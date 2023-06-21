@@ -61,15 +61,15 @@ IF(NOT yaml-cpp_FOUND)
 ENDIF()
 
 ######################################################
-###################### fmt: formating library ######################
+# ###################### fmt: formating library ######################
 
-find_package(fmt)
+# find_package(fmt)
 
-IF(NOT fmt_FOUND)
-    MESSAGE("find_package faild to find fmt: you need to do it manually")
-    MESSAGE("hint:  fmt_DIR or CMAKE_PREFIX_PATH need to be global path or relative to the source dir")
-    MESSAGE(FATAL_ERROR)
-ENDIF()
+# IF(NOT fmt_FOUND)
+#     MESSAGE("find_package faild to find fmt: you need to do it manually")
+#     MESSAGE("hint:  fmt_DIR or CMAKE_PREFIX_PATH need to be global path or relative to the source dir")
+#     MESSAGE(FATAL_ERROR)
+# ENDIF()
 
 ######################################################
 ######################################################
