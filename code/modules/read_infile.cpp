@@ -52,7 +52,6 @@ params_class::params_class(YAML::Node doc) {
     std::cout << "seed: " << seed << std::endl;
     std::cout << "StartCondition: " << StartCondition << std::endl;
 
-
 }
 
 

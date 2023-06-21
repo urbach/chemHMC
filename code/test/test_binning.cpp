@@ -6,6 +6,56 @@
 #include "HMC.hpp"
 #include "identical_particles.hpp"
 
+void add_error(std::vector<std::string> &errors , std::string s){
+    errors.emplace_back(s);
+    printf("%s\n",s.c_str());
+}
+
+void check_binning(particles_type* particles2, particles_type* particles3, std::string comparison, std::vector<std::string> &errors) {
+    t_permute_vector p2 = particles2->permute_vector;
+    t_permute_vector p3 = particles3->permute_vector;
+    t_bincount   bc2 = particles2->bincount;
+    t_bincount   bc3 = particles3->bincount;
+    t_binoffsets   bo2 = particles2->binoffsets;
+    t_binoffsets   bo3 = particles3->binoffsets;
+    printf("########################################################################################\n");
+    printf("comparing binning %s\n",comparison.c_str());
+    int Nb = particles2->bintot;
+    int sum=0;
+    Kokkos::parallel_reduce("check-binning-condition", Nb, KOKKOS_LAMBDA(const int ib, int& update) {
+        int bx, by, bz;
+        particles2->lextoc(ib, bx, by, bz);
+        if (bc2(ib) != bc3(ib)) {
+            printf("different count inside bin %d=(%d, %d, %d) : %d vs %d  \n", ib, bx, by, bz, bc2(ib), bc3(ib));
+            update++;
+        }
+        if (bo2(ib) != bo3(ib)) {
+            printf("different offset of bin %d=(%d, %d, %d) : %d vs %d  \n", ib, bx, by, bz, bo2(ib), bo3(ib));
+            update++;
+        }
+
+        for (int i = 0;i < bc2(ib);i++) {
+            int found = 1;
+            for (int j = 0;j < bc3(ib);j++) {
+                if (p2(i + bo2(ib)) == p3(j + bo3(ib)))
+                    found = 0;
+            }
+            if (found == 1) {
+                printf("Particle %d inside bin %d not found in the second partition  \n", p2(i + bo2(ib)), ib);
+                update++;
+            }
+        }
+
+
+    }, sum);
+    Kokkos::fence();
+
+    if (sum > 0)    add_error(errors,"comparing binning"+ comparison );
+    else printf("Test passed:  binning match\n");
+
+}
+
+
 int main(int argc, char** argv) {
 
     printf("chemHMC git commit %s\n", kGitHash);
@@ -28,15 +78,15 @@ int main(int argc, char** argv) {
         doc["StartCondition"] = "hot";
         doc["seed"] = 123;
 
-        doc["geometry"]["Lx"] = 1;
-        doc["geometry"]["Ly"] = 1;
-        doc["geometry"]["Lz"] = 1;
+        doc["geometry"]["Lx"] = 1.1;
+        doc["geometry"]["Ly"] = 1.2;
+        doc["geometry"]["Lz"] = 1.3;
 
         doc["particles"]["name"] = "identical_particles";
         doc["particles"]["N"] = std::stoi(argv[opt1]);;
         doc["particles"]["mass"] = 0.1;
         doc["particles"]["beta"] = 0.5;
-        doc["particles"]["cutoff"] = 0.2;
+        doc["particles"]["cutoff"] = 0.4;
         doc["particles"]["eps"] = 0.1;
         doc["particles"]["sigma"] = 0.1;
         doc["particles"]["algorithm"] = "all_neighbour";
@@ -73,7 +123,7 @@ int main(int argc, char** argv) {
         }, sum);
         if (sum > 0)Kokkos::abort("Initial position do not match");
         else printf("the initial positon of the two ensambles is the same\n");
-
+        particles1->printx();
         printf("############################# timing potential calculation #########################################\n");
         Kokkos::Timer timer1;
         double V1 = particles1->compute_potential();
@@ -90,20 +140,22 @@ int main(int argc, char** argv) {
         Kokkos::Timer timer4;
         double V4 = particles4->compute_potential();
         Kokkos::fence();
+
+        std::vector<std::string> errors(0);
         printf("total time parallel_binning = %gs   \n", timer4.seconds());
         if (fabs((V1 - V2) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V2);
-            Kokkos::abort("error: the potential all_neighbour does not match binning_serial");
+            add_error(errors, "error: the potential all_neighbour does not match binning_serial");
         }
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V3) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V3);
-            Kokkos::abort("error: the potential all_neighbour does not match quick_sort");
+            add_error(errors,"error: the potential all_neighbour does not match quick_sort");
         }
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V4) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V4);
-            Kokkos::abort("error: the potential all_neighbour does not match parallel_binning");
+            add_error(errors,"error: the potential all_neighbour does not match parallel_binning");
         }
         else printf("Test passed: the potential is the same\n");
         printf("###################################################################################################\n");
@@ -128,51 +180,19 @@ int main(int argc, char** argv) {
         printf("time to bin parallel_sort  %gs\n", t4b.seconds());
         Kokkos::fence();
 
+        check_binning(particles2, particles4, "binning_serial  agains parallel_binning", errors);
+        check_binning(particles2, particles3, "binning_serial  agains quick_sort", errors);
 
-        t_permute_vector p2 = particles2->permute_vector;
-        t_permute_vector p3 = particles3->permute_vector;
-        t_bincount   bc2 = particles2->bincount;
-        t_bincount   bc3 = particles3->bincount;
-        t_binoffsets   bo2 = particles2->binoffsets;
-        t_binoffsets   bo3 = particles3->binoffsets;
-
-        int Nb = particles2->bintot;
-        Kokkos::parallel_reduce("check-binning-condition", Nb, KOKKOS_LAMBDA(const int ib, int& update) {
-            if (bc2(ib) != bc3(ib)) {
-                printf("different count inside bin %d : %d vs %d  \n", ib, bc2(ib), bc3(ib));
-                update++;
-            }
-            if (bo2(ib) != bo3(ib)) {
-                printf("different offset of bin %d : %d vs %d  \n", ib, bo2(ib), bo3(ib));
-                update++;
-            }
-
-            for (int i = 0;i < bc2(ib);i++) {
-                int found = 1;
-                for (int j = 0;j < bc3(ib);j++) {
-                    if (p2(i + bo2(ib)) == p3(j + bo3(ib)))
-                        found = 0;
-                }
-                if (found == 1) {
-                    printf("Particle %d inside bin %d not found in the second partition  \n", p2(i + bo2(ib)), ib);
-                    update++;
-                }
-            }
-
-
-        }, sum);
-        Kokkos::fence();
-
-        if (sum > 0)Kokkos::abort("binnings do not match");
-        else printf("Test passed:  binning match\n");
-
-        if (fabs((V1 - V3) / V1) > 1e-6)Kokkos::abort("error: the potential is not the same");
-        else printf("Test passed\n");
-
-
-
-
-
+        printf("error recap:\n");
+        if (errors.size()>0){
+            for (auto e:errors)
+                printf("%s\n",e.c_str());   
+            Kokkos::abort("abort");
+        }
+        else{
+            printf("none\n");
+        }
     }
     Kokkos::finalize();
+    printf("all tests passed\n");
 }

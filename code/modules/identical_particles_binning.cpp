@@ -4,14 +4,27 @@
 void identical_particles::cutoff_binning() {
     bintot = 1;
     for (int i = 0;i < dim_space;i++) {
-        nbin[i] = (params.L[i] / cutoff);
+        if (params.L[i] < cutoff) {
+            printf("error: the dimention %d must be larger then the cutoff\n L[%d]=%g  cutoff=%g\n", i, i, params.L[i], cutoff);
+            Kokkos::abort("cutoff_binning");
+        }
+        nbin[i] = floor(params.L[i] / cutoff);
         sizebin[i] = params.L[i] / ((double)nbin[i]);
+        if (sizebin[i] < cutoff) {
+            printf("error: size of bin in dimension %d must be larger then the cutoff\n sizebin[%d]=%g  cutoff=%g\n", i, i, sizebin[i], cutoff);
+            Kokkos::abort("cutoff_binning");
+        }
         bintot *= nbin[i];
     }
 
     bincount = t_bincount("bincount", bintot);
     binoffsets = t_binoffsets("t_binoffsets", bintot);
     permute_vector = t_permute_vector("permute_vector", N);
+    printf("binning:\n");
+    for (int i = 0;i < dim_space;i++) {
+        printf("dim=%d  nbin=%d  sizebin=%g\n", i, nbin[i], sizebin[i]);
+    }
+
 
 }
 
@@ -22,7 +35,7 @@ void identical_particles::serial_binning_init() {
     h_permute_vector = Kokkos::create_mirror_view(permute_vector);
 }
 void identical_particles::parallel_binning_init() {
-   
+
     permute_vector_temp = t_prefix("permute_vector_temp", N);
     t_permute_vector& vec = permute_vector;
     Kokkos::parallel_for("init-permute-vector-quick-sort", N, KOKKOS_LAMBDA(const int i){
@@ -37,9 +50,9 @@ bool is_in_bin(type_x  x, int i, int bx, int by, int bz, const double sizebin[di
     double sz = sizebin[2];
     Kokkos::parallel_reduce("CheckValues", 1, KOKKOS_LAMBDA(const int&, int& lsum) {
 
-        if (x(i, 2) >= bz * sx && x(i, 2) < (bz + 1) * sx &&
+        if (x(i, 2) >= bz * sz && x(i, 2) < (bz + 1) * sz &&
             x(i, 1) >= by * sy && x(i, 1) < (by + 1) * sy &&
-            x(i, 0) >= bx * sz && x(i, 0) < (bx + 1) * sz)
+            x(i, 0) >= bx * sx && x(i, 0) < (bx + 1) * sx)
             lsum++;
     }, a);
     Kokkos::fence();
@@ -65,7 +78,6 @@ void identical_particles::serial_binning() {
                 for (int i = 0; i < N;i++) {
                     bool in = is_in_bin(x, i, bx, by, bz, sizebin);
                     if (in) {
-
                         h_permute_vector(count) = i;
                         h_bincount(ib) = h_bincount(ib) + 1;
                         count++;
