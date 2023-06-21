@@ -9,6 +9,8 @@ class HMC_class {
 public:
     integrator_type *integrator;
     int Ntrajectories;
+    int thermalization_steps;
+    int save_every;
     int acceptance;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;

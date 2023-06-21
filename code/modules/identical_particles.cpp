@@ -15,7 +15,7 @@
 #include "identical_particles.hpp"
 
 // contructor
-identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
+identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
     mass = check_and_assign_value<double>(doc["particles"], "mass");
     beta = check_and_assign_value<double>(doc["particles"], "beta");
     sbeta = sqrt(beta);
@@ -60,9 +60,7 @@ identical_particles::identical_particles(YAML::Node doc): particles_type(doc) {
 
 void identical_particles::InitX() {
     x = type_x("x", N);
-    // create_mirror will() always allocate a new view,
-    // create_mirror_view() will only create a new view if the original one is not in HostSpace
-    h_x = Kokkos::create_mirror(x);
+
     p = type_p("p", N);
     f = type_f("f", N);
 
@@ -75,6 +73,10 @@ void identical_particles::InitX() {
     else {
         Kokkos::abort("StartCondition not implemented");
     }
+    // create_mirror() willalways allocate a new view,
+    // create_mirror_view() will only create a new view if the original one is not in HostSpace
+    h_x = Kokkos::create_mirror(x);
+    Kokkos::deep_copy(h_x, x);
     Kokkos::fence();
     printf("particle initialized\n");
 };
@@ -102,6 +104,13 @@ void identical_particles::operator() (hot, const int i) const {
 
 // since we are using the hostMirror to store the starting point we don't whant to 
 // deep_copy it here 
+void particles_type::print_xyz(int traj, double K, double V) {
+    printf("%d\n", N);
+    printf("trajectory= %d,  kinetic_energy= %.12g,  potential= %.12g\n", traj, K, V);
+    for (int i = 0; i < N; i++)
+        printf("%-10d  %-20.12g %-20.12g %-20.12g\n", i, h_x(i, 0), h_x(i, 1), h_x(i, 2));
+}
+
 void particles_type::printx() {
     for (int i = 0; i < N; i++)
         printf("particle(%d)=%-20.12g %-20.12g %-20.12g\n", i, h_x(i, 0), h_x(i, 1), h_x(i, 2));
@@ -178,7 +187,7 @@ double identical_particles::potential_binning() {
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (Tag_potential_binning, const member_type& teamMember, double& V) const {
-    const int ib = teamMember.league_rank();
+    const int ib = teamMember.league_rank();// bin id
     double tempN = 0;
     // printf("bin =%d binncount=%d\n", ib, bincount(ib));
     Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, bincount(ib)), [=](const int ip, double& innerUpdateN) {
@@ -245,7 +254,7 @@ double identical_particles::compute_kinetic_E() {
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (kinetic, const int i, double& K) const {
-    K += -(beta / (2 * mass * mass)) * (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2));
+    K += (beta / (2 * mass * mass)) * (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2));
 };
 
 
@@ -268,11 +277,11 @@ void identical_particles::operator() (force, const int i) const {
 
                     double r = 0;
 
-                    double  rij = x(i, 0) - (x(j, 0) + bx);
+                    double  rij = x(i, 0) - (x(j, 0) + bx * L[0]);
                     r = r + rij * rij;
-                    rij = x(i, 1) - (x(j, 1) + by);
+                    rij = x(i, 1) - (x(j, 1) + by * L[1]);
                     r = r + rij * rij;
-                    rij = x(i, 2) - (x(j, 2) + bz);
+                    rij = x(i, 2) - (x(j, 2) + bz * L[2]);
                     r = r + rij * rij;
                     //printf("%g\n",rij);
 
@@ -306,19 +315,22 @@ public:
     const double c;
     type_x x;
     type_const_p p;
-    functor_update_pos(double dt_, double c, type_x& x_, type_p& p_): dt(dt_), c(c), x(x_), p(p_) {};
+    const double L[dim_space];
+    functor_update_pos(double dt_, double c, type_x& x_, type_p& p_, const double L_[]) : dt(dt_), c(c), x(x_), p(p_),
+        L{ L_[0], L_[1], L_[2] } {
+    };
 
     KOKKOS_FUNCTION
         void operator() (const int i) const {
         for (int dir = 0; dir < 3;dir++) {
             x(i, dir) += dt * c * p(i, 0);
             // apply boundary condition
-            x(i, dir) -= floor(x(i, dir));
+            x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
         }
     };
 };
 void  identical_particles::update_positions(const double dt_) {
-    Kokkos::parallel_for("update_position", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, coeff_x, x, p));
+    Kokkos::parallel_for("update_position", Kokkos::RangePolicy(0, N), functor_update_pos(dt_, coeff_x, x, p, L));
 }
 
 
@@ -327,7 +339,7 @@ public:
     const double dt;
     type_p p;
     type_const_f f;
-    functor_update_momenta(double dt_, type_p& p_, type_f& f_): dt(dt_), p(p_), f(f_) {};
+    functor_update_momenta(double dt_, type_p& p_, type_f& f_) : dt(dt_), p(p_), f(f_) {};
 
     KOKKOS_FUNCTION
         void operator() (const int i) const {

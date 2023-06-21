@@ -1,6 +1,8 @@
 StartCondition: hot
 seed: 123
 Ntrajectories: 100
+thermalization_steps: 100
+save_every: 2
 
 geometry: 
   Lx: 1

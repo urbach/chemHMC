@@ -55,6 +55,7 @@ public:
 
     void printx();
     void printp();
+    void print_xyz(int traj, double K, double V);
 
     virtual void hb() = 0;
     virtual double compute_potential() = 0;
