@@ -23,7 +23,7 @@ T check_and_assign_value(YAML::Node doc, const char* tag) {
         std::cout << doc << std::endl;
         Kokkos::abort("params not found");
     }
-
+    
     try {
         return doc[tag].as<T>();
     } catch (YAML::TypedBadConversion<T>) {
@@ -51,6 +51,9 @@ params_class::params_class(YAML::Node doc) {
     std::cout << "   Lz: " << L[2] << std::endl;
     std::cout << "seed: " << seed << std::endl;
     std::cout << "StartCondition: " << StartCondition << std::endl;
+    if (StartCondition=="read"){
+        start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
+    }
 
 }
 

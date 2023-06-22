@@ -31,6 +31,9 @@ public:
     type_p::HostMirror h_p;
     params_class params;
 
+    FILE * fileout;
+    std::string nameout;
+
     int nbin[dim_space], bintot;
     double sizebin[dim_space];
 
@@ -55,7 +58,9 @@ public:
 
     void printx();
     void printp();
-    void print_xyz(int traj, double K, double V);
+    virtual void print_xyz(int traj, double K, double V) =0;
+    virtual void read_xyz() = 0;
+
 
     virtual void hb() = 0;
     virtual double compute_potential() = 0;

@@ -8,6 +8,7 @@ struct params_class { // Just the thing that holds all variables
   
   double L[dim_space];
   std::string StartCondition;
+  std::string start_configuration_file;
   
   // run parameter
   int seed;

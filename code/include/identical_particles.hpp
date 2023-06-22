@@ -32,6 +32,8 @@ public:
     // constructor
     identical_particles(YAML::Node doc);
 
+    void print_xyz( int traj, double K, double V) override;
+    void read_xyz() override;
     void InitX() override;
     void hb() override; // heatbath for the momenta
 

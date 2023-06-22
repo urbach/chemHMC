@@ -1,7 +1,9 @@
-StartCondition: hot
+StartCondition: read
+start_configuration_file: in_xyz.txt
+output_file: out_xyz.txt
 seed: 123
-Ntrajectories: 100
-thermalization_steps: 100
+Ntrajectories: 4
+thermalization_steps: 4
 save_every: 2
 
 geometry: 

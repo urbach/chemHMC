@@ -76,12 +76,12 @@ void HMC_class::run() {
             Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
             printf("New configuration rejected\n");
         }
-
+        integrator->particles->printx();
         if (i >= thermalization_steps && (i % save_every == 0))
             integrator->particles->print_xyz(i, Ki, Vi);
         printf("time for trajectory: %g s\n", timer_traj.seconds());
     }
-    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories - thermalization_steps)));
+    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories )));
     printf("time for HMC: %g  s\n", timer.seconds());
 
 
