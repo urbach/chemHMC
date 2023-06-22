@@ -6,12 +6,43 @@
 #include "HMC.hpp"
 #include "identical_particles.hpp"
 
-void add_error(std::vector<std::string> &errors , std::string s){
+void add_error(std::vector<std::string>& errors, std::string s) {
     errors.emplace_back(s);
-    printf("%s\n",s.c_str());
+    printf("%s\n", s.c_str());
 }
 
-void check_binning(particles_type* particles2, particles_type* particles3, std::string comparison, std::vector<std::string> &errors) {
+void check_force(particles_type* particles2, particles_type* particles3, std::string comparison, std::vector<std::string>& errors) {
+    printf("########################################################################################\n");
+    printf("comparing force %s\n", comparison.c_str());
+    int sum = 0;
+    int N = particles2->N;
+    type_f f2 = particles2->f;
+    type_f f3 = particles3->f;
+    Kokkos::parallel_reduce("check-force", N, KOKKOS_LAMBDA(const int i, int& update) {
+        double diff;
+        for (int dir = 0;dir < dim_space;dir++) {
+            diff = 0;
+            if (f2(i, dir) * f2(i, dir) > 1e-6)
+                diff = Kokkos::fabs(f2(i, dir) - f3(i, dir)) / f2(i, dir);
+            else
+                diff = Kokkos::fabs(f2(i, dir) - f3(i, dir));
+            if (diff > 1e-7) {
+                printf("error: force difference at %d  f2= %.12g  f3=  %.12g  diff=%.12g  ratio=%.12g\n", i, f2(i, dir), f3(i, dir),
+                    f2(i, dir) - f3(i, dir), f2(i, dir) / f3(i, dir));
+                update++;
+            }
+        }
+
+    }, sum);
+    Kokkos::fence();
+
+    if (sum > 0)    add_error(errors, "comparing force" + comparison);
+    else printf("Test passed:  force match\n");
+
+}
+
+
+void check_binning(particles_type* particles2, particles_type* particles3, std::string comparison, std::vector<std::string>& errors) {
     t_permute_vector p2 = particles2->permute_vector;
     t_permute_vector p3 = particles3->permute_vector;
     t_bincount   bc2 = particles2->bincount;
@@ -19,9 +50,9 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
     t_binoffsets   bo2 = particles2->binoffsets;
     t_binoffsets   bo3 = particles3->binoffsets;
     printf("########################################################################################\n");
-    printf("comparing binning %s\n",comparison.c_str());
+    printf("comparing binning %s\n", comparison.c_str());
     int Nb = particles2->bintot;
-    int sum=0;
+    int sum = 0;
     Kokkos::parallel_reduce("check-binning-condition", Nb, KOKKOS_LAMBDA(const int ib, int& update) {
         int bx, by, bz;
         particles2->lextoc(ib, bx, by, bz);
@@ -50,7 +81,7 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
     }, sum);
     Kokkos::fence();
 
-    if (sum > 0)    add_error(errors,"comparing binning"+ comparison );
+    if (sum > 0)    add_error(errors, "comparing binning" + comparison);
     else printf("Test passed:  binning match\n");
 
 }
@@ -150,12 +181,12 @@ int main(int argc, char** argv) {
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V3) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V3);
-            add_error(errors,"error: the potential all_neighbour does not match quick_sort");
+            add_error(errors, "error: the potential all_neighbour does not match quick_sort");
         }
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V4) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V4);
-            add_error(errors,"error: the potential all_neighbour does not match parallel_binning");
+            add_error(errors, "error: the potential all_neighbour does not match parallel_binning");
         }
         else printf("Test passed: the potential is the same\n");
         printf("###################################################################################################\n");
@@ -183,13 +214,26 @@ int main(int argc, char** argv) {
         check_binning(particles2, particles4, "binning_serial  agains parallel_binning", errors);
         check_binning(particles2, particles3, "binning_serial  agains quick_sort", errors);
 
+        /////////////////////////////////////////////////////////////////////////////////////////
+        timer1.reset();
+        particles1->compute_force();
+        Kokkos::fence();
+        printf("time force all_neighbour = %f s\n", timer1.seconds());
+
+        timer4.reset();
+        particles4->compute_force();
+        Kokkos::fence();
+        printf("time force parallel_binning = %f s\n", timer4.seconds());
+
+        check_force(particles1, particles4, "all_neighbour  agains parallel_binning", errors);
+        //////////////////////////////////////////////////////////////////////////////////////////
         printf("error recap:\n");
-        if (errors.size()>0){
-            for (auto e:errors)
-                printf("%s\n",e.c_str());   
+        if (errors.size() > 0) {
+            for (auto e : errors)
+                printf("%s\n", e.c_str());
             Kokkos::abort("abort");
         }
-        else{
+        else {
             printf("none\n");
         }
     }

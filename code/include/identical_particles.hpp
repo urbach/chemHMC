@@ -18,6 +18,7 @@ public:
     struct Tag_potential_binning {};
     struct kinetic {};
     struct force {};
+    struct Tag_force_binning{};
     struct Tag_quicksort_compare {};
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     double mass;
@@ -69,7 +70,14 @@ public:
     };
 
     double compute_kinetic_E() override;
-    void compute_force() override;  //declaration of the function
+
+    std::function<void()>  force_strategy;
+    void compute_force_all();
+    void compute_force_binning();
+    void compute_force() override {
+        return force_strategy();
+    };
+    
 
     KOKKOS_FUNCTION void operator() (cold, const int i) const;
     KOKKOS_FUNCTION void operator() (hot, const int i) const;
@@ -81,9 +89,9 @@ public:
     // functor to compute the kinetic energy
     KOKKOS_FUNCTION void operator() (kinetic, const int i, double& K) const;
 
-
     // functor to compute the forces
     KOKKOS_FUNCTION void operator() (force, const int i) const; //declaration of functor
+    KOKKOS_FUNCTION void operator() (Tag_force_binning, const member_type& teamMember) const;
     ~identical_particles() {};
 
     void compute_coeff_momenta() override;
