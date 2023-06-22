@@ -122,6 +122,8 @@ int main(int argc, char** argv) {
         doc["particles"]["sigma"] = 0.1;
         doc["particles"]["algorithm"] = "all_neighbour";
 
+        doc["output_file"] = "test_out_for_binning.txt";
+
         particles_type* particles1, * particles2;
 
         particles1 = new identical_particles(doc);

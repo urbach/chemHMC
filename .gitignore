@@ -37,3 +37,4 @@ code/build*
 !code/build/do_cmake_*.sh
 /build
 code/.vscode/
+debug_build/
