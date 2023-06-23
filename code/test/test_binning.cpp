@@ -120,6 +120,7 @@ int main(int argc, char** argv) {
         doc["particles"]["cutoff"] = 0.4;
         doc["particles"]["eps"] = 0.1;
         doc["particles"]["sigma"] = 0.1;
+        doc["particles"]["name_xyz"] = "none";
         doc["particles"]["algorithm"] = "all_neighbour";
 
         doc["output_file"] = "test_out_for_binning.txt";
