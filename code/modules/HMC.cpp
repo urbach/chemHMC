@@ -39,7 +39,7 @@ void HMC_class::run() {
     Kokkos::Timer timer;
     double Vi = integrator->particles->compute_potential();
     double Ki = integrator->particles->compute_kinetic_E();
-
+    double beta = integrator->particles->beta;
     printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
     Kokkos::fence();
 
@@ -59,13 +59,12 @@ void HMC_class::run() {
         double Vf = integrator->particles->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
 
-        printf("Action after the MD evolution is: %.12g   K= %.12g  V=%.12g\n", Vf + Kf, Kf, Vf);
+        printf("Action after the MD evolution is: %.12g   K= %.12g  V=%.12g beta=%.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
         Kokkos::fence();
 
 
         double r = gen_random();// random number from 0 to 1
-        printf("%g\n",exp(-(Kf + Vf - Ki - Vi)));
-        if (r < exp(-(Kf + Vf - Ki - Vi))) {
+        if (r < exp(-beta * (Kf + Vf - Ki - Vi))) {
             acceptance++;
             Vi = Vf;
             Ki = Kf;
@@ -81,7 +80,7 @@ void HMC_class::run() {
             integrator->particles->print_xyz(i, Ki, Vi);
         printf("time for trajectory: %g s\n", timer_traj.seconds());
     }
-    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories )));
+    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories)));
     printf("time for HMC: %g  s\n", timer.seconds());
 
 

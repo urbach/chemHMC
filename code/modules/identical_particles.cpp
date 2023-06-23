@@ -200,7 +200,7 @@ void identical_particles::operator() (hbTag, const int i) const {
 double identical_particles::potential_all_neighbour() {
     double result = 0;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-all", Kokkos::RangePolicy<Tag_potential_all>(0, N), *this, result);
-    return result;
+    return 4 * eps * result;
 }
 
 
@@ -230,7 +230,6 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
             }
         }
     }
-    V *= 4.0 * eps;
 };
 
 
@@ -445,10 +444,15 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
                             if (r < cutoff) {
-                                // printf("r(%d,%d)=%g\n", i, j, r);
-                                innerfv.the_array[0] += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
-                                innerfv.the_array[1] += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
-                                innerfv.the_array[2] += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
+                                double sr = sigma / r;
+                                double sr4 = sr * sr * sr * sr;
+                                sr = sr4 * (sr4 * sr * sr - 1.0);
+                                innerfv.the_array[0] += sr * x(i, 0);
+                                innerfv.the_array[1] += sr * x(i, 1);
+                                innerfv.the_array[2] += sr * x(i, 2);
+                                // innerfv.the_array[0] += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
+                                // innerfv.the_array[1] += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
+                                // innerfv.the_array[2] += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
                             }
                         }
                         }, fv);
@@ -460,7 +464,11 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                 }
             }
         }
+        f(i, 0) *= 4.0 * eps;
+        f(i, 1) *= 4.0 * eps;
+        f(i, 2) *= 4.0 * eps;
         });
+
     // Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
     //     V += tempN;
     //     });
@@ -468,11 +476,11 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
 
 
 void identical_particles::compute_coeff_momenta() {
-    coeff_p = 1;
+    coeff_p = beta;
 }
 
 void identical_particles::compute_coeff_position() {
-    coeff_x = -beta / (mass * mass);
+    coeff_x = beta / (mass * mass);
 }
 
 
@@ -483,7 +491,7 @@ public:
     type_x x;
     type_const_p p;
     const double L[dim_space];
-    functor_update_pos(double dt_, double c, type_x& x_, type_p& p_, const double L_[]) : dt(dt_), c(c), x(x_), p(p_),
+    functor_update_pos(double dt_, double c_, type_x& x_, type_p& p_, const double L_[]) : dt(dt_), c(c_), x(x_), p(p_),
         L{ L_[0], L_[1], L_[2] } {
     };
 
@@ -504,18 +512,19 @@ void  identical_particles::update_positions(const double dt_) {
 class functor_update_momenta {
 public:
     const double dt;
+    const double c;
     type_p p;
     type_const_f f;
-    functor_update_momenta(double dt_, type_p& p_, type_f& f_) : dt(dt_), p(p_), f(f_) {};
+    functor_update_momenta(double dt_, double c_, type_p& p_, type_f& f_) : dt(dt_), c(c_), p(p_), f(f_) {};
 
     KOKKOS_FUNCTION
         void operator() (const int i) const {
-        p(i, 0) -= dt * f(i, 0);
-        p(i, 1) -= dt * f(i, 1);
-        p(i, 2) -= dt * f(i, 2);
+        p(i, 0) -= dt * c * f(i, 0);
+        p(i, 1) -= dt * c * f(i, 1);
+        p(i, 2) -= dt * c * f(i, 2);
     };
 };
 void identical_particles::update_momenta(const double dt_) {
     compute_force();
-    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, p, f));
+    Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, coeff_p, p, f));
 }
