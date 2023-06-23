@@ -8,7 +8,7 @@
 
 
 
-class identical_particles: public particles_type {
+class identical_particles : public particles_type {
 
 public:
     struct cold {};
@@ -18,7 +18,7 @@ public:
     struct Tag_potential_binning {};
     struct kinetic {};
     struct force {};
-    struct Tag_force_binning{};
+    struct Tag_force_binning {};
     struct Tag_quicksort_compare {};
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     double mass;
@@ -28,11 +28,12 @@ public:
     double eps;
     double cutoff;
     const std::string name = "identical_particles";
+    std::string name_xyz;
 
     // constructor
     identical_particles(YAML::Node doc);
 
-    void print_xyz( int traj, double K, double V) override;
+    void print_xyz(int traj, double K, double V) override;
     void read_xyz() override;
     void InitX() override;
     void hb() override; // heatbath for the momenta
@@ -79,7 +80,7 @@ public:
     void compute_force() override {
         return force_strategy();
     };
-    
+
 
     KOKKOS_FUNCTION void operator() (cold, const int i) const;
     KOKKOS_FUNCTION void operator() (hot, const int i) const;

@@ -1,8 +1,8 @@
 StartCondition: read
-start_configuration_file: in_xyz.txt
+start_configuration_file: examples_xyz/Ar-10.xyz
 output_file: out_xyz.txt
 seed: 123
-Ntrajectories: 4
+Ntrajectories: 6
 thermalization_steps: 4
 save_every: 2
 
@@ -13,7 +13,8 @@ geometry:
 
 particles:
   name: identical_particles
-  N: 8
+  name_xyz: Ar
+  N: 10
   mass: 0.1
   beta: 0.5
   cutoff: 0.5
