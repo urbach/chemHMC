@@ -33,6 +33,7 @@ public:
     // constructor
     identical_particles(YAML::Node doc);
 
+    double get_beta() { return beta; };
     void print_xyz(int traj, double K, double V) override;
     void read_xyz() override;
     void InitX() override;

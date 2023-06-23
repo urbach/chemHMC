@@ -39,7 +39,7 @@ void HMC_class::run() {
     Kokkos::Timer timer;
     double Vi = integrator->particles->compute_potential();
     double Ki = integrator->particles->compute_kinetic_E();
-    double beta = integrator->particles->beta;
+    double beta = integrator->particles->get_beta();
     printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
     Kokkos::fence();
 

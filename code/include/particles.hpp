@@ -31,7 +31,7 @@ public:
     type_p::HostMirror h_p;
     params_class params;
 
-    FILE * fileout;
+    FILE* fileout;
     std::string nameout;
 
     int nbin[dim_space], bintot;
@@ -54,11 +54,12 @@ public:
     // constructor
     particles_type(YAML::Node doc);
 
+    virtual double get_beta() = 0;
     virtual void InitX() = 0;
 
     void printx();
     void printp();
-    virtual void print_xyz(int traj, double K, double V) =0;
+    virtual void print_xyz(int traj, double K, double V) = 0;
     virtual void read_xyz() = 0;
 
 
