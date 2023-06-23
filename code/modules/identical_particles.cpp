@@ -220,18 +220,17 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
                     r = r + rij * rij;
                     rij = x(i, 2) - (x(j, 2) + bz * L[2]);
                     r = r + rij * rij;
-                    //printf("%g\n",rij);
 
                     r = sqrt(r);
                     if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
-                        // printf("r(%d,%d)=%g\n", i, j, r);
-                        V += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
+                        V += (pow(sigma / r, 12) - pow(sigma / r, 6));
                     }
+
                 }
             }
         }
     }
-
+    V *= 4.0 * eps;
 };
 
 
@@ -240,7 +239,7 @@ double identical_particles::potential_binning() {
     create_binning();
     typedef Kokkos::TeamPolicy<Tag_potential_binning>  team_policy;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-binning", team_policy(bintot, Kokkos::AUTO), *this, result);
-    return result;
+    return 4 * eps * result;
 }
 
 KOKKOS_FUNCTION
@@ -284,8 +283,11 @@ void identical_particles::operator() (Tag_potential_binning, const member_type& 
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
                             if (r < cutoff) {
-                                // printf("r(%d,%d)=%g\n", i, j, r);
-                                innerUpdateM += 4 * eps * (pow(sigma / r, 12) - pow(sigma / r, 6));
+                                // we multiply by 4*eps at the end, outside this operator
+                                double sr = sigma / r;
+                                double sr6 = sr * sr * sr * sr * sr * sr;
+                                innerUpdateM += sr6 * (sr6 - 1.0);
+                                // innerUpdateM +=  (pow(sigma / r, 12) - pow(sigma / r, 6));
                             }
                         }
                         }, tempM);
@@ -312,7 +314,7 @@ double identical_particles::compute_kinetic_E() {
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (kinetic, const int i, double& K) const {
-    K += (beta / (2 * mass * mass)) * (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2));
+    K += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass * mass);
 };
 
 
@@ -345,17 +347,19 @@ void identical_particles::operator() (force, const int i) const {
 
                     r = sqrt(r);
                     if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
-                        f(i, 0) += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
-                        f(i, 1) += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
-                        f(i, 2) += 4 * eps * (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
+                        f(i, 0) += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
+                        f(i, 1) += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
+                        f(i, 2) += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
                     }
                 }
             }
         }
     }
-
-
+    f(i, 0) *= 4 * eps;
+    f(i, 1) *= 4 * eps;
+    f(i, 2) *= 4 * eps;
 }
+
 
 
 
