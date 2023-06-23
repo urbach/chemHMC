@@ -38,3 +38,5 @@ code/build*
 /build
 code/.vscode/
 debug_build/
+.vscode/settings.json
+code/cmake/.Rhistory
