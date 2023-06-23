@@ -53,9 +53,14 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
     printf("comparing binning %s\n", comparison.c_str());
     int Nb = particles2->bintot;
     int sum = 0;
+    int nbin[3] = { particles2->nbin[0],particles2->nbin[1],particles2->nbin[2] };
     Kokkos::parallel_reduce("check-binning-condition", Nb, KOKKOS_LAMBDA(const int ib, int& update) {
         int bx, by, bz;
-        particles2->lextoc(ib, bx, by, bz);
+        // we need this manually here we can not call lextoc from here
+        bz = ib / (nbin[0] * nbin[1]);
+        by = (ib - bz * nbin[0] * nbin[1]) / (nbin[0]);
+        bx = ib - nbin[0] * (by + bz * nbin[1]);
+        //// 
         if (bc2(ib) != bc3(ib)) {
             printf("different count inside bin %d=(%d, %d, %d) : %d vs %d  \n", ib, bx, by, bz, bc2(ib), bc3(ib));
             update++;
@@ -157,7 +162,7 @@ int main(int argc, char** argv) {
         }, sum);
         if (sum > 0)Kokkos::abort("Initial position do not match");
         else printf("the initial positon of the two ensambles is the same\n");
-        particles1->printx();
+        // particles1->printx();
         printf("############################# timing potential calculation #########################################\n");
         Kokkos::Timer timer1;
         double V1 = particles1->compute_potential();
