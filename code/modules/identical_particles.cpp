@@ -499,7 +499,7 @@ public:
         void operator() (const int i) const {
         for (int dir = 0; dir < 3;dir++) {
             x(i, dir) += dt * c * p(i, 0);
-            // apply boundary condition
+            // apply  periodic boundary condition
             x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
         }
     };
