@@ -1,7 +1,9 @@
 StartCondition: read
-start_configuration_file: examples_xyz/Ar-10.xyz
+start_configuration_file: out_xyz.txt # examples_xyz/Ar-10.xyz
 output_file: out_xyz.txt
+append: true
 seed: 123
+rng_host_state: rng_host
 Ntrajectories: 6
 thermalization_steps: 4
 save_every: 2

@@ -1,5 +1,6 @@
 #include "HMC.hpp"
 #include "read_infile.hpp"
+#include <fstream>
 
 void HMC_class::init(int argc, char** argv) {
 
@@ -26,13 +27,29 @@ void HMC_class::init(int argc, char** argv) {
     thermalization_steps = check_and_assign_value<int>(doc, "thermalization_steps");
     save_every = check_and_assign_value<int>(doc, "save_every");
     int seed = check_and_assign_value<int>(doc, "seed");
+
     gen64.seed(seed);
+    if (integrator->particles->params.append == true) {
+        std::cout << std::endl << "Loading rng host...\n";
+        std::ifstream fin(integrator->particles->params.rng_host_state);
+        fin >> gen64;
+    }
+
     acceptance = 0;
 }
 
 double HMC_class::gen_random() {
     return (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));// random number from 0 to 1
 };
+
+void HMC_class::save_host_rng_state() {
+    // save state
+    std::cout << std::endl << "Saving rng host...\n";
+    {
+        std::ofstream fout(integrator->particles->params.rng_host_state);
+        fout << gen64;
+    }
+}
 
 void HMC_class::run() {
 
@@ -75,9 +92,13 @@ void HMC_class::run() {
             Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
             printf("New configuration rejected\n");
         }
+#ifdef DEBUG
         integrator->particles->printx();
-        if (i >= thermalization_steps && (i % save_every == 0))
+#endif
+        if (i >= thermalization_steps && (i % save_every == 0)) {
             integrator->particles->print_xyz(i, Ki, Vi);
+            save_host_rng_state();
+        }
         printf("time for trajectory: %g s\n", timer_traj.seconds());
     }
     printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories)));

@@ -9,7 +9,12 @@ struct params_class { // Just the thing that holds all variables
   double L[dim_space];
   std::string StartCondition;
   std::string start_configuration_file;
-  
+  FILE* fileout;
+  bool append;
+  std::string nameout;
+  std::string rng_host_state;
+
+
   // run parameter
   int seed;
   int replica;

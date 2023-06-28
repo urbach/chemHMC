@@ -31,9 +31,6 @@ public:
     type_p::HostMirror h_p;
     params_class params;
 
-    FILE* fileout;
-    std::string nameout;
-
     int nbin[dim_space], bintot;
     double sizebin[dim_space];
 

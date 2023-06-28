@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
 #include "global.hpp"
 #include "yaml-cpp/yaml.h"
 #include "particles.hpp"
@@ -23,10 +24,11 @@ T check_and_assign_value(YAML::Node doc, const char* tag) {
         std::cout << doc << std::endl;
         Kokkos::abort("params not found");
     }
-    
+
     try {
         return doc[tag].as<T>();
-    } catch (YAML::TypedBadConversion<T>) {
+    }
+    catch (YAML::TypedBadConversion<T>) {
         printf("error: impossible to read tag %s\n", tag);
         Kokkos::abort("Incorrect input type");
     }
@@ -36,6 +38,10 @@ template int check_and_assign_value<int>(YAML::Node, const char*);
 template std::string check_and_assign_value<std::string>(YAML::Node, const char*);
 
 
+inline bool file_exist(const std::string& name) {
+    std::ifstream f(name.c_str());
+    return f.good();
+}
 
 params_class::params_class(YAML::Node doc) {
 
@@ -51,8 +57,38 @@ params_class::params_class(YAML::Node doc) {
     std::cout << "   Lz: " << L[2] << std::endl;
     std::cout << "seed: " << seed << std::endl;
     std::cout << "StartCondition: " << StartCondition << std::endl;
-    if (StartCondition=="read"){
+    if (StartCondition == "read") {
         start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
+    }
+    fileout = NULL;
+    nameout = check_and_assign_value<std::string>(doc, "output_file");
+    append = check_and_assign_value<bool>(doc, "append");
+    if (append == true) {
+        if (StartCondition != "read") {
+            printf("error: append=true so the start condition must be read, while in the inputfile StartCondition=%s\n", StartCondition.c_str());
+            Kokkos::abort("aborting");
+        }
+        if (start_configuration_file != nameout) {
+            printf("error: append=true is only supported if the start_configuration_file is the same of the output_file\n");
+            printf("start_configuration_file= %s\n", start_configuration_file.c_str());
+            printf("output_file             = %s\n", nameout.c_str());
+            Kokkos::abort("aborting");
+        }
+        rng_host_state = check_and_assign_value<std::string>(doc, "rng_host_state");
+
+    }
+    else {
+        if (file_exist(nameout)) {
+            printf("error: output file %s exist but in the input file\n append=false found\n", nameout.c_str());Kokkos::abort("aborting");
+        }
+    }
+
+
+
+    fileout = fopen(nameout.c_str(), "ab");
+    if (fileout == NULL || nameout.length() <= 0 || nameout.compare("null") == 0) {
+        printf("unable to open file %s\n", nameout.c_str());
+        Kokkos::abort("abort");
     }
 
 }
