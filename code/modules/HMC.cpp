@@ -55,9 +55,9 @@ void HMC_class::run() {
 
     Kokkos::Timer timer;
     double Vi = integrator->particles->compute_potential();
-    double Ki = integrator->particles->compute_kinetic_E();
+    
     double beta = integrator->particles->get_beta();
-    printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
+    
     Kokkos::fence();
 
     // copy the configuration before the MD
@@ -66,6 +66,8 @@ void HMC_class::run() {
         Kokkos::Timer timer_traj;
         printf("Starting trajectory %d\n", i);
         integrator->particles->hb();
+        double Ki = integrator->particles->compute_kinetic_E();
+        printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
 #ifdef DEBUG
         integrator->particles->printx();
         integrator->particles->printp();
@@ -96,8 +98,11 @@ void HMC_class::run() {
         integrator->particles->printx();
 #endif
         if (i >= thermalization_steps && (i % save_every == 0)) {
+                printf( "trajectory= %d,  kinetic_energy= %.12g,  potential= %.12g\n", i, Ki, Vi);
+
             integrator->particles->print_xyz(i, Ki, Vi);
             save_host_rng_state();
+            integrator->particles->save_device_rng();
         }
         printf("time for trajectory: %g s\n", timer_traj.seconds());
     }
