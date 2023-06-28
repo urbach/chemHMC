@@ -55,14 +55,15 @@ void HMC_class::run() {
 
     Kokkos::Timer timer;
     double Vi = integrator->particles->compute_potential();
-    
-    double beta = integrator->particles->get_beta();
-    
-    Kokkos::fence();
 
+    double beta = integrator->particles->get_beta();
+
+    Kokkos::fence();
+    int first_traj = integrator->particles->params.istart + 1;
+    int last_traj = Ntrajectories + integrator->particles->params.istart + 1;
     // copy the configuration before the MD
     Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-    for (int i = 0; i < Ntrajectories; i++) {
+    for (int i = first_traj; i <= last_traj; i++) {
         Kokkos::Timer timer_traj;
         printf("Starting trajectory %d\n", i);
         integrator->particles->hb();
@@ -98,8 +99,6 @@ void HMC_class::run() {
         integrator->particles->printx();
 #endif
         if (i >= thermalization_steps && (i % save_every == 0)) {
-                printf( "trajectory= %d,  kinetic_energy= %.12g,  potential= %.12g\n", i, Ki, Vi);
-
             integrator->particles->print_xyz(i, Ki, Vi);
             save_host_rng_state();
             integrator->particles->save_device_rng();

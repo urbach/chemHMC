@@ -33,7 +33,7 @@ public:
 
     int nbin[dim_space], bintot;
     double sizebin[dim_space];
-
+    std::string rng_device_state;
 
     t_bincount bincount;
     t_binoffsets binoffsets;
@@ -48,6 +48,14 @@ public:
     t_bool after;
 
     RandPoolType rand_pool;
+    using device_type = typename Kokkos::DefaultExecutionSpace::device_type;
+    using state_data_type = Kokkos::View<uint64_t**, device_type>;
+    int padding;
+    typename state_data_type::HostMirror hs;
+
+
+    void save_device_rng();
+    void load_device_rng();
     // constructor
     particles_type(YAML::Node doc);
 

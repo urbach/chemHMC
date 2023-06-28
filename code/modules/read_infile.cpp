@@ -43,6 +43,31 @@ inline bool file_exist(const std::string& name) {
     return f.good();
 }
 
+void error_if_file_exist(const std::string& name) {
+    if (file_exist(name)) {
+        printf("error: output file %s exist but in the input file\n append=false found\n", name.c_str());
+        Kokkos::abort("aborting");
+    }
+}
+void error_if_can_not_open_file_to_read(const std::string& name) {
+    FILE* f = NULL;
+    f = fopen(name.c_str(), "r");
+    if (f == NULL || name.length() <= 0 || name.compare("null") == 0) {
+        printf("unable to open file %s\n", name.c_str());
+        Kokkos::abort("abort");
+    }
+    fclose(f);
+}
+void error_if_can_not_open_file_to_write(const std::string& name) {
+    FILE* f = NULL;
+    f = fopen(name.c_str(), "w+");
+    if (f == NULL || name.length() <= 0 || name.compare("null") == 0) {
+        printf("unable to open file %s\n", name.c_str());
+        Kokkos::abort("abort");
+    }
+    fclose(f);
+}
+
 params_class::params_class(YAML::Node doc) {
 
     L[0] = check_and_assign_value<double>(doc["geometry"], "Lx");
@@ -62,6 +87,12 @@ params_class::params_class(YAML::Node doc) {
     }
     fileout = NULL;
     nameout = check_and_assign_value<std::string>(doc, "output_file");
+    rng_host_state = check_and_assign_value<std::string>(doc, "rng_host_state");
+    rng_device_state = check_and_assign_value<std::string>(doc, "rng_device_state");
+    if (rng_device_state == rng_host_state) Kokkos::abort("rng_device_state must be different from rng_host_state\n");
+    if (rng_device_state == nameout) Kokkos::abort("rng_device_state must be different from output_file\n");
+    if (rng_host_state == nameout) Kokkos::abort("rng_host_state must be different from output_file\n");
+
     append = check_and_assign_value<bool>(doc, "append");
     if (append == true) {
         if (StartCondition != "read") {
@@ -74,22 +105,23 @@ params_class::params_class(YAML::Node doc) {
             printf("output_file             = %s\n", nameout.c_str());
             Kokkos::abort("aborting");
         }
-        rng_host_state = check_and_assign_value<std::string>(doc, "rng_host_state");
-
+        error_if_can_not_open_file_to_read(rng_host_state);
+        error_if_can_not_open_file_to_read(rng_device_state);
     }
     else {
-        if (file_exist(nameout)) {
-            printf("error: output file %s exist but in the input file\n append=false found\n", nameout.c_str());Kokkos::abort("aborting");
-        }
+        error_if_file_exist(nameout);
+        error_if_file_exist(rng_host_state);
+        error_if_file_exist(rng_device_state);
+        error_if_can_not_open_file_to_write(rng_host_state);
+        error_if_can_not_open_file_to_write(rng_device_state);
     }
-
-
 
     fileout = fopen(nameout.c_str(), "ab");
     if (fileout == NULL || nameout.length() <= 0 || nameout.compare("null") == 0) {
         printf("unable to open file %s\n", nameout.c_str());
         Kokkos::abort("abort");
     }
+    istart = 0;
 
 }
 
