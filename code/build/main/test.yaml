@@ -12,6 +12,7 @@ geometry:
   Lz: 1
 
 particles:
+  # H=beta(P^2/(2m)+V)
   name: identical_particles
   name_xyz: Ar
   N: 10
