@@ -14,9 +14,10 @@ public:
     int acceptance;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
+    std::string rng_host_state;
 
     HMC_class(){};
-
+    void save_host_rng_state();
     void init(int argc, char** argv);
        
     void run();

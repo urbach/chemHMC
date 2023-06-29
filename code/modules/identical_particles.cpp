@@ -88,25 +88,33 @@ void identical_particles::read_xyz() {
     rewind(file);
     int count = 0;
     char id[1000];
+
     while ((c = fgetc(file)) != EOF) {
+
         if (c == '\n') {
             count++;
-            if (count == (confs - 1) * (N + 2) + 2) {// if starting of the last conf
+            if (count == (confs - 1) * (N + 2) + 1) {
+                for (int i = 0;i < 11;i++) c = fgetc(file);
+                fscanf(file, " %d",  &params.istart);
+                printf("%d %d\n",  params.istart, count);
+                // count++;
+            }
+            if (count == (confs - 1) * (N + 2) + 2) {// if starting of the last conf, count missmatched by fscanf
                 break;
             }
         }
     }
-    printf("reading last configuration from input file %s", params.start_configuration_file.c_str());
+    printf("reading last configuration from input file %s\n", params.start_configuration_file.c_str());
     count = 0;
     for (int i = 0; i < N;i++) {
         count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
-        printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
+        // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
     }
     if (name_xyz.compare(id) != 0) {
         printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
         Kokkos::abort("abort");
     }
-    printf("%d  %d\n", count, N);
+    // printf("%d  %d\n", count, N);
     if (count != N * 4) { Kokkos::abort("error in reading the file"); }
     fclose(file);
     Kokkos::deep_copy(x, h_x);
@@ -115,7 +123,7 @@ void identical_particles::read_xyz() {
 
 void identical_particles::InitX() {
     x = type_x("x", N);
-    // create_mirror() willalways allocate a new view,
+    // create_mirror() will always allocate a new view,
     // create_mirror_view() will only create a new view if the original one is not in HostSpace
     h_x = Kokkos::create_mirror(x);
     p = type_p("p", N);
@@ -163,10 +171,10 @@ void identical_particles::operator() (hot, const int i) const {
 // since we are using the hostMirror to store the starting point we don't whant to 
 // deep_copy it here 
 void identical_particles::print_xyz(int traj, double K, double V) {
-    fprintf(fileout, "     %d\n", N);
-    fprintf(fileout, "trajectory= %d,  kinetic_energy= %.12g,  potential= %.12g\n", traj, K, V);
+    fprintf(params.fileout, "     %d\n", N);
+    fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g\n", traj, K, V);
     for (int i = 0; i < N; i++)
-        fprintf(fileout, "%s  %-20.12g %-20.12g %-20.12g\n", name_xyz.c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
+        fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", name_xyz.c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 
 void particles_type::printx() {

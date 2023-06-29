@@ -1,5 +1,6 @@
 #include "HMC.hpp"
 #include "read_infile.hpp"
+#include <fstream>
 
 void HMC_class::init(int argc, char** argv) {
 
@@ -26,7 +27,14 @@ void HMC_class::init(int argc, char** argv) {
     thermalization_steps = check_and_assign_value<int>(doc, "thermalization_steps");
     save_every = check_and_assign_value<int>(doc, "save_every");
     int seed = check_and_assign_value<int>(doc, "seed");
+
     gen64.seed(seed);
+    if (integrator->particles->params.append == true) {
+        std::cout << std::endl << "Loading rng host...\n";
+        std::ifstream fin(integrator->particles->params.rng_host_state);
+        fin >> gen64;
+    }
+
     acceptance = 0;
 }
 
@@ -34,21 +42,33 @@ double HMC_class::gen_random() {
     return (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));// random number from 0 to 1
 };
 
+void HMC_class::save_host_rng_state() {
+    // save state
+    std::cout << std::endl << "Saving rng host...\n";
+    {
+        std::ofstream fout(integrator->particles->params.rng_host_state);
+        fout << gen64;
+    }
+}
+
 void HMC_class::run() {
 
     Kokkos::Timer timer;
     double Vi = integrator->particles->compute_potential();
-    double Ki = integrator->particles->compute_kinetic_E();
-    double beta = integrator->particles->get_beta();
-    printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
-    Kokkos::fence();
 
+    double beta = integrator->particles->get_beta();
+
+    Kokkos::fence();
+    int first_traj = integrator->particles->params.istart + 1;
+    int last_traj = Ntrajectories + integrator->particles->params.istart + 1;
     // copy the configuration before the MD
     Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-    for (int i = 0; i < Ntrajectories; i++) {
+    for (int i = first_traj; i <= last_traj; i++) {
         Kokkos::Timer timer_traj;
         printf("Starting trajectory %d\n", i);
         integrator->particles->hb();
+        double Ki = integrator->particles->compute_kinetic_E();
+        printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
 #ifdef DEBUG
         integrator->particles->printx();
         integrator->particles->printp();
@@ -75,9 +95,14 @@ void HMC_class::run() {
             Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
             printf("New configuration rejected\n");
         }
+#ifdef DEBUG
         integrator->particles->printx();
-        if (i >= thermalization_steps && (i % save_every == 0))
+#endif
+        if (i >= thermalization_steps && (i % save_every == 0)) {
             integrator->particles->print_xyz(i, Ki, Vi);
+            save_host_rng_state();
+            integrator->particles->save_device_rng();
+        }
         printf("time for trajectory: %g s\n", timer_traj.seconds());
     }
     printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories)));

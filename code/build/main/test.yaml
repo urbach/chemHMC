@@ -1,15 +1,18 @@
 StartCondition: read
-start_configuration_file: examples_xyz/Ar-10.xyz
+start_configuration_file: out_xyz.txt # examples_xyz/Ar-10.xyz
 output_file: out_xyz.txt
+append: true
 seed: 123
-Ntrajectories: 6
-thermalization_steps: 4
-save_every: 2
+rng_host_state: rng_host
+rng_device_state: rng_device
+Ntrajectories: 4
+thermalization_steps: 0
+save_every: 1
 
 geometry: 
-  Lx: 1
-  Ly: 1
-  Lz: 1
+  Lx: 3
+  Ly: 3
+  Lz: 3
 
 particles:
   # H=beta(P^2/(2m)+V)
