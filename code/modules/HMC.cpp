@@ -63,12 +63,12 @@ void HMC_class::run() {
     int last_traj = Ntrajectories + integrator->particles->params.istart + 1;
     // copy the configuration before the MD
     Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-    for (int i = first_traj; i <= last_traj; i++) {
+    for (int i = first_traj; i < last_traj; i++) {
         Kokkos::Timer timer_traj;
         printf("Starting trajectory %d\n", i);
         integrator->particles->hb();
         double Ki = integrator->particles->compute_kinetic_E();
-        printf("initial Action values : %.12g   K= %.12g  V=%.12g\n", Vi + Ki, Ki, Vi);
+        printf("initial Action values betaS= %.12g   K= %.12g  V=%.12g\n", beta * (Vi + Ki), Ki, Vi);
 #ifdef DEBUG
         integrator->particles->printx();
         integrator->particles->printp();
@@ -79,7 +79,7 @@ void HMC_class::run() {
         double Vf = integrator->particles->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
 
-        printf("Action after the MD evolution is: %.12g   K= %.12g  V=%.12g beta=%.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
+        printf("Action after the MD evolution betaS= %.12g   K= %.12g  V=%.12g beta=%.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
         Kokkos::fence();
 
 

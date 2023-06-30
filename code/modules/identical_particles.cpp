@@ -95,8 +95,8 @@ void identical_particles::read_xyz() {
             count++;
             if (count == (confs - 1) * (N + 2) + 1) {
                 for (int i = 0;i < 11;i++) c = fgetc(file);
-                fscanf(file, " %d",  &params.istart);
-                printf("%d %d\n",  params.istart, count);
+                fscanf(file, " %d", &params.istart);
+                // printf("%d %d\n", params.istart, count);
                 // count++;
             }
             if (count == (confs - 1) * (N + 2) + 2) {// if starting of the last conf, count missmatched by fscanf
@@ -118,7 +118,7 @@ void identical_particles::read_xyz() {
     if (count != N * 4) { Kokkos::abort("error in reading the file"); }
     fclose(file);
     Kokkos::deep_copy(x, h_x);
-    printx();
+    // printx();
 }
 
 void identical_particles::InitX() {
@@ -505,8 +505,8 @@ public:
 
     KOKKOS_FUNCTION
         void operator() (const int i) const {
-        for (int dir = 0; dir < 3;dir++) {
-            x(i, dir) += dt * c * p(i, 0);
+        for (int dir = 0; dir < 3; dir++) {
+            x(i, dir) += dt * c * p(i, dir);
             // apply  periodic boundary condition
             x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
         }
