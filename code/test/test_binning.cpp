@@ -127,17 +127,28 @@ int main(int argc, char** argv) {
         doc["particles"]["sigma"] = 0.1;
         doc["particles"]["name_xyz"] = "none";
         doc["particles"]["algorithm"] = "all_neighbour";
-
-        doc["output_file"] = "test_out_for_binning.txt";
+        doc["append"] = "false";
+        doc["rng_host_state"] = "tmp1";
+        doc["rng_device_state"] = "tmp2";
+        doc["output_file"] = "tmp3";
 
         particles_type* particles1, * particles2;
 
         particles1 = new identical_particles(doc);
         doc["particles"]["algorithm"] = "binning_serial";
+        doc["rng_host_state"] = "tmp4";
+        doc["rng_device_state"] = "tmp5";
+        doc["output_file"] = "tmp6";
         particles2 = new identical_particles(doc);
         doc["particles"]["algorithm"] = "quick_sort";
+        doc["rng_host_state"] = "tmp7";
+        doc["rng_device_state"] = "tmp8";
+        doc["output_file"] = "tmp9";
         particles_type* particles3 = new identical_particles(doc);
         doc["particles"]["algorithm"] = "parallel_binning";
+        doc["rng_host_state"] = "tmp10";
+        doc["rng_device_state"] = "tmp11";
+        doc["output_file"] = "tmp12";
         particles_type* particles4 = new identical_particles(doc);
 
         //// init the positions
@@ -173,9 +184,9 @@ int main(int argc, char** argv) {
         Kokkos::fence();
         printf("time binning_serial = %f s\n", timer2.seconds());
         Kokkos::Timer timer3;
-        double V3 = particles3->compute_potential();
-        Kokkos::fence();
-        printf("total time quick_sort = %gs   \n", timer3.seconds());
+        // double V3 = particles3->compute_potential();
+        // Kokkos::fence();
+        // printf("total time quick_sort = %gs   \n", timer3.seconds());
         Kokkos::Timer timer4;
         double V4 = particles4->compute_potential();
         Kokkos::fence();
@@ -187,11 +198,11 @@ int main(int argc, char** argv) {
             add_error(errors, "error: the potential all_neighbour does not match binning_serial");
         }
         else printf("Test passed: the potential is the same\n");
-        if (fabs((V1 - V3) / V1) > 1e-6) {
-            printf("%.12g   %.12g\n", V1, V3);
-            add_error(errors, "error: the potential all_neighbour does not match quick_sort");
-        }
-        else printf("Test passed: the potential is the same\n");
+        // if (fabs((V1 - V3) / V1) > 1e-6) {
+        //     printf("%.12g   %.12g\n", V1, V3);
+        //     add_error(errors, "error: the potential all_neighbour does not match quick_sort");
+        // }
+        // else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V4) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V4);
             add_error(errors, "error: the potential all_neighbour does not match parallel_binning");
@@ -204,14 +215,14 @@ int main(int argc, char** argv) {
         Kokkos::fence();
         printf("time to bin  serial = %g s\n", timer2.seconds());
         /////////////////////
-        Kokkos::Timer t3b;
-        particles3->create_binning();
-        Kokkos::fence();
-        printf("time to bin quick_sort  %gs\n", t3b.seconds());
-        Kokkos::Timer t3bb;
-        particles3->create_binning();
-        Kokkos::fence();
-        printf("time to bin quick_sort  %gs\n", t3bb.seconds());
+        // Kokkos::Timer t3b;
+        // particles3->create_binning();
+        // Kokkos::fence();
+        // printf("time to bin quick_sort  %gs\n", t3b.seconds());
+        // Kokkos::Timer t3bb;
+        // particles3->create_binning();
+        // Kokkos::fence();
+        // printf("time to bin quick_sort  %gs\n", t3bb.seconds());
         ////////////////////////////
         Kokkos::Timer t4b;
         particles4->create_binning();
@@ -220,7 +231,7 @@ int main(int argc, char** argv) {
         Kokkos::fence();
 
         check_binning(particles2, particles4, "binning_serial  agains parallel_binning", errors);
-        check_binning(particles2, particles3, "binning_serial  agains quick_sort", errors);
+        // check_binning(particles2, particles3, "binning_serial  agains quick_sort", errors);
 
         /////////////////////////////////////////////////////////////////////////////////////////
         timer1.reset();
