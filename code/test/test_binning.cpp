@@ -50,7 +50,7 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
     t_binoffsets   bo2 = particles2->binoffsets;
     t_binoffsets   bo3 = particles3->binoffsets;
     printf("########################################################################################\n");
-    printf("comparing binning %s\n", comparison.c_str());
+    printf("comparing binning  %s\n", comparison.c_str());
     int Nb = particles2->bintot;
     int sum = 0;
     int nbin[3] = { particles2->nbin[0],particles2->nbin[1],particles2->nbin[2] };
@@ -69,16 +69,30 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
             printf("different offset of bin %d=(%d, %d, %d) : %d vs %d  \n", ib, bx, by, bz, bo2(ib), bo3(ib));
             update++;
         }
-
-        for (int i = 0;i < bc2(ib);i++) {
-            int found = 1;
-            for (int j = 0;j < bc3(ib);j++) {
-                if (p2(i + bo2(ib)) == p3(j + bo3(ib)))
-                    found = 0;
+        if (bc2(ib) >= bc3(ib)) {
+            for (int i = 0;i < bc2(ib);i++) {
+                int found = 1;
+                for (int j = 0;j < bc3(ib);j++) {
+                    if (p2(i + bo2(ib)) == p3(j + bo3(ib)))
+                        found = 0;
+                }
+                if (found == 1) {
+                    printf("Particle %d inside bin %d not found in the second partition  \n", p2(i + bo2(ib)), ib);
+                    update++;
+                }
             }
-            if (found == 1) {
-                printf("Particle %d inside bin %d not found in the second partition  \n", p2(i + bo2(ib)), ib);
-                update++;
+        }
+        else {
+            for (int i = 0;i < bc3(ib);i++) {
+                int found = 1;
+                for (int j = 0;j < bc2(ib);j++) {
+                    if (p2(j + bo2(ib)) == p3(i + bo3(ib)))
+                        found = 0;
+                }
+                if (found == 1) {
+                    printf("Particle %d inside bin %d not found in the first partition  \n", p3(i + bo3(ib)), ib);
+                    update++;
+                }
             }
         }
 
@@ -97,32 +111,45 @@ void check_force_with_num_der(particles_type* particles, std::vector<std::string
     double h = 1e-4;
     type_x tmpx = particles->x;
     int count = 0;
-    for (int i = 0; i < particles->N;i++) {
-        Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int i) {
-            tmpx(0, 0) -= h;
-        });
-        double V1 = particles->compute_potential();
-        type_f::HostMirror force_val = Kokkos::create_mirror_view(particles->f);// force is already computed
-        Kokkos::deep_copy(force_val, particles->f);
-        Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int i) {
-            tmpx(0, 0) += 2 * h;
-        });
-        double V2 = particles->compute_potential();
-        double num_der = (V2 - V1) / (2 * h);
-        if (fabs(num_der - force_val(0, 0)) > 1e-7) {
-            printf("error: numerical derivative does not match the force: x=%d\t", i);
-            printf("num_der= %.12g     force= %.12g    diff= %12.g  ratio= %12.g \n",
-                num_der, force_val(0, 0), num_der - force_val(0, 0), num_der / force_val(0, 0));
-            count++;
+    type_f::HostMirror force_val = Kokkos::create_mirror(particles->f);// force is already computed
+    Kokkos::deep_copy(force_val, particles->f);
+    for (int i = 0; i < particles->N; i++) {
+        for (int dir = 0; dir < dim_space; dir++) {
+            Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+                tmpx(i, dir) += 2 * h;
+            });
+            double V = -particles->compute_potential();
+            Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+                tmpx(i, dir) -= h;
+            });
+            V += 8 * particles->compute_potential();
+            Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+                tmpx(i, dir) -= 2 * h;
+            });
+            V -= 8 * particles->compute_potential();
+            Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+                tmpx(i, dir) -= h;
+            });
+            V += particles->compute_potential();
+            double num_der = (V) / (12.0 * h);
+            double diff = num_der - force_val(i, dir);
+            if (fabs(num_der) > 1e-6) diff /= num_der;
+            diff = fabs(diff);
+            if (diff > 1e-4) {
+                printf("error: numerical derivative does not match force: x=%-6d dir=%-2d ", i, dir);
+                printf("num_der= %-18.12g force= %-18.12g diff= %-18.12g ratio= %-18.12g \n",
+                    num_der, force_val(i, dir), num_der - force_val(i, dir), num_der / force_val(i, dir));
+                count++;
+            }
+            // restore position
+            Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+                tmpx(i, dir) += 2 * h;
+            });
+            Kokkos::fence();
         }
-
-        // restore position
-        Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int i) {
-            tmpx(0, 0) -= h;
-        });
     }
-    if (count>0){
-        std::string s="comparing force with numerical deriv  algorithm:" + particles->algorithm;
+    if (count > 0) {
+        std::string s = "comparing force with numerical deriv  algorithm:" + particles->algorithm;
         add_error(errors, s);
     }
     else { printf("test passed\n"); }
@@ -218,6 +245,7 @@ int main(int argc, char** argv) {
         Kokkos::fence();
         printf("time all_neighbour = %f s\n", timer1.seconds());
         Kokkos::Timer timer2;
+        particles2->create_binning();
         double V2 = particles2->compute_potential();
         Kokkos::fence();
         printf("time binning_serial = %f s\n", timer2.seconds());
@@ -226,6 +254,7 @@ int main(int argc, char** argv) {
         // Kokkos::fence();
         // printf("total time quick_sort = %gs   \n", timer3.seconds());
         Kokkos::Timer timer4;
+        particles4->create_binning();
         double V4 = particles4->compute_potential();
         Kokkos::fence();
 
@@ -282,12 +311,14 @@ int main(int argc, char** argv) {
         Kokkos::fence();
         printf("time force parallel_binning = %f s\n", timer4.seconds());
 
+        check_force(particles1, particles4, "all_neighbour  agains serial_binning", errors);
         check_force(particles1, particles4, "all_neighbour  agains parallel_binning", errors);
         //////////////////////////////////////////////////////////////////////////////////////////
 
-        check_force_with_num_der( particles1,  errors);
-        check_force_with_num_der( particles4,  errors);
-        
+        check_force_with_num_der(particles1, errors);
+        // check_force_with_num_der(particles2, errors);
+        check_force_with_num_der(particles4, errors);
+
         //////////////////////////////////////////////////////////////////////////////////////////
         printf("error recap:\n");
         if (errors.size() > 0) {

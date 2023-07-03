@@ -143,8 +143,19 @@ void identical_particles::InitX() {
     }
 
     Kokkos::deep_copy(h_x, x);
+    Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<check_in_volume>(0, N), *this);
     Kokkos::fence();
     printf("particle initialized\n");
+};
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (check_in_volume, const int i) const {
+    for (int dir = 0; dir < dim_space;dir++) {
+        if (x(i, dir) < 0 || x(i, dir) >= params.L[dir]) {
+            printf("error: particle position x(%d, %d)= %g  outside the box of length %g\n", i, dir, x(i, dir), params.L[dir]);
+            Kokkos::abort("aborting");
+        }
+    }
 };
 
 KOKKOS_FUNCTION
@@ -154,9 +165,9 @@ void identical_particles::operator() (cold, const int i) const {
     int iy = (int)(i - iz * N3 * N3) / (N3);
     int ix = (int)(i - iz * N3 * N3 - iy * N3);
 
-    x(i, 0) = params.L[0] * (ix / N3);
-    x(i, 1) = params.L[1] * (iy / N3);
-    x(i, 2) = params.L[2] * (iz / N3);
+    x(i, 0) = params.L[0] * (ix - N3 * floor(ix / N3)) / N3;
+    x(i, 1) = params.L[1] * (iy - N3 * floor(iy / N3)) / N3;
+    x(i, 2) = params.L[2] * (iz - N3 * floor(iz / N3)) / N3;
 };
 
 KOKKOS_FUNCTION
@@ -241,10 +252,8 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
     }
 };
 
-
 double identical_particles::potential_binning() {
     double result = 0;
-    create_binning();
     typedef Kokkos::TeamPolicy<Tag_potential_binning>  team_policy;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-binning", team_policy(bintot, Kokkos::AUTO), *this, result);
     // 2 *eps instead of 4 *eps because we count the couples i,j twice
@@ -373,7 +382,6 @@ void identical_particles::operator() (force, const int i) const {
 
 
 void identical_particles::compute_force_binning() {
-    create_binning();
     typedef Kokkos::TeamPolicy<Tag_force_binning>  team_policy;
     Kokkos::parallel_for("identical_particles-LJ-force-binning", team_policy(bintot, Kokkos::AUTO), *this);
 }
@@ -455,7 +463,7 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
                             double r = sqrt(r2);
-                            if (r2 < cutoff* cutoff) {
+                            if (r2 < cutoff * cutoff) {
                                 double sr2 = sigma * sigma / r2;
                                 double sr6 = sr2 * sr2 * sr2;
                                 sr2 = sr6 * (-sr6 + 0.5) / r2;
@@ -537,6 +545,7 @@ public:
     };
 };
 void identical_particles::update_momenta(const double dt_) {
+    create_binning();
     compute_force();
     Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, coeff_p, p, f));
 }

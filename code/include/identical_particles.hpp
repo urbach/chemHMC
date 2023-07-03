@@ -20,6 +20,7 @@ public:
     struct force {};
     struct Tag_force_binning {};
     struct Tag_quicksort_compare {};
+    struct check_in_volume {};
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     double mass;
     double beta;
@@ -85,6 +86,8 @@ public:
 
     KOKKOS_FUNCTION void operator() (cold, const int i) const;
     KOKKOS_FUNCTION void operator() (hot, const int i) const;
+    KOKKOS_FUNCTION void operator() (check_in_volume, const int i) const;
+
 
     KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     // functor to compute the potential

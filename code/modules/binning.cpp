@@ -1,7 +1,7 @@
 #include "binning.hpp"
 
 functor_count_bin::functor_count_bin(int N_, int nbin_[dim_space], double sizebin_[dim_space], type_x& x_,
-    t_permute_vector& permute_vector_temp_, t_permute_vector& permute_vector_, t_bincount& bincount_, t_binoffsets& binoffsets_):
+    t_permute_vector& permute_vector_temp_, t_permute_vector& permute_vector_, t_bincount& bincount_, t_binoffsets& binoffsets_) :
     N(N_),
     nbin{ nbin_[0], nbin_[1], nbin_[2] },
     sizebin{ sizebin_[0], sizebin_[1], sizebin_[2] },
