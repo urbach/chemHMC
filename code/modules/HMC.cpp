@@ -44,7 +44,7 @@ double HMC_class::gen_random() {
 
 void HMC_class::save_host_rng_state() {
     // save state
-    std::cout << std::endl << "Saving rng host...\n";
+    std::cout << "Saving rng host...\n";
     {
         std::ofstream fout(integrator->particles->params.rng_host_state);
         fout << gen64;
@@ -99,11 +99,12 @@ void HMC_class::run() {
         integrator->particles->printx();
 #endif
         if (i >= thermalization_steps && (i % save_every == 0)) {
+            printf("saving conf\n");
             integrator->particles->print_xyz(i, Ki, Vi);
             save_host_rng_state();
             integrator->particles->save_device_rng();
         }
-        printf("time for trajectory: %g s\n", timer_traj.seconds());
+        printf("time for trajectory: %g s\n\n", timer_traj.seconds());
     }
     printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories)));
     printf("time for HMC: %g  s\n", timer.seconds());

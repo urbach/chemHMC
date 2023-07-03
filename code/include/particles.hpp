@@ -34,6 +34,7 @@ public:
     int nbin[dim_space], bintot;
     double sizebin[dim_space];
     std::string rng_device_state;
+    std::string algorithm;
 
     t_bincount bincount;
     t_binoffsets binoffsets;

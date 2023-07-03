@@ -24,7 +24,7 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
     sigma = check_and_assign_value<double>(doc["particles"], "sigma");
     name_xyz = check_and_assign_value<std::string>(doc["particles"], "name_xyz");
 
-    std::string algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
+    algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
     if (algorithm.compare("all_neighbour") == 0) {
         potential_strategy = std::bind(&identical_particles::potential_all_neighbour, this);
         force_strategy = std::bind(&identical_particles::compute_force_all, this);
@@ -199,16 +199,17 @@ void identical_particles::hb() {
 KOKKOS_FUNCTION
 void identical_particles::operator() (hbTag, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
-    p(i, 0) = rgen.normal(0, mass / sbeta); // exp(- beta p^2/(2m^2))
-    p(i, 1) = rgen.normal(0, mass / sbeta);
-    p(i, 2) = rgen.normal(0, mass / sbeta);
+    p(i, 0) = rgen.normal(); // exp(-  p^2)
+    p(i, 1) = rgen.normal();
+    p(i, 2) = rgen.normal();
     rand_pool.free_state(rgen);
 }
 
 double identical_particles::potential_all_neighbour() {
     double result = 0;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-all", Kokkos::RangePolicy<Tag_potential_all>(0, N), *this, result);
-    return 4 * eps * result;
+    // 2 *eps instead of 4 *eps because we count the couples i,j twice
+    return 2 * eps * result;
 }
 
 
@@ -246,7 +247,8 @@ double identical_particles::potential_binning() {
     create_binning();
     typedef Kokkos::TeamPolicy<Tag_potential_binning>  team_policy;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-binning", team_policy(bintot, Kokkos::AUTO), *this, result);
-    return 4 * eps * result;
+    // 2 *eps instead of 4 *eps because we count the couples i,j twice
+    return 2 * eps * result;
 }
 
 KOKKOS_FUNCTION
@@ -321,7 +323,7 @@ double identical_particles::compute_kinetic_E() {
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (kinetic, const int i, double& K) const {
-    K += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass * mass);
+    K += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
 };
 
 
@@ -350,21 +352,20 @@ void identical_particles::operator() (force, const int i) const {
                     r = r + rij * rij;
                     rij = x(i, 2) - (x(j, 2) + bz * L[2]);
                     r = r + rij * rij;
-                    //printf("%g\n",rij);
 
                     r = sqrt(r);
                     if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
-                        f(i, 0) += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
-                        f(i, 1) += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
-                        f(i, 2) += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
+                        f(i, 0) += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 0) - (x(j, 0) + bx * L[0])) / (r * r);
+                        f(i, 1) += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 1) - (x(j, 1) + by * L[1])) / (r * r);
+                        f(i, 2) += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 2) - (x(j, 2) + bz * L[2])) / (r * r);
                     }
                 }
             }
         }
     }
-    f(i, 0) *= 4 * eps;
-    f(i, 1) *= 4 * eps;
-    f(i, 2) *= 4 * eps;
+    f(i, 0) *= 48 * eps;
+    f(i, 1) *= 48 * eps;
+    f(i, 2) *= 48 * eps;
 }
 
 
@@ -409,6 +410,8 @@ namespace Kokkos { //reduction identity must be defined in Kokkos namespace
         }
     };
 }
+
+
 KOKKOS_FUNCTION
 void identical_particles::operator() (Tag_force_binning, const member_type& teamMember) const {
     const int ib = teamMember.league_rank();// bin id
@@ -448,19 +451,20 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                         int j = permute_vector(jp + binoffsets(jb));
 
                         if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
-                            double  r = sqrt((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
+                            double  r2 = ((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
-                            if (r < cutoff) {
-                                double sr = sigma / r;
-                                double sr4 = sr * sr * sr * sr;
-                                sr = sr4 * (sr4 * sr * sr - 1.0);
-                                innerfv.the_array[0] += sr * x(i, 0);
-                                innerfv.the_array[1] += sr * x(i, 1);
-                                innerfv.the_array[2] += sr * x(i, 2);
-                                // innerfv.the_array[0] += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 0);
-                                // innerfv.the_array[1] += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 1);
-                                // innerfv.the_array[2] += (pow(sigma / r, 10) - pow(sigma / r, 4)) * x(i, 2);
+                            double r = sqrt(r2);
+                            if (r2 < cutoff* cutoff) {
+                                double sr2 = sigma * sigma / r2;
+                                double sr6 = sr2 * sr2 * sr2;
+                                sr2 = sr6 * (-sr6 + 0.5) / r2;
+                                // innerfv.the_array[0] += sr2 * (x(i, 0) - x(j, 0) - wrap_x);
+                                // innerfv.the_array[1] += sr2 * (x(i, 1) - x(j, 1) - wrap_y);
+                                // innerfv.the_array[2] += sr2 * (x(i, 2) - x(j, 2) - wrap_z);
+                                innerfv.the_array[0] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 0) - x(j, 0) - wrap_x) / (r * r);
+                                innerfv.the_array[1] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 1) - x(j, 1) - wrap_y) / (r * r);
+                                innerfv.the_array[2] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 2) - x(j, 2) - wrap_z) / (r * r);
                             }
                         }
                         }, fv);
@@ -472,9 +476,9 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                 }
             }
         }
-        f(i, 0) *= 4.0 * eps;
-        f(i, 1) *= 4.0 * eps;
-        f(i, 2) *= 4.0 * eps;
+        f(i, 0) *= 48 * eps;
+        f(i, 1) *= 48 * eps;
+        f(i, 2) *= 48 * eps;
         });
 
     // Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
@@ -488,7 +492,7 @@ void identical_particles::compute_coeff_momenta() {
 }
 
 void identical_particles::compute_coeff_position() {
-    coeff_x = beta / (mass * mass);
+    coeff_x = beta / (mass);
 }
 
 

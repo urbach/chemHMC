@@ -91,6 +91,44 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
 
 }
 
+void check_force_with_num_der(particles_type* particles, std::vector<std::string>& errors) {
+    printf("###################################################################################################\n");
+    printf("compare force and potential  %s \n", particles->algorithm.c_str());
+    double h = 1e-4;
+    type_x tmpx = particles->x;
+    int count = 0;
+    for (int i = 0; i < particles->N;i++) {
+        Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int i) {
+            tmpx(0, 0) -= h;
+        });
+        double V1 = particles->compute_potential();
+        type_f::HostMirror force_val = Kokkos::create_mirror_view(particles->f);// force is already computed
+        Kokkos::deep_copy(force_val, particles->f);
+        Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int i) {
+            tmpx(0, 0) += 2 * h;
+        });
+        double V2 = particles->compute_potential();
+        double num_der = (V2 - V1) / (2 * h);
+        if (fabs(num_der - force_val(0, 0)) > 1e-7) {
+            printf("error: numerical derivative does not match the force: x=%d\t", i);
+            printf("num_der= %.12g     force= %.12g    diff= %12.g  ratio= %12.g \n",
+                num_der, force_val(0, 0), num_der - force_val(0, 0), num_der / force_val(0, 0));
+            count++;
+        }
+
+        // restore position
+        Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int i) {
+            tmpx(0, 0) -= h;
+        });
+    }
+    if (count>0){
+        std::string s="comparing force with numerical deriv  algorithm:" + particles->algorithm;
+        add_error(errors, s);
+    }
+    else { printf("test passed\n"); }
+
+}
+
 
 int main(int argc, char** argv) {
 
@@ -159,7 +197,7 @@ int main(int argc, char** argv) {
 
         int sum = 0;
         type_x x1 = particles1->x;
-        type_x x2 = particles2->x;
+        type_x x2 = particles4->x;
         // check that the initial position is the same
         int N = particles1->N;
         Kokkos::parallel_reduce("check-initial-condition", N, KOKKOS_LAMBDA(const int i, int& update) {
@@ -245,6 +283,11 @@ int main(int argc, char** argv) {
         printf("time force parallel_binning = %f s\n", timer4.seconds());
 
         check_force(particles1, particles4, "all_neighbour  agains parallel_binning", errors);
+        //////////////////////////////////////////////////////////////////////////////////////////
+
+        check_force_with_num_der( particles1,  errors);
+        check_force_with_num_der( particles4,  errors);
+        
         //////////////////////////////////////////////////////////////////////////////////////////
         printf("error recap:\n");
         if (errors.size() > 0) {
