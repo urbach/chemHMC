@@ -12,6 +12,8 @@ void HMC_class::init(int argc, char** argv) {
             integrator = new LEAP(doc);
         else if (name == "OMF2")
             integrator = new OMF2(doc);
+        else if (name == "OMF4")
+            integrator = new OMF4(doc);
         else {
             printf("no valid integrator name: ");
             std::cout << doc["integrator"]["name"].as<std::string>() << std::endl;
@@ -71,7 +73,7 @@ void HMC_class::run() {
         // hb momenta
         integrator->particles->hb();
         double Ki = integrator->particles->compute_kinetic_E();
-        printf("initial Action values betaS= %.12g   K= %.12g  V=%.12g\n", beta * (Vi + Ki), Ki, Vi);
+        printf("initial Action values betaS= %.12g   K= %.12g  V= %.12g\n", beta * (Vi + Ki), Ki, Vi);
 
         // molecular dynamics
         integrator->integrate();
@@ -80,7 +82,7 @@ void HMC_class::run() {
         double Vf = integrator->particles->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
 
-        printf("Action after the MD evolution betaS= %.12g   K= %.12g  V=%.12g beta=%.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
+        printf("Action after the MD evolution betaS= %.12g   K= %.12g  V= %.12g beta= %.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
         Kokkos::fence();
 
         double r = gen_random();// random number from 0 to 1

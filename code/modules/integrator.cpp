@@ -27,7 +27,7 @@ integrator_type::integrator_type(YAML::Node doc) {
 
 }
 
-LEAP::LEAP(YAML::Node doc): integrator_type(doc) {
+LEAP::LEAP(YAML::Node doc) : integrator_type(doc) {
 
 }
 
@@ -52,9 +52,8 @@ void LEAP::integrate() {
 //////////////////////////////////////////////////////////////////////////////
 // OMF2
 //////////////////////////////////////////////////////////////////////////////
-OMF2::OMF2(YAML::Node doc): integrator_type(doc), lambda(0.1938), oneminus2lambda(1. - 2. * lambda) {
+OMF2::OMF2(YAML::Node doc) : integrator_type(doc), lambda(0.1938), oneminus2lambda(1. - 2. * lambda) {
 }
-
 
 
 void OMF2::integrate() {
@@ -73,5 +72,43 @@ void OMF2::integrate() {
     particles->update_positions(dt / 2.);
     particles->update_momenta(oneminus2lambda * dt);
     particles->update_positions(dt / 2.);
-    particles->update_momenta( lambda * dt);
+    particles->update_momenta(lambda * dt);
+}
+//////////////////////////////////////////////////////////////////////////////
+// OMF4 integration scheme
+//////////////////////////////////////////////////////////////////////////////
+OMF4::OMF4(YAML::Node doc) :
+    integrator_type(doc),
+    rho(0.2539785108410595),
+    theta(-0.03230286765269967),
+    vartheta(0.08398315262876693),
+    lambda(0.6822365335719091),
+    dtau(dt* steps),
+    eps{ rho * dtau, lambda * dtau,
+                 theta * dtau, 0.5 * (1 - 2. * (lambda + vartheta)) * dtau,
+                 (1 - 2. * (theta + rho)) * dtau, 0.5 * (1 - 2. * (lambda + vartheta)) * dtau,
+                 theta * dtau, lambda * dtau,
+                 rho * dtau, 2 * vartheta * dtau } {
+}
+
+void OMF4::integrate() {
+
+    // initial half-step for the momenta
+    particles->update_momenta(0.5 * eps[9]);
+
+    // nsteps-1 full steps
+    for (size_t i = 1; i < steps - 1; i++) {
+        for (size_t j = 0; j < 5; j++) {
+            particles->update_positions(eps[2 * j]);
+            particles->update_momenta(eps[2 * j + 1]);
+        }
+    }
+    // almost one more full step
+    for (size_t j = 0; j < 4; j++) {
+        particles->update_positions(eps[2 * j]);
+        particles->update_momenta(eps[2 * j + 1]);
+    }
+    particles->update_positions(eps[8]);
+    // final half-step in the momenta
+    particles->update_momenta(0.5 * eps[9]);
 }
