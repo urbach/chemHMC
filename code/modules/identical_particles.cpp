@@ -259,7 +259,7 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
 double identical_particles::potential_binning() {
     // double result = 0;
     create_binning();
-    evaluate_potential();
+    return evaluate_potential();
     // typedef Kokkos::TeamPolicy<Tag_potential_binning>  team_policy;
     // Kokkos::parallel_reduce("identical_particles-LJ-potential-binning", team_policy(bintot, Kokkos::AUTO), *this, result);
     // // 2 *eps instead of 4 *eps because we count the couples i,j twice

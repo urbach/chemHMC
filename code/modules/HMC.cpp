@@ -25,7 +25,9 @@ void HMC_class::init(int argc, char** argv) {
     Ntrajectories = check_and_assign_value<int>(doc, "Ntrajectories");
     std::cout << "Ntrajectories:" << Ntrajectories << std::endl;
     thermalization_steps = check_and_assign_value<int>(doc, "thermalization_steps");
+    std::cout << "thermalization_steps:" << thermalization_steps << std::endl;
     save_every = check_and_assign_value<int>(doc, "save_every");
+    std::cout << "save_every:" << save_every << std::endl;
     int seed = check_and_assign_value<int>(doc, "seed");
 
     gen64.seed(seed);

@@ -48,7 +48,7 @@ public:
     };
     std::function<double()>  potential_without_binning_strategy;
     double potential_with_binning_set();
-    double evaluate_potential() override{
+    double evaluate_potential() override {
         return potential_without_binning_strategy();
     };
 
@@ -56,7 +56,7 @@ public:
     std::function<void()>  binning_geometry_strategy;
     void cutoff_binning();
     void binning_geometry() override {
-        return binning_geometry_strategy();
+        binning_geometry_strategy();
     };
 
     // binning strategy functions and related
@@ -76,7 +76,7 @@ public:
     void parallel_binning();//<-- can be a binning_strategy
 
     void create_binning() override {
-        return binning_strategy();
+        binning_strategy();
     };
 
     double compute_kinetic_E() override;
@@ -85,7 +85,7 @@ public:
     void compute_force_all();
     void compute_force_binning();
     void compute_force() override {
-        return force_strategy();
+        force_strategy();
     };
 
 
