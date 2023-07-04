@@ -27,6 +27,7 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
     if (algorithm.compare("all_neighbour") == 0) {
         potential_strategy = std::bind(&identical_particles::potential_all_neighbour, this);
+        potential_without_binning_strategy = std::bind(&identical_particles::potential_all_neighbour, this);
         force_strategy = std::bind(&identical_particles::compute_force_all, this);
     }
     if (algorithm.compare("binning_serial") == 0) {
@@ -35,6 +36,7 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
         binning_strategy = std::bind(&identical_particles::serial_binning, this);
         serial_binning_init();
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
+        potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
         force_strategy = std::bind(&identical_particles::compute_force_binning, this);
     }
     if (algorithm.compare("parallel_binning") == 0) {
@@ -43,6 +45,7 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
         binning_strategy = std::bind(&identical_particles::parallel_binning, this);
         parallel_binning_init();
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
+        potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
         force_strategy = std::bind(&identical_particles::compute_force_binning, this);
     }
     if (algorithm.compare("quick_sort") == 0) {
@@ -51,6 +54,7 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
         binning_strategy = std::bind(&identical_particles::create_quick_sort, this);
         quick_sort_init();
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
+        potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
         force_strategy = std::bind(&identical_particles::compute_force_binning, this);
     }
     std::cout << "partilces_type:" << std::endl;
@@ -253,6 +257,16 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
 };
 
 double identical_particles::potential_binning() {
+    // double result = 0;
+    create_binning();
+    evaluate_potential();
+    // typedef Kokkos::TeamPolicy<Tag_potential_binning>  team_policy;
+    // Kokkos::parallel_reduce("identical_particles-LJ-potential-binning", team_policy(bintot, Kokkos::AUTO), *this, result);
+    // // 2 *eps instead of 4 *eps because we count the couples i,j twice
+    // return 2 * eps * result;
+}
+
+double identical_particles::potential_with_binning_set() {
     double result = 0;
     typedef Kokkos::TeamPolicy<Tag_potential_binning>  team_policy;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-binning", team_policy(bintot, Kokkos::AUTO), *this, result);
@@ -382,6 +396,7 @@ void identical_particles::operator() (force, const int i) const {
 
 
 void identical_particles::compute_force_binning() {
+    create_binning();
     typedef Kokkos::TeamPolicy<Tag_force_binning>  team_policy;
     Kokkos::parallel_for("identical_particles-LJ-force-binning", team_policy(bintot, Kokkos::AUTO), *this);
 }
@@ -545,7 +560,6 @@ public:
     };
 };
 void identical_particles::update_momenta(const double dt_) {
-    create_binning();
     compute_force();
     Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, coeff_p, p, f));
 }

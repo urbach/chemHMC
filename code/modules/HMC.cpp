@@ -66,13 +66,12 @@ void HMC_class::run() {
     for (int i = first_traj; i < last_traj; i++) {
         Kokkos::Timer timer_traj;
         printf("Starting trajectory %d\n", i);
+        // hb momenta
         integrator->particles->hb();
         double Ki = integrator->particles->compute_kinetic_E();
         printf("initial Action values betaS= %.12g   K= %.12g  V=%.12g\n", beta * (Vi + Ki), Ki, Vi);
-#ifdef DEBUG
-        integrator->particles->printx();
-        integrator->particles->printp();
-#endif //DEBUG
+
+        // molecular dynamics
         integrator->integrate();
 
         // accept/reject
@@ -81,7 +80,6 @@ void HMC_class::run() {
 
         printf("Action after the MD evolution betaS= %.12g   K= %.12g  V=%.12g beta=%.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
         Kokkos::fence();
-
 
         double r = gen_random();// random number from 0 to 1
         if (r < exp(-beta * (Kf + Vf - Ki - Vi))) {

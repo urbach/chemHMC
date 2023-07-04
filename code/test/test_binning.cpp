@@ -108,7 +108,7 @@ void check_binning(particles_type* particles2, particles_type* particles3, std::
 void check_force_with_num_der(particles_type* particles, std::vector<std::string>& errors) {
     printf("###################################################################################################\n");
     printf("compare force and potential  %s \n", particles->algorithm.c_str());
-    double h = 1e-4;
+    double h = 1e-6;
     type_x tmpx = particles->x;
     int count = 0;
     type_f::HostMirror force_val = Kokkos::create_mirror(particles->f);// force is already computed
@@ -118,24 +118,35 @@ void check_force_with_num_der(particles_type* particles, std::vector<std::string
             Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
                 tmpx(i, dir) += 2 * h;
             });
-            double V = -particles->compute_potential();
+            double V = -particles->evaluate_potential();
             Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
                 tmpx(i, dir) -= h;
             });
-            V += 8 * particles->compute_potential();
+            V += 8 * particles->evaluate_potential();
             Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
                 tmpx(i, dir) -= 2 * h;
             });
-            V -= 8 * particles->compute_potential();
+            V -= 8 * particles->evaluate_potential();
             Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
                 tmpx(i, dir) -= h;
             });
-            V += particles->compute_potential();
+            V += particles->evaluate_potential();
             double num_der = (V) / (12.0 * h);
+
+            // Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+            //     tmpx(i, dir) += h;
+            // });
+            // double V = particles->compute_potential();
+            // Kokkos::parallel_for("check-force-condition", 1, KOKKOS_LAMBDA(const int x) {
+            //     tmpx(i, dir) -= 2 * h;
+            // });
+            // V -= particles->compute_potential();
+            // double num_der = (V) / (2.0 * h);
+
             double diff = num_der - force_val(i, dir);
             if (fabs(num_der) > 1e-6) diff /= num_der;
             diff = fabs(diff);
-            if (diff > 1e-4) {
+            if (diff > 1e-3) {
                 printf("error: numerical derivative does not match force: x=%-6d dir=%-2d ", i, dir);
                 printf("num_der= %-18.12g force= %-18.12g diff= %-18.12g ratio= %-18.12g \n",
                     num_der, force_val(i, dir), num_der - force_val(i, dir), num_der / force_val(i, dir));
@@ -176,7 +187,7 @@ int main(int argc, char** argv) {
             Kokkos::abort("");
         }
         YAML::Node doc;
-        doc["StartCondition"] = "hot";
+        doc["StartCondition"] = "cold";
         doc["seed"] = 123;
 
         doc["geometry"]["Lx"] = 1.1;

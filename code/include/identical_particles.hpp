@@ -46,6 +46,11 @@ public:
     double compute_potential() override {
         return potential_strategy();
     };
+    std::function<double()>  potential_without_binning_strategy;
+    double potential_with_binning_set();
+    double evaluate_potential() override{
+        return potential_without_binning_strategy();
+    };
 
     // function to define the domains
     std::function<void()>  binning_geometry_strategy;

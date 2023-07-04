@@ -71,6 +71,7 @@ public:
 
     virtual void hb() = 0;
     virtual double compute_potential() = 0;
+    virtual double evaluate_potential() = 0;
     virtual double compute_kinetic_E() = 0;
     virtual void compute_force() = 0;
     virtual void compute_coeff_momenta() = 0;
