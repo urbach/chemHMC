@@ -214,9 +214,11 @@ void identical_particles::hb() {
 KOKKOS_FUNCTION
 void identical_particles::operator() (hbTag, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
-    p(i, 0) = rgen.normal(); // exp(-  p^2)
-    p(i, 1) = rgen.normal();
-    p(i, 2) = rgen.normal();
+    // we need to divide by sqrt(2) in order to have exp(-p^2)
+    // normal() produced distribution exp(-p^2/2)
+    p(i, 0) = rgen.normal()*sqrt(mass/beta);
+    p(i, 1) = rgen.normal()*sqrt(mass/beta);
+    p(i, 2) = rgen.normal()*sqrt(mass/beta);
     rand_pool.free_state(rgen);
 }
 
@@ -345,8 +347,8 @@ double identical_particles::compute_kinetic_E() {
 }
 
 KOKKOS_FUNCTION
-void identical_particles::operator() (kinetic, const int i, double& K) const {
-    K += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
+void identical_particles::operator() (kinetic, const int i, double& sum) const {
+    sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
 };
 
 
