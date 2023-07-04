@@ -33,8 +33,26 @@ T check_and_assign_value(YAML::Node doc, const char* tag) {
         Kokkos::abort("Incorrect input type");
     }
 }
+// int specialization
+template<>
+int check_and_assign_value(YAML::Node doc, const char* tag) {
+    if (!doc[tag]) {
+        printf("error: tag %s is not present in the input file\n", tag);
+        std::cout << "infile structure:" << std::endl;
+        std::cout << doc << std::endl;
+        Kokkos::abort("params not found");
+    }
+
+    try {
+        return ((int) stod(doc[tag].as<std::string>()));
+    }
+    catch (YAML::TypedBadConversion<std::string>) {
+        printf("error: impossible to read tag %s\n", tag );
+        Kokkos::abort("Incorrect input type");
+    }
+}
 template double check_and_assign_value<double>(YAML::Node, const char*);
-template int check_and_assign_value<int>(YAML::Node, const char*);
+// template int check_and_assign_value<int>(YAML::Node, const char*);
 template std::string check_and_assign_value<std::string>(YAML::Node, const char*);
 
 
