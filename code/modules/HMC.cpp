@@ -86,29 +86,39 @@ void HMC_class::run() {
         Kokkos::fence();
 
         double r = gen_random();// random number from 0 to 1
-        if (r < exp(-beta * (Kf + Vf - Ki - Vi))) {
-            acceptance++;
+        if (i < thermalization_steps) {
             Vi = Vf;
             Ki = Kf;
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-            printf("New configuration accepted\n");
+            printf("New configuration accepted during thermalization\n");
         }
         else {
-            Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
-            printf("New configuration rejected\n");
+            if (r < exp(-beta * (Kf + Vf - Ki - Vi))) {
+                acceptance++;
+                Vi = Vf;
+                Ki = Kf;
+                Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
+                printf("New configuration accepted\n");
+            }
+            else {
+                Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
+                printf("New configuration rejected\n");
+            }
+            // save
+            if ((i % save_every == 0)) {
+                printf("saving conf\n");
+                integrator->particles->print_xyz(i, Ki, Vi);
+                save_host_rng_state();
+                integrator->particles->save_device_rng();
+            }
         }
 #ifdef DEBUG
         integrator->particles->printx();
 #endif
-        if (i >= thermalization_steps && (i % save_every == 0)) {
-            printf("saving conf\n");
-            integrator->particles->print_xyz(i, Ki, Vi);
-            save_host_rng_state();
-            integrator->particles->save_device_rng();
-        }
+
         printf("time for trajectory: %g s\n\n", timer_traj.seconds());
     }
-    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories)));
+    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories - thermalization_steps)));
     printf("time for HMC: %g  s\n", timer.seconds());
 
 
