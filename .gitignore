@@ -41,6 +41,7 @@ debug_build/
 code/cmake/.Rhistory
 
 code/builds/*
+!code/builds/test.yaml
 
 !code/builds/openMP
 code/builds/openMP/*
