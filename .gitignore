@@ -55,3 +55,4 @@ code/builds/qbig_ampere/*
 code/builds/qbig_kepler/*
 !code/builds/qbig_kepler/load_modules_qbig_kepler.sh
 !code/builds/qbig_kepler/do_cmake_kepler.sh
+!code/builds/qbig_kepler/scr.sh
