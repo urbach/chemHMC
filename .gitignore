@@ -40,3 +40,8 @@ code/.vscode/
 debug_build/
 .vscode/settings.json
 code/cmake/.Rhistory
+
+!code/builds/openMP/do_cmake_openMP.sh 
+!code/builds/openMP/do_cmake_A100.sh
+!code/builds/qbig_kepler/load_modules_qbig_kepler.sh
+!code/builds/qbig_kepler/do_cmake_kepler.sh
