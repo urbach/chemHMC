@@ -82,10 +82,13 @@ void HMC_class::run() {
         double Vf = integrator->particles->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
 
-        printf("Action after the MD evolution betaS= %.12g   K= %.12g  V= %.12g beta= %.12g\n", beta * (Vf + Kf), Kf, Vf, beta);
+        double dh = beta * (Kf + Vf - Ki - Vi);
+        double exp_mdh = exp(-dh);
+        printf("Action after the MD evolution betaS= %.12g   K= %.12g  V= %.12g beta= %.12g dh= %.12g exp_mdh= %.12g\n",
+         beta * (Vf + Kf), Kf, Vf, beta,dh,exp_mdh);
         Kokkos::fence();
 
-        double r = gen_random();// random number from 0 to 1
+        
         if (i < thermalization_steps) {
             Vi = Vf;
             Ki = Kf;
@@ -93,7 +96,8 @@ void HMC_class::run() {
             printf("New configuration accepted during thermalization\n");
         }
         else {
-            if (r < exp(-beta * (Kf + Vf - Ki - Vi))) {
+            double r = gen_random();// random number from 0 to 1
+            if (r < exp_mdh) {
                 acceptance++;
                 Vi = Vf;
                 Ki = Kf;
