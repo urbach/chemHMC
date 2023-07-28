@@ -37,6 +37,9 @@ public:
     double get_beta() { return beta; };
     void print_xyz(int traj, double K, double V) override;
     void read_xyz() override;
+    int how_many_confs_xyz(FILE* file) override;
+    void read_next_confs_xyz(FILE* file) override;
+    
     void InitX() override;
     void hb() override; // heatbath for the momenta
 

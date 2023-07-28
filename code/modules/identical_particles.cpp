@@ -125,6 +125,56 @@ void identical_particles::read_xyz() {
     // printx();
 }
 
+int identical_particles::how_many_confs_xyz(FILE* file) {
+
+    int lines = 0;
+    char c;
+
+    /* count the newline characters */
+    while ((c = fgetc(file)) != EOF) {
+        if (c == '\n')
+            lines++;
+    }
+    if (lines % (N + 2) != 0) {
+        printf("error: xyz file contains %d lines\n", lines);
+        printf("       the number of lines mus be a multiple of N+2=%d\n", N + 2);
+        Kokkos::abort("abort");
+    }
+    int confs = lines / (N + 2);
+    printf("confs in input configuration file %d\n", confs);
+    rewind(file);
+    return confs;
+}
+
+void identical_particles::read_next_confs_xyz(FILE* file) {
+    int count = 0;
+    char id[1000];
+    char c;
+    while ((c = fgetc(file)) != EOF) {
+        if (c == '\n') {
+            for (int i = 0;i < 11;i++) c = fgetc(file);
+            fscanf(file, " %d", &params.istart);
+            break;
+        }
+    } 
+    while ((c = fgetc(file)) != EOF) { if (c == '\n') break;}
+    count = 0;
+    for (int i = 0; i < N;i++) {
+        count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
+        // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
+    }
+    if (name_xyz.compare(id) != 0) {
+        printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
+        Kokkos::abort("abort");
+    }
+    // printf("%d  %d\n", count, N);
+    if (count != N * 4) { Kokkos::abort("error in reading the file"); }
+    Kokkos::deep_copy(x, h_x);
+    // printx();
+}
+
+
+
 void identical_particles::InitX() {
     x = type_x("x", N);
     // create_mirror() will always allocate a new view,
@@ -216,9 +266,9 @@ void identical_particles::operator() (hbTag, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
     // we need to divide by sqrt(2) in order to have exp(-p^2)
     // normal() produced distribution exp(-p^2/2)
-    p(i, 0) = rgen.normal()*sqrt(mass/beta);
-    p(i, 1) = rgen.normal()*sqrt(mass/beta);
-    p(i, 2) = rgen.normal()*sqrt(mass/beta);
+    p(i, 0) = rgen.normal() * sqrt(mass / beta);
+    p(i, 1) = rgen.normal() * sqrt(mass / beta);
+    p(i, 2) = rgen.normal() * sqrt(mass / beta);
     rand_pool.free_state(rgen);
 }
 

@@ -23,7 +23,7 @@ struct params_class { // Just the thing that holds all variables
   std::string rng_host_state;
   std::string rng_device_state;
 
-
+  std::string name_RDF;
   
   // contructor;
   params_class(YAML::Node doc);

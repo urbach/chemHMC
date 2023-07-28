@@ -141,6 +141,10 @@ params_class::params_class(YAML::Node doc) {
     }
     istart = 0;
 
+    if (doc["particles"]["RDF"]){
+        name_RDF = check_and_assign_value<std::string>(doc["particles"]["RDF"], "output_file");
+    }
+
 }
 
 

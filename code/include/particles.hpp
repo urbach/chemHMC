@@ -67,6 +67,8 @@ public:
     void printp();
     virtual void print_xyz(int traj, double K, double V) = 0;
     virtual void read_xyz() = 0;
+    virtual int how_many_confs_xyz(FILE* file) =0;
+    virtual void read_next_confs_xyz(FILE* file) =0;
 
 
     virtual void hb() = 0;

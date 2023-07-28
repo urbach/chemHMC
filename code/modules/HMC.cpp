@@ -127,3 +127,22 @@ void HMC_class::run() {
 
 
 }
+
+
+void HMC_class::measure() {
+    auto &p=integrator->particles;
+    FILE* file = NULL;
+    file = fopen(p->params.nameout.c_str(), "r");
+    if (file == NULL) {
+        printf("error in opening file %s\n", p->params.nameout.c_str());
+        Kokkos::abort("abort");
+    }
+    int confs=p->how_many_confs_xyz(file);
+    printf("the input file contains %d configurations \n",confs);
+    for (int i=0; i<confs; i++ ){
+        p->read_next_confs_xyz(file);
+        
+    }
+
+    fclose(file);
+}

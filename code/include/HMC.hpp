@@ -23,5 +23,6 @@ public:
     void run();
     double gen_random();
 
+    void measure();
 };
 #endif // !HMC_H
