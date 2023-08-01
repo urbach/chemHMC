@@ -7,6 +7,7 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 
+typedef Kokkos::View<double*> t_RDF;
 typedef Kokkos::View<int*> t_bincount;
 typedef Kokkos::View<int*> t_binoffsets;
 typedef Kokkos::View<int*> t_permute_vector;
@@ -48,6 +49,15 @@ public:
     t_bool before;
     t_bool after;
 
+    //RDF
+    int NbRDF;
+    double LmaxRDF;
+    double size_bRDF;
+    std::string filename_RDF;
+    t_RDF RDF;
+    t_RDF::HostMirror h_RDF;
+
+    // rng
     RandPoolType rand_pool;
     using device_type = typename Kokkos::DefaultExecutionSpace::device_type;
     using state_data_type = Kokkos::View<uint64_t**, device_type>;
@@ -67,8 +77,8 @@ public:
     void printp();
     virtual void print_xyz(int traj, double K, double V) = 0;
     virtual void read_xyz() = 0;
-    virtual int how_many_confs_xyz(FILE* file) =0;
-    virtual void read_next_confs_xyz(FILE* file) =0;
+    virtual int how_many_confs_xyz(FILE* file) = 0;
+    virtual void read_next_confs_xyz(FILE* file) = 0;
 
 
     virtual void hb() = 0;
@@ -82,7 +92,10 @@ public:
     virtual void update_positions(const double dt_) = 0;
     virtual void binning_geometry() = 0;
     virtual void create_binning() = 0;
-
+    virtual void compute_RDF() = 0;
+    virtual void print_RDF() = 0;
+    virtual void write_header_RDF(FILE* file, int confs) = 0;
+    virtual void write_RDF(FILE* file, int iconf) = 0;
 
     KOKKOS_INLINE_FUNCTION void lextoc(int ib, int& bx, int& by, int& bz) const {
         bz = ib / (nbin[0] * nbin[1]);

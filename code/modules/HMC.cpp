@@ -85,10 +85,10 @@ void HMC_class::run() {
         double dh = beta * (Kf + Vf - Ki - Vi);
         double exp_mdh = exp(-dh);
         printf("Action after the MD evolution betaS= %.12g   K= %.12g  V= %.12g beta= %.12g dh= %.12g exp_mdh= %.12g\n",
-         beta * (Vf + Kf), Kf, Vf, beta,dh,exp_mdh);
+            beta * (Vf + Kf), Kf, Vf, beta, dh, exp_mdh);
         Kokkos::fence();
 
-        
+
         if (i < thermalization_steps) {
             Vi = Vf;
             Ki = Kf;
@@ -130,19 +130,30 @@ void HMC_class::run() {
 
 
 void HMC_class::measure() {
-    auto &p=integrator->particles;
+    auto& p = integrator->particles;
     FILE* file = NULL;
     file = fopen(p->params.nameout.c_str(), "r");
     if (file == NULL) {
         printf("error in opening file %s\n", p->params.nameout.c_str());
         Kokkos::abort("abort");
     }
-    int confs=p->how_many_confs_xyz(file);
-    printf("the input file contains %d configurations \n",confs);
-    for (int i=0; i<confs; i++ ){
-        p->read_next_confs_xyz(file);
-        
+    int confs = p->how_many_confs_xyz(file);
+    printf("the input file contains %d configurations \n", confs);
+    ////////////////////
+    FILE* file_RDF = NULL;
+    file_RDF = fopen(p->filename_RDF.c_str(), "w");
+    if (file_RDF == NULL) {
+        printf("error in opening file %s\n", p->filename_RDF.c_str());
+        Kokkos::abort("abort");
     }
+    p->write_header_RDF(file_RDF, confs);
 
+    ///////////////////////
+    for (int i = 0; i < confs; i++) {
+        p->read_next_confs_xyz(file);
+        p->compute_RDF();
+        p->write_RDF(file_RDF, i);
+    }
+    fclose(file_RDF);
     fclose(file);
 }

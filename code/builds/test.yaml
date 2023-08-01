@@ -25,6 +25,11 @@ particles:
   eps: 0.1
   sigma: 0.1
   algorithm: all_neighbour
+  RDF:           # optional
+    Lmax: 1
+    size_bin: 1  # 300 x nanometer # 30 x Angstrom
+    output_file: RDF.out_xyz
+
 
 integrator:
   name: OMF2

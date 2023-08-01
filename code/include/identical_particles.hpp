@@ -21,6 +21,7 @@ public:
     struct Tag_force_binning {};
     struct Tag_quicksort_compare {};
     struct check_in_volume {};
+    struct Tag_RDF {};
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     double mass;
     double beta;
@@ -91,6 +92,7 @@ public:
         force_strategy();
     };
 
+    void compute_RDF() override;
 
     KOKKOS_FUNCTION void operator() (cold, const int i) const;
     KOKKOS_FUNCTION void operator() (hot, const int i) const;
@@ -107,12 +109,20 @@ public:
     // functor to compute the forces
     KOKKOS_FUNCTION void operator() (force, const int i) const; //declaration of functor
     KOKKOS_FUNCTION void operator() (Tag_force_binning, const member_type& teamMember) const;
-    ~identical_particles() {};
+
+    // functor for the RDF
+    KOKKOS_FUNCTION void operator() (Tag_RDF, const member_type& teamMember) const; //declaration of functor
 
     void compute_coeff_momenta() override;
     void compute_coeff_position() override;
     void update_momenta(const double dt_) override;
     void update_positions(const double dt_) override;
+    void print_RDF() override;
+    void write_header_RDF(FILE* file, int confs) override;
+    virtual void write_RDF(FILE* file, int iconf);
+
+
+    ~identical_particles() {};
 };
 
 

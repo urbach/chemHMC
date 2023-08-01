@@ -64,6 +64,16 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
 
     compute_coeff_momenta();
     compute_coeff_position();
+
+    if (doc["particles"]["RDF"]) {
+        size_bRDF = check_and_assign_value<double>(doc["particles"]["RDF"], "size_bin");
+        LmaxRDF = check_and_assign_value<double>(doc["particles"]["RDF"], "Lmax");
+        filename_RDF = check_and_assign_value<std::string>(doc["particles"]["RDF"], "output_file");
+        NbRDF = (int)(LmaxRDF / size_bRDF);
+        printf("RDF: Lmax=%g  size_bin=%g  N=%d  \n", LmaxRDF, size_bRDF, NbRDF);
+        RDF = t_RDF("RDF", NbRDF);
+        h_RDF = Kokkos::create_mirror(RDF);
+    }
 }
 
 void identical_particles::read_xyz() {
@@ -156,8 +166,8 @@ void identical_particles::read_next_confs_xyz(FILE* file) {
             fscanf(file, " %d", &params.istart);
             break;
         }
-    } 
-    while ((c = fgetc(file)) != EOF) { if (c == '\n') break;}
+    }
+    while ((c = fgetc(file)) != EOF) { if (c == '\n') break; }
     count = 0;
     for (int i = 0; i < N;i++) {
         count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
@@ -197,7 +207,7 @@ void identical_particles::InitX() {
     }
 
     Kokkos::deep_copy(h_x, x);
-    Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<check_in_volume>(0, N), *this);
+    Kokkos::parallel_for("volume_check", Kokkos::RangePolicy<check_in_volume>(0, N), *this);
     Kokkos::fence();
     printf("particle initialized\n");
 };
@@ -614,4 +624,66 @@ public:
 void identical_particles::update_momenta(const double dt_) {
     compute_force();
     Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, coeff_p, p, f));
+}
+
+
+
+void identical_particles::compute_RDF() {
+    typedef Kokkos::TeamPolicy<Tag_RDF>  team_policy;
+    Kokkos::parallel_for("identical_particles-RDF", team_policy(NbRDF, Kokkos::AUTO), *this);
+}
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (Tag_RDF, const member_type& teamMember) const {
+    const int ib = teamMember.league_rank();// bin id
+    RDF(ib) = 0;
+    // printf("bin =%d binncount=%d\n", ib, bincount(ib));
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, 1, N), [=](const int i, double& update) {
+        double r = 0;
+        for (int dir = 0;dir < dim_space;dir++) {
+            double ri = (x(0, dir) - x(i, dir) - L[dir]) * (x(0, dir) - x(i, dir) - L[dir]);
+            double si = (x(0, dir) - x(i, dir)) * (x(0, dir) - x(i, dir));
+            if (si < ri) ri = si;
+            si = (x(0, dir) - x(i, dir) + L[dir]) * (x(0, dir) - x(i, dir) + L[dir]);
+            if (si < ri) ri = si;
+            r += ri;
+        }
+        r = sqrt(r);
+        int ib1 = (int)(r / size_bRDF);
+
+        if (ib == ib1)
+            update++;
+        }, RDF(ib));
+    RDF(ib) /= (N - 1);
+};
+
+void identical_particles::write_header_RDF(FILE* file, int confs) {
+
+    fprintf(file, "%g\n%g\n%g\n", L[0], L[1], L[2]);
+    fprintf(file, "%d\n", N);
+    fprintf(file, "%g\n", mass);
+    fprintf(file, "%g\n", beta);
+    fprintf(file, "%g\n", cutoff);
+    fprintf(file, "%g\n", eps);
+    fprintf(file, "%g\n", sigma);
+    fprintf(file, "%g\n", LmaxRDF);
+    fprintf(file, "%g\n", size_bRDF);
+    fprintf(file, "%d\n", confs);
+}
+
+
+void identical_particles::print_RDF() {
+    Kokkos::deep_copy(h_RDF, RDF);
+    for (int i = 0;i < NbRDF;i++) {
+        printf("%g  %g\n", i * size_bRDF, h_RDF(i));
+    }
+}
+
+
+void identical_particles::write_RDF(FILE* file, int iconf) {
+    fprintf(file, "%d\n", iconf);
+    Kokkos::deep_copy(h_RDF, RDF);
+    for (int i = 0;i < NbRDF;i++) {
+        fprintf(file, "%g  %g\n", i * size_bRDF, h_RDF(i));
+    }
 }

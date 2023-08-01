@@ -22,20 +22,20 @@ public:
 };
 
 
-class LEAP: public integrator_type {
+class LEAP : public integrator_type {
 
 public:
     LEAP() = delete;
     LEAP(YAML::Node doc);
     void integrate() override;
-   
+
 };
 
-class OMF2: public integrator_type {
+class OMF2 : public integrator_type {
 
 public:
     const double lambda;
-    const double oneminus2lambda ;
+    const double oneminus2lambda;
     OMF2() = delete;
     OMF2(YAML::Node doc);
     void integrate() override;
@@ -44,7 +44,7 @@ public:
 
 
 
-class OMF4: public integrator_type {
+class OMF4 : public integrator_type {
 
 public:
     const double rho;
