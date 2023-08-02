@@ -276,9 +276,9 @@ void identical_particles::operator() (hbTag, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
     // we need to divide by sqrt(2) in order to have exp(-p^2)
     // normal() produced distribution exp(-p^2/2)
-    p(i, 0) = rgen.normal() * sqrt(mass / beta);
-    p(i, 1) = rgen.normal() * sqrt(mass / beta);
-    p(i, 2) = rgen.normal() * sqrt(mass / beta);
+    p(i, 0) = rgen.normal() * Kokkos::sqrt(mass / beta);
+    p(i, 1) = rgen.normal() * Kokkos::sqrt(mass / beta);
+    p(i, 2) = rgen.normal() * Kokkos::sqrt(mass / beta);
     rand_pool.free_state(rgen);
 }
 
@@ -307,7 +307,7 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
                     rij = x(i, 2) - (x(j, 2) + bz * L[2]);
                     r = r + rij * rij;
 
-                    r = sqrt(r);
+                    r = Kokkos::sqrt(r);
                     if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
                         V += (pow(sigma / r, 12) - pow(sigma / r, 6));
                     }
@@ -373,7 +373,7 @@ void identical_particles::operator() (Tag_potential_binning, const member_type& 
                         int j = permute_vector(jp + binoffsets(jb));
 
                         if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
-                            double  r = sqrt((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
+                            double  r = Kokkos::sqrt((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
                             if (r < cutoff) {
@@ -438,7 +438,7 @@ void identical_particles::operator() (force, const int i) const {
                     rij = x(i, 2) - (x(j, 2) + bz * L[2]);
                     r = r + rij * rij;
 
-                    r = sqrt(r);
+                    r = Kokkos::sqrt(r);
                     if (r < cutoff && !(i == j && bx == 0 && by == 0 && bz == 0)) {
                         f(i, 0) += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 0) - (x(j, 0) + bx * L[0])) / (r * r);
                         f(i, 1) += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 1) - (x(j, 1) + by * L[1])) / (r * r);
@@ -539,7 +539,7 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                             double  r2 = ((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
-                            double r = sqrt(r2);
+                            double r = Kokkos::sqrt(r2);
                             if (r2 < cutoff * cutoff) {
                                 double sr2 = sigma * sigma / r2;
                                 double sr6 = sr2 * sr2 * sr2;
@@ -648,7 +648,7 @@ void identical_particles::operator() (Tag_RDF, const member_type& teamMember) co
             if (si < ri) ri = si;
             r += ri;
         }
-        r = sqrt(r);
+        r = Kokkos::sqrt(r);
         int ib1 = (int)(r / size_bRDF);
 
         if (ib == ib1)
