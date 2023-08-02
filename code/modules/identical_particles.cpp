@@ -407,7 +407,7 @@ double identical_particles::compute_kinetic_E() {
 }
 
 KOKKOS_FUNCTION
-void identical_particles::operator() (kinetic, const int i, double& sum) const {
+void identical_particles::operator() (kinetic, const int &i, double& sum) const {
     sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
 };
 
