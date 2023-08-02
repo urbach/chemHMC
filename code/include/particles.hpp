@@ -105,7 +105,7 @@ public:
     KOKKOS_INLINE_FUNCTION int ctolex(int& bx, int& by, int& bz)  const {
         return bx + nbin[0] * (by + bz * nbin[1]);
     };
-    KOKKOS_INLINE_FUNCTION int which_bin(type_x  x, int i) {
+    KOKKOS_INLINE_FUNCTION int which_bin(type_x  x, int i) const {
         int bx = floor(x(i, 0) / sizebin[0]);
         int by = floor(x(i, 1) / sizebin[1]);
         int bz = floor(x(i, 2) / sizebin[2]);
