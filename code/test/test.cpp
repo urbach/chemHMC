@@ -68,6 +68,46 @@ int Foo_2::value() {
     return val;
 }
 
+class Parent {
+    
+public:
+    int a=100;
+    virtual void call_operator() =0;
+    std::string sa="lalala";
+    double *p;
+    typedef Kokkos::View<double*> vec;
+    vec  x=Kokkos::View<double*>("x",10);
+    int dim[3]={0,1,2};
+    KOKKOS_FUNCTION
+    void  fun() const{
+        printf("print a=%d\n",a);
+    };
+};
+
+class Child : public Parent {
+    
+public:
+    int b=100;
+    std::string  sb="asdasda";
+    KOKKOS_FUNCTION void operator() ( const int i) const;
+    void call_operator() override;
+};
+
+KOKKOS_FUNCTION
+void Child::operator() ( const int i) const {
+    // do nothing
+    x(i)=0;
+    fun();
+    printf("%d\n",dim[0]);
+};
+
+void Child::call_operator() {
+    Kokkos::parallel_for("myclass", 3, *this);
+}
+
+
+
+
 int main(int argc, char* argv[]) {
     Kokkos::initialize(argc, argv);
 
@@ -103,6 +143,15 @@ int main(int argc, char* argv[]) {
 
         Kokkos::kokkos_free(f_1);
         Kokkos::kokkos_free(f_2);
+
+        /////////////////////////////////////////////////////////////////
+
+        Parent *myclass;
+        myclass = new Child();
+        double d=3.4;
+        myclass->p=&d;
+        // Kokkos::parallel_for("myclass", 3, *myclass);
+        myclass->call_operator();
     }
 
     Kokkos::finalize();

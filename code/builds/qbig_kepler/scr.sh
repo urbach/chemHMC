@@ -19,5 +19,5 @@ source load_modules_qbig_kepler.sh
 #rm rng* out_xyz.txt
 #/qbigwork/garofalo/valgrind/install_dir/bin/valgrind --leak-check=full ../../chemHMC/code/build/main//main -i input_I.yaml
 #../../chemHMC/code/build/main//main -i input_I.yaml
-main/main -i ../test.yaml
-                                         
+#main/main -i ../test.yaml
+./test/test                                         
