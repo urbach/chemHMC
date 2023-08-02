@@ -24,7 +24,7 @@ public:
         virtual ~Foo() {}
 };
 
-class Foo_1: public Foo {
+class Foo_1 : public Foo {
 public:
     KOKKOS_FUNCTION
         Foo_1();
@@ -33,7 +33,7 @@ public:
         int value();
 };
 
-class Foo_2: public Foo {
+class Foo_2 : public Foo {
 public:
     KOKKOS_FUNCTION
         Foo_2();
@@ -49,7 +49,7 @@ Foo::Foo() {
 }
 
 KOKKOS_FUNCTION
-Foo_1::Foo_1(): Foo() {
+Foo_1::Foo_1() : Foo() {
     val = 1;
 }
 
@@ -59,7 +59,7 @@ int Foo_1::value() {
 }
 
 KOKKOS_FUNCTION
-Foo_2::Foo_2(): Foo() {
+Foo_2::Foo_2() : Foo() {
     val = 2;
 }
 
@@ -68,42 +68,13 @@ int Foo_2::value() {
     return val;
 }
 
-class Parent {
-    
+class a_class {
+
 public:
-    int a=100;
-    virtual void call_operator() =0;
-    std::string sa="lalala";
-    double *p;
-    typedef Kokkos::View<double*> vec;
-    vec  x=Kokkos::View<double*>("x",10);
-    int dim[3]={0,1,2};
-    KOKKOS_FUNCTION
-    void  fun() const{
-        printf("print a=%d\n",a);
-    };
+    std::string sa;
+    KOKKOS_FUNCTION void operator() (const int& i, double& s1) const { s1++; };
 };
 
-class Child : public Parent {
-    
-public:
-    int b=100;
-    std::string  sb="asdasda";
-    KOKKOS_FUNCTION void operator() ( const int i) const;
-    void call_operator() override;
-};
-
-KOKKOS_FUNCTION
-void Child::operator() ( const int i) const {
-    // do nothing
-    x(i)=0;
-    fun();
-    printf("%d\n",dim[0]);
-};
-
-void Child::call_operator() {
-    Kokkos::parallel_for("myclass", 3, *this);
-}
 
 
 
@@ -146,12 +117,12 @@ int main(int argc, char* argv[]) {
 
         /////////////////////////////////////////////////////////////////
 
-        Parent *myclass;
-        myclass = new Child();
-        double d=3.4;
-        myclass->p=&d;
+        a_class myclass;
+        // myclass = new Child();
+        // myclass->dim[0]=33;
         // Kokkos::parallel_for("myclass", 3, *myclass);
-        myclass->call_operator();
+        double sum;
+        Kokkos::parallel_reduce("myclass", 1, myclass, sum);
     }
 
     Kokkos::finalize();
