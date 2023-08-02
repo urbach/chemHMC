@@ -216,11 +216,11 @@ int main(int argc, char** argv) {
         doc["rng_device_state"] = "tmp5";
         doc["output_file"] = "tmp6";
         particles2 = new identical_particles(doc);
-        doc["particles"]["algorithm"] = "quick_sort";
-        doc["rng_host_state"] = "tmp7";
-        doc["rng_device_state"] = "tmp8";
-        doc["output_file"] = "tmp9";
-        particles_type* particles3 = new identical_particles(doc);
+        // doc["particles"]["algorithm"] = "quick_sort";
+        // doc["rng_host_state"] = "tmp7";
+        // doc["rng_device_state"] = "tmp8";
+        // doc["output_file"] = "tmp9";
+        // particles_type* particles3 = new identical_particles(doc);
         doc["particles"]["algorithm"] = "parallel_binning";
         doc["rng_host_state"] = "tmp10";
         doc["rng_device_state"] = "tmp11";
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
         //// init the positions
         particles1->InitX();
         particles2->InitX();
-        particles3->InitX();
+        // particles3->InitX();
         particles4->InitX();
 
         int sum = 0;
