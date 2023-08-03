@@ -6,7 +6,6 @@ public:
     KOKKOS_FUNCTION void operator() (const int& i, double& s1) const { s1++; };
 };
 
-
 int main(int argc, char* argv[]) {
     Kokkos::initialize(argc, argv);
     {

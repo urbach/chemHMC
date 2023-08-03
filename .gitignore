@@ -56,3 +56,9 @@ code/builds/qbig_kepler/*
 !code/builds/qbig_kepler/load_modules_qbig_kepler.sh
 !code/builds/qbig_kepler/do_cmake_kepler.sh
 !code/builds/qbig_kepler/scr.sh
+
+!code/builds/qbig_pascal/
+code/builds/qbig_pascal/*
+!code/builds/qbig_pascal/load_modules_qbig_pascal.sh
+!code/builds/qbig_pascal/do_cmake_pascal.sh
+!code/builds/qbig_pascal/scr.sh
