@@ -22,6 +22,7 @@ public:
     struct Tag_quicksort_compare {};
     struct check_in_volume {};
     struct Tag_RDF {};
+    struct check_RDF {};
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     double mass;
     double beta;
@@ -112,6 +113,7 @@ public:
 
     // functor for the RDF
     KOKKOS_FUNCTION void operator() (Tag_RDF, const member_type& teamMember) const; //declaration of functor
+    KOKKOS_FUNCTION void operator() (check_RDF, const int& i, double& update) const;
 
     void compute_coeff_momenta() override;
     void compute_coeff_position() override;

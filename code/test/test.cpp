@@ -2,7 +2,7 @@
 
 class a_class {
 public:
-    std::string sa;
+    std::string s;
     KOKKOS_FUNCTION void operator() (const int& i, double& s1) const { s1++; };
 };
 
@@ -12,7 +12,6 @@ int main(int argc, char* argv[]) {
         a_class myclass;
         double sum;
         Kokkos::parallel_reduce("myclass", 1, myclass, sum);
-
     }
     Kokkos::finalize();
 }

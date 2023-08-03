@@ -407,7 +407,7 @@ double identical_particles::compute_kinetic_E() {
 }
 
 KOKKOS_FUNCTION
-void identical_particles::operator() (kinetic, const int &i, double& sum) const {
+void identical_particles::operator() (kinetic, const int& i, double& sum) const {
     sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
 };
 
@@ -631,30 +631,87 @@ void identical_particles::update_momenta(const double dt_) {
 void identical_particles::compute_RDF() {
     typedef Kokkos::TeamPolicy<Tag_RDF>  team_policy;
     Kokkos::parallel_for("identical_particles-RDF", team_policy(NbRDF, Kokkos::AUTO), *this);
+    double a;
+    Kokkos::parallel_reduce("identical_particles-RDF-check", Kokkos::RangePolicy<check_RDF>(0, NbRDF), *this, a);
+    printf(" sum RDF =%g     L=%g  Lmax=%g  size_bin=%g  bins=%d\n", a, L[0], LmaxRDF, size_bRDF, NbRDF);
 }
+
+// KOKKOS_FUNCTION
+// void identical_particles::operator() (Tag_RDF, const member_type& teamMember) const {
+//     const int ib = teamMember.league_rank();// bin id
+//     double count;
+//     Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, 1, N), [=](const int i, double& update) {
+//         double r = 0;
+//         for (int dir = 0;dir < dim_space;dir++) {
+//             double ri = (x(0, dir) - x(i, dir) - L[dir]) * (x(0, dir) - x(i, dir) - L[dir]);
+//             double si = (x(0, dir) - x(i, dir)) * (x(0, dir) - x(i, dir));
+//             if (si < ri) ri = si;
+//             si = (x(0, dir) - x(i, dir) + L[dir]) * (x(0, dir) - x(i, dir) + L[dir]);
+//             if (si < ri) ri = si;
+//             r += ri;
+//         }
+//         r = Kokkos::sqrt(r);
+//         int ib1 = (int)(r / size_bRDF);
+
+//         if (ib == ib1)
+//             update++;
+//         }, count);
+//     // RDF(ib) /= (N - 1);
+//     // Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
+
+//         double ri = ib * size_bRDF;
+//         double rf = ri + size_bRDF;
+//         ri = ri * ri * ri;
+//         rf = rf * rf * rf;
+//         double V = 1.0;
+//         for (int dir = 0;dir < dim_space;dir++) V *= L[dir];
+//         RDF(ib) = count* V / (1.33333333333 * M_PI * (rf - ri) * (N - 1));
+//         // });
+// };
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (Tag_RDF, const member_type& teamMember) const {
     const int ib = teamMember.league_rank();// bin id
-    RDF(ib) = 0;
-    // printf("bin =%d binncount=%d\n", ib, bincount(ib));
-    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, 1, N), [=](const int i, double& update) {
-        double r = 0;
-        for (int dir = 0;dir < dim_space;dir++) {
-            double ri = (x(0, dir) - x(i, dir) - L[dir]) * (x(0, dir) - x(i, dir) - L[dir]);
-            double si = (x(0, dir) - x(i, dir)) * (x(0, dir) - x(i, dir));
-            if (si < ri) ri = si;
-            si = (x(0, dir) - x(i, dir) + L[dir]) * (x(0, dir) - x(i, dir) + L[dir]);
-            if (si < ri) ri = si;
-            r += ri;
-        }
-        r = Kokkos::sqrt(r);
-        int ib1 = (int)(r / size_bRDF);
+    double count;
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, 0, N), [=](const int i, double& update) {
+        double innercount;
+        Kokkos::parallel_reduce(Kokkos::ThreadVectorRange(teamMember, 0, N), [=](const int j, double& innerUpdate) {
+            double r = 0;
+            for (int dir = 0;dir < dim_space;dir++) {
+                double ri = (x(j, dir) - x(i, dir) - L[dir]) * (x(j, dir) - x(i, dir) - L[dir]);
+                double si = (x(j, dir) - x(i, dir)) * (x(j, dir) - x(i, dir));
+                if (si < ri) ri = si;
+                si = (x(j, dir) - x(i, dir) + L[dir]) * (x(j, dir) - x(i, dir) + L[dir]);
+                if (si < ri) ri = si;
+                r += ri;
+            }
+            r = Kokkos::sqrt(r);
+            int ib1 = (int)(r / size_bRDF);
 
-        if (ib == ib1)
-            update++;
-        }, RDF(ib));
-    RDF(ib) /= (N - 1);
+            if (ib == ib1 && i!=j)
+                innerUpdate++;
+            }, innercount);
+        Kokkos::single(Kokkos::PerThread(teamMember), [&]() {
+            update += innercount;
+            });
+        }, count);
+    // RDF(ib) /= (N - 1);
+    // Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
+
+    double ri = ib * size_bRDF;
+    double rf = ri + size_bRDF;
+    ri = ri * ri * ri;
+    rf = rf * rf * rf;
+    double V = 1.0;
+    for (int dir = 0;dir < dim_space;dir++) V *= L[dir];
+    RDF(ib) = count * V / (1.33333333333 * M_PI * (rf - ri) * (N - 1) * N);
+    // });
+};
+
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (check_RDF, const int& i, double& update) const {
+    update += RDF(i);
 };
 
 void identical_particles::write_header_RDF(FILE* file, int confs) {
