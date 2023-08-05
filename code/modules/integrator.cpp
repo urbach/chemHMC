@@ -84,7 +84,7 @@ OMF4::OMF4(YAML::Node doc, params_class params) :
     theta(-0.03230286765269967),
     vartheta(0.08398315262876693),
     lambda(0.6822365335719091),
-    dtau(dt* steps),
+    dtau(dt),
     eps{ rho * dtau, lambda * dtau,
                  theta * dtau, 0.5 * (1 - 2. * (lambda + vartheta)) * dtau,
                  (1 - 2. * (theta + rho)) * dtau, 0.5 * (1 - 2. * (lambda + vartheta)) * dtau,
