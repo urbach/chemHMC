@@ -3,18 +3,18 @@
 #include "identical_particles.hpp"
 
 
-integrator_type::integrator_type(YAML::Node doc) {
+integrator_type::integrator_type(YAML::Node doc, params_class params) {
 
     if (doc["particles"]) {
         std::string name = check_and_assign_value<std::string>(doc["particles"], "name");
         if (name == "identical_particles")
-            particles = new identical_particles(doc);
+            particles = new identical_particles(doc, params);
         else {
             printf("no valid name for particles: ");
             std::cout << doc["particles"].as<std::string>() << std::endl;
             exit(1);
         }
-        particles->InitX();
+        particles->InitX(params);
     }
     else {
         Kokkos::abort("no particles in input file");
@@ -27,7 +27,7 @@ integrator_type::integrator_type(YAML::Node doc) {
 
 }
 
-LEAP::LEAP(YAML::Node doc) : integrator_type(doc) {
+LEAP::LEAP(YAML::Node doc, params_class params) : integrator_type(doc, params) {
 
 }
 
@@ -52,7 +52,8 @@ void LEAP::integrate() {
 //////////////////////////////////////////////////////////////////////////////
 // OMF2
 //////////////////////////////////////////////////////////////////////////////
-OMF2::OMF2(YAML::Node doc) : integrator_type(doc), lambda(0.1938), oneminus2lambda(1. - 2. * lambda) {
+OMF2::OMF2(YAML::Node doc, params_class params) :
+    integrator_type(doc, params), lambda(0.1938), oneminus2lambda(1. - 2. * lambda) {
 }
 
 
@@ -77,8 +78,8 @@ void OMF2::integrate() {
 //////////////////////////////////////////////////////////////////////////////
 // OMF4 integration scheme
 //////////////////////////////////////////////////////////////////////////////
-OMF4::OMF4(YAML::Node doc) :
-    integrator_type(doc),
+OMF4::OMF4(YAML::Node doc, params_class params) :
+    integrator_type(doc, params),
     rho(0.2539785108410595),
     theta(-0.03230286765269967),
     vartheta(0.08398315262876693),

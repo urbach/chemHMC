@@ -21,4 +21,4 @@ source load_modules_qbig_pascal.sh
 #../../chemHMC/code/build/main//main -i input_I.yaml
 #main/main -i ../test.yaml
 #./test/test 
-./test/test_binning -N 500                                         
+#./test/test_binning -i ../test.yaml                                         

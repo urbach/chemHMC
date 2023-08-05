@@ -44,10 +44,10 @@ int check_and_assign_value(YAML::Node doc, const char* tag) {
     }
 
     try {
-        return ((int) stod(doc[tag].as<std::string>()));
+        return ((int)stod(doc[tag].as<std::string>()));
     }
     catch (YAML::TypedBadConversion<std::string>) {
-        printf("error: impossible to read tag %s\n", tag );
+        printf("error: impossible to read tag %s\n", tag);
         Kokkos::abort("Incorrect input type");
     }
 }
@@ -86,7 +86,7 @@ void error_if_can_not_open_file_to_write(const std::string& name) {
     fclose(f);
 }
 
-params_class::params_class(YAML::Node doc) {
+params_class::params_class(YAML::Node doc, bool check_overwrite) {
 
     L[0] = check_and_assign_value<double>(doc["geometry"], "Lx");
     L[1] = check_and_assign_value<double>(doc["geometry"], "Ly");
@@ -127,11 +127,13 @@ params_class::params_class(YAML::Node doc) {
         error_if_can_not_open_file_to_read(rng_device_state);
     }
     else {
-        error_if_file_exist(nameout);
-        error_if_file_exist(rng_host_state);
-        error_if_file_exist(rng_device_state);
-        error_if_can_not_open_file_to_write(rng_host_state);
-        error_if_can_not_open_file_to_write(rng_device_state);
+        if (check_overwrite) {
+            error_if_file_exist(nameout);
+            error_if_file_exist(rng_host_state);
+            error_if_file_exist(rng_device_state);
+            error_if_can_not_open_file_to_write(rng_host_state);
+            error_if_can_not_open_file_to_write(rng_device_state);
+        }
     }
 
     fileout = fopen(nameout.c_str(), "ab");
@@ -141,7 +143,7 @@ params_class::params_class(YAML::Node doc) {
     }
     istart = 0;
 
-    if (doc["particles"]["RDF"]){
+    if (doc["particles"]["RDF"]) {
         name_RDF = check_and_assign_value<std::string>(doc["particles"]["RDF"], "output_file");
     }
 

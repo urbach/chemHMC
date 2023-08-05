@@ -19,10 +19,11 @@ class particles_type {
 public:
 
     int N;
-
+    int seed;
     double coeff_p;
     double coeff_x;
     double L[dim_space];
+
     type_x  x;
     type_p  p;
     type_f  f;
@@ -30,7 +31,6 @@ public:
     // the host mirror of x is used to restore the position before the MD in case of a rejection
     type_x::HostMirror h_x;
     type_p::HostMirror h_p;
-    params_class params;
 
     int nbin[dim_space], bintot;
     double sizebin[dim_space];
@@ -68,15 +68,15 @@ public:
     void save_device_rng();
     void load_device_rng();
     // constructor
-    particles_type(YAML::Node doc);
+    particles_type(YAML::Node doc, params_class params);
 
     virtual double get_beta() = 0;
-    virtual void InitX() = 0;
+    virtual void InitX(params_class params) = 0;
 
     void printx();
     void printp();
-    virtual void print_xyz(int traj, double K, double V) = 0;
-    virtual void read_xyz() = 0;
+    virtual void print_xyz(params_class params, int traj, double K, double V) = 0;
+    virtual void read_xyz(params_class params) = 0;
     virtual int how_many_confs_xyz(FILE* file) = 0;
     virtual void read_next_confs_xyz(FILE* file) = 0;
 

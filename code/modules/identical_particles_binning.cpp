@@ -4,12 +4,12 @@
 void identical_particles::cutoff_binning() {
     bintot = 1;
     for (int i = 0;i < dim_space;i++) {
-        if (params.L[i] < cutoff) {
-            printf("error: the dimention %d must be larger then the cutoff\n L[%d]=%g  cutoff=%g\n", i, i, params.L[i], cutoff);
+        if (L[i] < cutoff) {
+            printf("error: the dimention %d must be larger then the cutoff\n L[%d]=%g  cutoff=%g\n", i, i, L[i], cutoff);
             Kokkos::abort("cutoff_binning");
         }
-        nbin[i] = floor(params.L[i] / cutoff);
-        sizebin[i] = params.L[i] / ((double)nbin[i]);
+        nbin[i] = floor(L[i] / cutoff);
+        sizebin[i] = L[i] / ((double)nbin[i]);
         if (sizebin[i] < cutoff) {
             printf("error: size of bin in dimension %d must be larger then the cutoff\n sizebin[%d]=%g  cutoff=%g\n", i, i, sizebin[i], cutoff);
             Kokkos::abort("cutoff_binning");

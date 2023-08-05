@@ -26,7 +26,8 @@ struct params_class { // Just the thing that holds all variables
   std::string name_RDF;
   
   // contructor;
-  params_class(YAML::Node doc);
+  params_class(){};
+  params_class(YAML::Node doc, bool check_overwrite=true);
  
 
 };

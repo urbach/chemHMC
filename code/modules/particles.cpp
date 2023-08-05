@@ -14,7 +14,7 @@
 #include "read_infile.hpp"
 
 
-particles_type::particles_type(YAML::Node doc) : params(doc) {
+particles_type::particles_type(YAML::Node doc, params_class params)  {
 
 
     N = check_and_assign_value<int>(doc["particles"], "N");

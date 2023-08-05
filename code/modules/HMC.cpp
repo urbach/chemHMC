@@ -5,15 +5,16 @@
 void HMC_class::init(int argc, char** argv) {
 
     YAML::Node doc = read_params(argc, argv);
+    params = params_class(doc);
 
     if (doc["integrator"]) {
         std::string name = check_and_assign_value<std::string>(doc["integrator"], "name");
         if (name == "LEAP")
-            integrator = new LEAP(doc);
+            integrator = new LEAP(doc, params);
         else if (name == "OMF2")
-            integrator = new OMF2(doc);
+            integrator = new OMF2(doc, params);
         else if (name == "OMF4")
-            integrator = new OMF4(doc);
+            integrator = new OMF4(doc, params);
         else {
             printf("no valid integrator name: ");
             std::cout << doc["integrator"]["name"].as<std::string>() << std::endl;
@@ -33,9 +34,9 @@ void HMC_class::init(int argc, char** argv) {
     int seed = check_and_assign_value<int>(doc, "seed");
 
     gen64.seed(seed);
-    if (integrator->particles->params.append == true) {
+    if (params.append == true) {
         std::cout << std::endl << "Loading rng host...\n";
-        std::ifstream fin(integrator->particles->params.rng_host_state);
+        std::ifstream fin(params.rng_host_state);
         fin >> gen64;
     }
 
@@ -50,7 +51,7 @@ void HMC_class::save_host_rng_state() {
     // save state
     std::cout << "Saving rng host...\n";
     {
-        std::ofstream fout(integrator->particles->params.rng_host_state);
+        std::ofstream fout(params.rng_host_state);
         fout << gen64;
     }
 }
@@ -63,8 +64,8 @@ void HMC_class::run() {
     double beta = integrator->particles->get_beta();
 
     Kokkos::fence();
-    int first_traj = integrator->particles->params.istart + 1;
-    int last_traj = Ntrajectories + integrator->particles->params.istart + 1;
+    int first_traj = params.istart + 1;
+    int last_traj = Ntrajectories + params.istart + 1;
     // copy the configuration before the MD
     Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
     for (int i = first_traj; i < last_traj; i++) {
@@ -111,7 +112,7 @@ void HMC_class::run() {
             // save
             if ((i % save_every == 0)) {
                 printf("saving conf\n");
-                integrator->particles->print_xyz(i, Ki, Vi);
+                integrator->particles->print_xyz(params, i, Ki, Vi);
                 save_host_rng_state();
                 integrator->particles->save_device_rng();
             }
@@ -132,9 +133,9 @@ void HMC_class::run() {
 void HMC_class::measure() {
     auto& p = integrator->particles;
     FILE* file = NULL;
-    file = fopen(p->params.nameout.c_str(), "r");
+    file = fopen(params.nameout.c_str(), "r");
     if (file == NULL) {
-        printf("error in opening file %s\n", p->params.nameout.c_str());
+        printf("error in opening file %s\n", params.nameout.c_str());
         Kokkos::abort("abort");
     }
     int confs = p->how_many_confs_xyz(file);

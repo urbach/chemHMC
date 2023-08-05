@@ -15,7 +15,8 @@
 #include "identical_particles.hpp"
 
 // contructor
-identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
+identical_particles::identical_particles(YAML::Node doc, params_class params) :
+    particles_type(doc, params) {
     mass = check_and_assign_value<double>(doc["particles"], "mass");
     beta = check_and_assign_value<double>(doc["particles"], "beta");
     sbeta = sqrt(beta);
@@ -76,7 +77,7 @@ identical_particles::identical_particles(YAML::Node doc) : particles_type(doc) {
     }
 }
 
-void identical_particles::read_xyz() {
+void identical_particles::read_xyz(params_class params) {
     FILE* file = NULL;
     file = fopen(params.start_configuration_file.c_str(), "r");
     if (file == NULL) {
@@ -163,12 +164,12 @@ void identical_particles::read_next_confs_xyz(FILE* file) {
     while ((c = fgetc(file)) != EOF) {
         if (c == '\n') {
             for (int i = 0;i < 11;i++) c = fgetc(file);
-            fscanf(file, " %d", &params.istart);
+            int tmp;
+            count += fscanf(file, " %d", &tmp);
             break;
         }
     }
     while ((c = fgetc(file)) != EOF) { if (c == '\n') break; }
-    count = 0;
     for (int i = 0; i < N;i++) {
         count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
         // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
@@ -178,14 +179,14 @@ void identical_particles::read_next_confs_xyz(FILE* file) {
         Kokkos::abort("abort");
     }
     // printf("%d  %d\n", count, N);
-    if (count != N * 4) { Kokkos::abort("error in reading the file"); }
+    if (count != N * 4 + 1) { Kokkos::abort("error in reading the file"); }
     Kokkos::deep_copy(x, h_x);
     // printx();
 }
 
 
 
-void identical_particles::InitX() {
+void identical_particles::InitX(params_class params) {
     x = type_x("x", N);
     // create_mirror() will always allocate a new view,
     // create_mirror_view() will only create a new view if the original one is not in HostSpace
@@ -195,12 +196,13 @@ void identical_particles::InitX() {
 
     if (params.StartCondition == "cold") {
         Kokkos::parallel_for("cold initialization", Kokkos::RangePolicy<cold>(0, N), *this);
+
     }
     else if (params.StartCondition == "hot") {
         Kokkos::parallel_for("hot initialization", Kokkos::RangePolicy<hot>(0, N), *this);
     }
     else if (params.StartCondition == "read") {
-        read_xyz();
+        read_xyz(params);
     }
     else {
         Kokkos::abort("StartCondition not implemented");
@@ -210,13 +212,15 @@ void identical_particles::InitX() {
     Kokkos::parallel_for("volume_check", Kokkos::RangePolicy<check_in_volume>(0, N), *this);
     Kokkos::fence();
     printf("particle initialized\n");
+    // printx();
+    // printf("# end initial configuration---------------------------------------------------------------\n");
 };
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (check_in_volume, const int i) const {
     for (int dir = 0; dir < dim_space;dir++) {
-        if (x(i, dir) < 0 || x(i, dir) >= params.L[dir]) {
-            printf("error: particle position x(%d, %d)= %g  outside the box of length %g\n", i, dir, x(i, dir), params.L[dir]);
+        if (x(i, dir) < 0 || x(i, dir) >= L[dir]) {
+            printf("error: particle position x(%d, %d)= %g  outside the box of length %g\n", i, dir, x(i, dir), L[dir]);
             Kokkos::abort("aborting");
         }
     }
@@ -229,23 +233,23 @@ void identical_particles::operator() (cold, const int i) const {
     int iy = (int)(i - iz * N3 * N3) / (N3);
     int ix = (int)(i - iz * N3 * N3 - iy * N3);
 
-    x(i, 0) = params.L[0] * (ix - N3 * floor(ix / N3)) / N3;
-    x(i, 1) = params.L[1] * (iy - N3 * floor(iy / N3)) / N3;
-    x(i, 2) = params.L[2] * (iz - N3 * floor(iz / N3)) / N3;
+    x(i, 0) = L[0] * (ix - N3 * floor(ix / N3)) / (N3 + 1);
+    x(i, 1) = L[1] * (iy - N3 * floor(iy / N3)) / (N3 + 1);
+    x(i, 2) = L[2] * (iz - N3 * floor(iz / N3)) / (N3 + 1);
 };
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (hot, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
-    x(i, 0) = rgen.drand() * params.L[0];
-    x(i, 1) = rgen.drand() * params.L[1];
-    x(i, 2) = rgen.drand() * params.L[2];
+    x(i, 0) = rgen.drand() * L[0];
+    x(i, 1) = rgen.drand() * L[1];
+    x(i, 2) = rgen.drand() * L[2];
     rand_pool.free_state(rgen);
 };
 
 // since we are using the hostMirror to store the starting point we don't whant to 
 // deep_copy it here 
-void identical_particles::print_xyz(int traj, double K, double V) {
+void identical_particles::print_xyz(params_class params, int traj, double K, double V) {
     fprintf(params.fileout, "     %d\n", N);
     fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g\n", traj, K, V);
     for (int i = 0; i < N; i++)
@@ -688,7 +692,7 @@ void identical_particles::operator() (Tag_RDF, const member_type& teamMember) co
             r = Kokkos::sqrt(r);
             int ib1 = (int)(r / size_bRDF);
 
-            if (ib == ib1 && i!=j)
+            if (ib == ib1 && i != j)
                 innerUpdate++;
             }, innercount);
         Kokkos::single(Kokkos::PerThread(teamMember), [&]() {

@@ -16,9 +16,9 @@ public:
     double dt;
 
     integrator_type() = delete;
-    integrator_type(YAML::Node doc);
+    integrator_type(YAML::Node doc, params_class params);
     virtual void integrate() = 0;
-    
+
 };
 
 
@@ -26,7 +26,7 @@ class LEAP : public integrator_type {
 
 public:
     LEAP() = delete;
-    LEAP(YAML::Node doc);
+    LEAP(YAML::Node doc, params_class params);
     void integrate() override;
 
 };
@@ -37,7 +37,7 @@ public:
     const double lambda;
     const double oneminus2lambda;
     OMF2() = delete;
-    OMF2(YAML::Node doc);
+    OMF2(YAML::Node doc, params_class params);
     void integrate() override;
 
 };
@@ -54,7 +54,7 @@ public:
     const double dtau;
     const double eps[10];
     OMF4() = delete;
-    OMF4(YAML::Node doc);
+    OMF4(YAML::Node doc, params_class params);
     void integrate() override;
 
 };

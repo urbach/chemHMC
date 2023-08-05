@@ -34,15 +34,15 @@ public:
     std::string name_xyz;
 
     // constructor
-    identical_particles(YAML::Node doc);
+    identical_particles(YAML::Node doc, params_class params);
 
     double get_beta() { return beta; };
-    void print_xyz(int traj, double K, double V) override;
-    void read_xyz() override;
+    void print_xyz(params_class params, int traj, double K, double V) override;
+    void read_xyz(params_class params) override;
     int how_many_confs_xyz(FILE* file) override;
     void read_next_confs_xyz(FILE* file) override;
-    
-    void InitX() override;
+
+    void InitX(params_class params) override;
     void hb() override; // heatbath for the momenta
 
     std::function<double()>  potential_strategy;
@@ -105,7 +105,7 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_all, const int i, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_binning, const member_type& teamMember, double& V) const;
     // functor to compute the kinetic energy
-    KOKKOS_FUNCTION void operator() (kinetic, const int &i, double& K) const;
+    KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& K) const;
 
     // functor to compute the forces
     KOKKOS_FUNCTION void operator() (force, const int i) const; //declaration of functor
