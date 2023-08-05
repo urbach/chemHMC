@@ -175,63 +175,28 @@ int main(int argc, char** argv) {
     // starting kokkos
     Kokkos::initialize(argc, argv); {
 
-        int opt1 = -1;
-        for (int i = 0; i < argc; ++i) {
-            if (std::strcmp(argv[i], "-N") == 0) {
-                opt1 = i + 1;
-            }
-        }
-        if (opt1 < 0) {
-            std::cout << "No input file specified, Aborting" << std::endl;
-            std::cout << "usage:  ./main -N ${number-of-particles}" << std::endl;
-            Kokkos::abort("");
-        }
-        YAML::Node doc;
-        doc["StartCondition"] = "cold";
-        doc["seed"] = 123;
-
-        doc["geometry"]["Lx"] = 1.1;
-        doc["geometry"]["Ly"] = 1.2;
-        doc["geometry"]["Lz"] = 1.3;
-
-        doc["particles"]["name"] = "identical_particles";
-        doc["particles"]["N"] = std::stoi(argv[opt1]);;
-        doc["particles"]["mass"] = 0.1;
-        doc["particles"]["beta"] = 0.5;
-        doc["particles"]["cutoff"] = 0.4;
-        doc["particles"]["eps"] = 0.1;
-        doc["particles"]["sigma"] = 0.1;
-        doc["particles"]["name_xyz"] = "none";
-        doc["particles"]["algorithm"] = "all_neighbour";
-        doc["append"] = "false";
-        doc["rng_host_state"] = "tmp1";
-        doc["rng_device_state"] = "tmp2";
-        doc["output_file"] = "tmp3";
-
+        YAML::Node doc = read_params(argc, argv);
+        params_class params(doc,false);
         particles_type* particles1, * particles2;
 
-        particles1 = new identical_particles(doc);
+        doc["particles"]["algorithm"] = "all_neighbour";
+        particles1 = new identical_particles(doc, params);
+
         doc["particles"]["algorithm"] = "binning_serial";
-        doc["rng_host_state"] = "tmp4";
-        doc["rng_device_state"] = "tmp5";
-        doc["output_file"] = "tmp6";
-        particles2 = new identical_particles(doc);
+        particles2 = new identical_particles(doc, params);
         // doc["particles"]["algorithm"] = "quick_sort";
         // doc["rng_host_state"] = "tmp7";
         // doc["rng_device_state"] = "tmp8";
         // doc["output_file"] = "tmp9";
         // particles_type* particles3 = new identical_particles(doc);
         doc["particles"]["algorithm"] = "parallel_binning";
-        doc["rng_host_state"] = "tmp10";
-        doc["rng_device_state"] = "tmp11";
-        doc["output_file"] = "tmp12";
-        particles_type* particles4 = new identical_particles(doc);
+        particles_type* particles4 = new identical_particles(doc, params);
 
         //// init the positions
-        particles1->InitX();
-        particles2->InitX();
+        particles1->InitX(params);
+        particles2->InitX(params);
         // particles3->InitX();
-        particles4->InitX();
+        particles4->InitX(params);
 
         int sum = 0;
         type_x x1 = particles1->x;
@@ -331,7 +296,7 @@ int main(int argc, char** argv) {
         check_force_with_num_der(particles4, errors);
 
         //////////////////////////////////////////////////////////////////////////////////////////
-        printf("error recap:\n");
+        printf("\nerror recap:\n");
         if (errors.size() > 0) {
             for (auto e : errors)
                 printf("%s\n", e.c_str());
