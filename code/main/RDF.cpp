@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
         Kokkos::Timer timer;
 
         HMC_class HMC;
-        HMC.init(argc, argv);
+        HMC.init(argc, argv, false);
         
         HMC.measure();
 

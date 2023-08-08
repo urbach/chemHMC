@@ -7,7 +7,7 @@
 
 class HMC_class {
 public:
-    integrator_type *integrator;
+    integrator_type* integrator;
     int Ntrajectories;
     int thermalization_steps;
     int save_every;
@@ -17,10 +17,10 @@ public:
     std::string rng_host_state;
     params_class params;
 
-    HMC_class(){};
+    HMC_class() {};
     void save_host_rng_state();
-    void init(int argc, char** argv);
-       
+    void init(int argc, char** argv, bool check_overwrite = true);
+
     void run();
     double gen_random();
 

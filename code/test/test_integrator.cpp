@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
         printf("time LEAP integration = %f s\n", times[2]);
         /////////////////////////////////////////////////////////////////////////////////////////
         check_integrator_res(int_OMF4, int_OMF2, " OMF4  agains OMF2", errors);
-        check_integrator_res(int_OMF2, int_LEAP, " OMF4  agains LEAP", errors);
+        check_integrator_res(int_OMF2, int_LEAP, " OMF2  agains LEAP", errors);
 
         //////////////////////////////////////////////////////////////////////////////////////////
         printf("error recap:\n");

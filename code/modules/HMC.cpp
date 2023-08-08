@@ -2,10 +2,10 @@
 #include "read_infile.hpp"
 #include <fstream>
 
-void HMC_class::init(int argc, char** argv) {
+void HMC_class::init(int argc, char** argv, bool check_overwrite) {
 
     YAML::Node doc = read_params(argc, argv);
-    params = params_class(doc);
+    params = params_class(doc, check_overwrite);
 
     if (doc["integrator"]) {
         std::string name = check_and_assign_value<std::string>(doc["integrator"], "name");
