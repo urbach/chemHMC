@@ -15,9 +15,11 @@ public:
     struct hot {};
     struct hbTag {};
     struct Tag_potential_all {};
+    struct Tag_potential_all_inner_parallel {};
     struct Tag_potential_binning {};
     struct kinetic {};
     struct force {};
+    struct Tag_force_inner_parallel {};
     struct Tag_force_binning {};
     struct Tag_quicksort_compare {};
     struct check_in_volume {};
@@ -48,6 +50,7 @@ public:
     std::function<double()>  potential_strategy;
     double potential_all_neighbour();
     double potential_binning();
+    double potential_all_neighbour_inner_parallel();
     double compute_potential() override {
         return potential_strategy();
     };
@@ -88,6 +91,7 @@ public:
 
     std::function<void()>  force_strategy;
     void compute_force_all();
+    void compute_force_all_inner_parallel();
     void compute_force_binning();
     void compute_force() override {
         force_strategy();
@@ -103,12 +107,14 @@ public:
     KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     // functor to compute the potential
     KOKKOS_FUNCTION void operator() (Tag_potential_all, const int i, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_binning, const member_type& teamMember, double& V) const;
     // functor to compute the kinetic energy
     KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& K) const;
 
     // functor to compute the forces
     KOKKOS_FUNCTION void operator() (force, const int i) const; //declaration of functor
+    KOKKOS_FUNCTION void operator() (Tag_force_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_binning, const member_type& teamMember) const;
 
     // functor for the RDF
@@ -127,6 +133,40 @@ public:
     ~identical_particles() {};
 };
 
+
+
+// we need a ruduction of 3 double array
+template< class ScalarType, int N >
+struct array_type {
+    ScalarType the_array[N];
+
+    KOKKOS_INLINE_FUNCTION   // Default constructor - Initialize to 0's
+        array_type() {
+        for (int i = 0; i < N; i++) { the_array[i] = 0; }
+    }
+    KOKKOS_INLINE_FUNCTION   // Copy Constructor
+        array_type(const array_type& rhs) {
+        for (int i = 0; i < N; i++) {
+            the_array[i] = rhs.the_array[i];
+        }
+    }
+    KOKKOS_INLINE_FUNCTION   // add operator
+        array_type& operator += (const array_type& src) {
+        for (int i = 0; i < N; i++) {
+            the_array[i] += src.the_array[i];
+        }
+        return *this;
+    }
+};
+typedef array_type<double, dim_space> space_vector;  // used to simplify code below
+namespace Kokkos { //reduction identity must be defined in Kokkos namespace
+    template<>
+    struct reduction_identity< space_vector > {
+        KOKKOS_FORCEINLINE_FUNCTION static space_vector sum() {
+            return space_vector();
+        }
+    };
+}
 
 
 #endif

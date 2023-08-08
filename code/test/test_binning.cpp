@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
         params_class params(doc,false);
         particles_type* particles1, * particles2;
 
-        doc["particles"]["algorithm"] = "all_neighbour";
+        doc["particles"]["algorithm"] = "all_neighbour_inner_parallel";
         particles1 = new identical_particles(doc, params);
 
         doc["particles"]["algorithm"] = "binning_serial";

@@ -31,7 +31,12 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
         potential_without_binning_strategy = std::bind(&identical_particles::potential_all_neighbour, this);
         force_strategy = std::bind(&identical_particles::compute_force_all, this);
     }
-    if (algorithm.compare("binning_serial") == 0) {
+    else if (algorithm.compare("all_neighbour_inner_parallel") == 0) {
+        potential_strategy = std::bind(&identical_particles::potential_all_neighbour_inner_parallel, this);
+        potential_without_binning_strategy = std::bind(&identical_particles::potential_all_neighbour_inner_parallel, this);
+        force_strategy = std::bind(&identical_particles::compute_force_all_inner_parallel, this);
+    }
+    else if (algorithm.compare("binning_serial") == 0) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
         binning_geometry();
         binning_strategy = std::bind(&identical_particles::serial_binning, this);
@@ -40,7 +45,7 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
         potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
         force_strategy = std::bind(&identical_particles::compute_force_binning, this);
     }
-    if (algorithm.compare("parallel_binning") == 0) {
+    else if (algorithm.compare("parallel_binning") == 0) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
         binning_geometry();
         binning_strategy = std::bind(&identical_particles::parallel_binning, this);
@@ -49,7 +54,7 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
         potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
         force_strategy = std::bind(&identical_particles::compute_force_binning, this);
     }
-    if (algorithm.compare("quick_sort") == 0) {
+    else if (algorithm.compare("quick_sort") == 0) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
         binning_geometry();
         binning_strategy = std::bind(&identical_particles::create_quick_sort, this);
@@ -57,6 +62,10 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
         potential_strategy = std::bind(&identical_particles::potential_binning, this);
         potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
         force_strategy = std::bind(&identical_particles::compute_force_binning, this);
+    }
+    else {
+        printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
+        Kokkos::abort("aborting");
     }
     std::cout << "partilces_type:" << std::endl;
     std::cout << "name:" << name << std::endl;
@@ -322,6 +331,49 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
     }
 };
 
+
+double identical_particles::potential_all_neighbour_inner_parallel() {
+    double result;
+    Kokkos::parallel_reduce("identical_particles-LJ-potential-all-inner-parallel",
+        Kokkos::TeamPolicy<Tag_potential_all_inner_parallel>(N, Kokkos::AUTO), *this, result);
+    // 2 *eps instead of 4 *eps because we count the couples i,j twice
+    return 2 * eps * result;
+}
+
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const {
+    const int i = teamMember.league_rank();
+    double tmpV;
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& innerV) {
+        for (int bx = -1; bx < 2; bx++) {
+            for (int by = -1; by < 2; by++) {
+                for (int bz = -1; bz < 2; bz++) {
+                    if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
+                        double  rij = x(i, 0) - (x(j, 0) + bx * L[0]);
+                        double  r2 = rij * rij;
+                        rij = x(i, 1) - (x(j, 1) + by * L[1]);
+                        r2 += rij * rij;
+                        rij = x(i, 2) - (x(j, 2) + bz * L[2]);
+                        r2 += rij * rij;
+
+
+                        if (r2 < cutoff * cutoff) {
+                            double sr2 = sigma * sigma / r2;
+                            double sr6 = sr2 * sr2 * sr2;
+                            innerV += sr6 * (sr6 - 1.0);
+                        }
+                    }
+                }
+            }
+        }
+        }, tmpV);
+    Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
+        V += tmpV;
+        });
+};
+
+
 double identical_particles::potential_binning() {
     // double result = 0;
     create_binning();
@@ -458,6 +510,49 @@ void identical_particles::operator() (force, const int i) const {
 }
 
 
+void identical_particles::compute_force_all_inner_parallel() {
+    typedef Kokkos::TeamPolicy<Tag_force_inner_parallel>  team_policy;
+    Kokkos::parallel_for("identical_particles-LJ-force-all-inner-parall", team_policy(N, Kokkos::AUTO), *this);
+}
+
+KOKKOS_FUNCTION
+void identical_particles::operator() (Tag_force_inner_parallel, const member_type& teamMember) const {
+    const int i = teamMember.league_rank();// bin id
+    f(i, 0) = 0;
+    f(i, 1) = 0;
+    f(i, 2) = 0;
+    space_vector  fv;
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, space_vector& innerfv) {
+        for (int bx = -1; bx < 2; bx++) {
+            for (int by = -1; by < 2; by++) {
+                for (int bz = -1; bz < 2; bz++) {
+                    if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
+
+                        double  rij = x(i, 0) - (x(j, 0) + bx * L[0]);
+                        double r2 = rij * rij;
+                        rij = x(i, 1) - (x(j, 1) + by * L[1]);
+                        r2 += rij * rij;
+                        rij = x(i, 2) - (x(j, 2) + bz * L[2]);
+                        r2 += rij * rij;
+
+                        if (r2 < cutoff * cutoff) {
+                            double sr2 = sigma * sigma / r2;
+                            double sr6 = sr2 * sr2 * sr2;
+                            sr2 = sr6 * (-sr6 + 0.5) / r2;
+                            innerfv.the_array[0] += sr2 * (x(i, 0) - (x(j, 0) + bx * L[0]));
+                            innerfv.the_array[1] += sr2 * (x(i, 1) - (x(j, 1) + by * L[1]));
+                            innerfv.the_array[2] += sr2 * (x(i, 2) - (x(j, 2) + bz * L[2]));
+                        }
+                    }
+                }
+            }
+        }
+        }, fv);
+    f(i, 0) = fv.the_array[0] * 48 * eps;
+    f(i, 1) = fv.the_array[1] * 48 * eps;
+    f(i, 2) = fv.the_array[2] * 48 * eps;
+
+}
 
 
 
@@ -467,38 +562,6 @@ void identical_particles::compute_force_binning() {
     Kokkos::parallel_for("identical_particles-LJ-force-binning", team_policy(bintot, Kokkos::AUTO), *this);
 }
 
-// we need a ruduction of 3 double array
-template< class ScalarType, int N >
-struct array_type {
-    ScalarType the_array[N];
-
-    KOKKOS_INLINE_FUNCTION   // Default constructor - Initialize to 0's
-        array_type() {
-        for (int i = 0; i < N; i++) { the_array[i] = 0; }
-    }
-    KOKKOS_INLINE_FUNCTION   // Copy Constructor
-        array_type(const array_type& rhs) {
-        for (int i = 0; i < N; i++) {
-            the_array[i] = rhs.the_array[i];
-        }
-    }
-    KOKKOS_INLINE_FUNCTION   // add operator
-        array_type& operator += (const array_type& src) {
-        for (int i = 0; i < N; i++) {
-            the_array[i] += src.the_array[i];
-        }
-        return *this;
-    }
-};
-typedef array_type<double, dim_space> space_vector;  // used to simplify code below
-namespace Kokkos { //reduction identity must be defined in Kokkos namespace
-    template<>
-    struct reduction_identity< space_vector > {
-        KOKKOS_FORCEINLINE_FUNCTION static space_vector sum() {
-            return space_vector();
-        }
-    };
-}
 
 
 KOKKOS_FUNCTION
