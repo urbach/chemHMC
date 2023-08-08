@@ -534,26 +534,26 @@ void identical_particles::operator() (Tag_force_binning, const member_type& team
                         jbz = (ibz + nbin[2] + bz) % nbin[2];
                         wrap_z = bz * L[2];
                     }
-                    int jb = ctolex(jbx, jby, jbz);
+                    const int jb = ctolex(jbx, jby, jbz);
                     space_vector  fv;
                     Kokkos::parallel_reduce(Kokkos::ThreadVectorRange(teamMember, bincount(jb)), [=](const int jp, space_vector& innerfv) {
-                        int j = permute_vector(jp + binoffsets(jb));
+                        const int j = permute_vector(jp + binoffsets(jb));
 
                         if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
-                            double  r2 = ((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
+                            const double  r2 = ((x(i, 0) - x(j, 0) - wrap_x) * (x(i, 0) - x(j, 0) - wrap_x) +
                                 (x(i, 1) - x(j, 1) - wrap_y) * (x(i, 1) - x(j, 1) - wrap_y) +
                                 (x(i, 2) - x(j, 2) - wrap_z) * (x(i, 2) - x(j, 2) - wrap_z));
-                            double r = Kokkos::sqrt(r2);
+                            // double r = Kokkos::sqrt(r2);
                             if (r2 < cutoff * cutoff) {
                                 double sr2 = sigma * sigma / r2;
                                 double sr6 = sr2 * sr2 * sr2;
                                 sr2 = sr6 * (-sr6 + 0.5) / r2;
-                                // innerfv.the_array[0] += sr2 * (x(i, 0) - x(j, 0) - wrap_x);
-                                // innerfv.the_array[1] += sr2 * (x(i, 1) - x(j, 1) - wrap_y);
-                                // innerfv.the_array[2] += sr2 * (x(i, 2) - x(j, 2) - wrap_z);
-                                innerfv.the_array[0] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 0) - x(j, 0) - wrap_x) / (r * r);
-                                innerfv.the_array[1] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 1) - x(j, 1) - wrap_y) / (r * r);
-                                innerfv.the_array[2] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 2) - x(j, 2) - wrap_z) / (r * r);
+                                innerfv.the_array[0] += sr2 * (x(i, 0) - x(j, 0) - wrap_x);
+                                innerfv.the_array[1] += sr2 * (x(i, 1) - x(j, 1) - wrap_y);
+                                innerfv.the_array[2] += sr2 * (x(i, 2) - x(j, 2) - wrap_z);
+                                // innerfv.the_array[0] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 0) - x(j, 0) - wrap_x) / (r * r);
+                                // innerfv.the_array[1] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 1) - x(j, 1) - wrap_y) / (r * r);
+                                // innerfv.the_array[2] += (-pow(sigma / r, 12) + 0.5 * pow(sigma / r, 6)) * (x(i, 2) - x(j, 2) - wrap_z) / (r * r);
                             }
                         }
                         }, fv);
