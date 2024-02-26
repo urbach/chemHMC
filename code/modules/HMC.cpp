@@ -1,6 +1,7 @@
 #include "HMC.hpp"
-#include "read_infile.hpp"
+#include <iostream>
 #include <fstream>
+#include "read_infile.hpp"
 
 void HMC_class::init(int argc, char** argv, bool check_overwrite) {
 
