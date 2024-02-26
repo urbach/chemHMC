@@ -507,43 +507,43 @@ size_t estimate_required_memory(int N) {
 
 /* This routine does the full parallelised quicksort algorithm */
 void identical_particles::create_quick_sort() {
-    Kokkos::abort("quicksort not supported");
-    // Kokkos::Timer t1;
-    // // quickSort(0, N - 1);
-    // /////////////////////////////
-    // using scheduler_type = Kokkos::TaskScheduler<Kokkos::DefaultExecutionSpace>;
-    // using memory_space = typename scheduler_type::memory_space;
-    // using memory_pool = typename scheduler_type::memory_pool;
+    // Kokkos::abort("quicksort not supported");
+    Kokkos::Timer t1;
+    // quickSort(0, N - 1);
+    /////////////////////////////
+    using scheduler_type = Kokkos::TaskScheduler<Kokkos::DefaultExecutionSpace>;
+    using memory_space = typename scheduler_type::memory_space;
+    using memory_pool = typename scheduler_type::memory_pool;
 
-    // auto mpool = memory_pool(memory_space{}, estimate_required_memory(N));
-    // auto scheduler = scheduler_type(mpool);
+    auto mpool = memory_pool(memory_space{}, estimate_required_memory(N));
+    auto scheduler = scheduler_type(mpool);
 
-    // Kokkos::BasicFuture<int, scheduler_type> result;
+    Kokkos::BasicFuture<int, scheduler_type> result;
 
-    // Kokkos::Timer timer;
-    // {
-    //     // launch the root task from the host
-    //     result =
-    //         Kokkos::host_spawn(
-    //             Kokkos::TaskTeam(scheduler),
-    //             quickSortTask<scheduler_type>(nbin, sizebin, x, permute_vector,
-    //                 permute_vector_temp, before, after, 0, N - 1)
-    //         );
+    Kokkos::Timer timer;
+    {
+        // launch the root task from the host
+        result =
+            Kokkos::host_spawn(
+                Kokkos::TaskTeam(scheduler),
+                quickSortTask<scheduler_type>(nbin, sizebin, x, permute_vector,
+                    permute_vector_temp, before, after, 0, N - 1)
+            );
 
-    //     // wait on all tasks submitted to the scheduler to be done
-    //     Kokkos::wait(scheduler);
-    // }
+        // wait on all tasks submitted to the scheduler to be done
+        Kokkos::wait(scheduler);
+    }
 
-    // Kokkos::parallel_for("quicksort-binncount", Kokkos::TeamPolicy<functor_count_bin::Tag_count_bin>(bintot, Kokkos::AUTO),
-    //     functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
+    Kokkos::parallel_for("quicksort-binncount", Kokkos::TeamPolicy<functor_count_bin::Tag_count_bin>(bintot, Kokkos::AUTO),
+        functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
 
-    // Kokkos::parallel_scan("quicksort-binoffsets", Kokkos::RangePolicy<functor_count_bin::Tag_offset>(0, bintot),
-    //     functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
+    Kokkos::parallel_scan("quicksort-binoffsets", Kokkos::RangePolicy<functor_count_bin::Tag_offset>(0, bintot),
+        functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
 
-    // Kokkos::parallel_for("binset", Kokkos::TeamPolicy<functor_count_bin::Tag_set_bin>(bintot, Kokkos::AUTO),
-    //     functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
+    Kokkos::parallel_for("binset", Kokkos::TeamPolicy<functor_count_bin::Tag_set_bin>(bintot, Kokkos::AUTO),
+        functor_count_bin(N, nbin, sizebin, x, permute_vector_temp, permute_vector, bincount, binoffsets));
 
-    // Kokkos::parallel_for("copy-range", Kokkos::RangePolicy(0, N), copy_range(permute_vector, permute_vector_temp));
+    Kokkos::parallel_for("copy-range", Kokkos::RangePolicy(0, N), copy_range(permute_vector, permute_vector_temp));
 };
 
 

@@ -4,7 +4,7 @@
 void identical_particles::cutoff_binning() {
     bintot = 1;
     for (int i = 0;i < dim_space;i++) {
-        if (L[i] < cutoff) {
+        if (L[i] <= cutoff) {
             printf("error: the dimention %d must be larger then the cutoff\n L[%d]=%g  cutoff=%g\n", i, i, L[i], cutoff);
             Kokkos::abort("cutoff_binning");
         }
