@@ -31,6 +31,7 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     std::cout << "thermalization_steps:" << thermalization_steps << std::endl;
     save_every = check_and_assign_value<int>(doc, "save_every");
     std::cout << "save_every:" << save_every << std::endl;
+    randomize_traj = check_and_assign_value<int>(doc, "randomize_trajectory");
     int seed = check_and_assign_value<int>(doc, "seed");
 
     gen64.seed(seed);
@@ -77,6 +78,10 @@ void HMC_class::run() {
         printf("initial Action values betaS= %.12g   K= %.12g  V= %.12g\n", beta * (Vi + Ki), Ki, Vi);
 
         // molecular dynamics
+        if (randomize_traj) {
+            integrator->set_binomial_steps(gen64);
+            printf("trajectory: steps= %d  dt= %g  traj_len= %g\n", integrator->steps, integrator->dt, integrator->steps * integrator->dt);
+        }
         integrator->integrate();
 
         // accept/reject

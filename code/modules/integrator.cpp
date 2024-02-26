@@ -21,6 +21,7 @@ integrator_type::integrator_type(YAML::Node doc, params_class params) {
     }
 
     steps = check_and_assign_value<int>(doc["integrator"], "steps");
+    average_steps = steps;
     dt = check_and_assign_value<double>(doc["integrator"], "dt");
     std::cout << "steps: " << steps << std::endl;
     std::cout << "dt: " << dt << std::endl;
@@ -31,6 +32,20 @@ LEAP::LEAP(YAML::Node doc, params_class params) : integrator_type(doc, params) {
 
 }
 
+// binomial distribution with average n*p= average_steps
+void integrator_type::set_binomial_steps(std::mt19937_64 &gen64) {
+    int K = 2;
+    // nouber of steps
+    int n = K * average_steps;
+    // success propability 
+    double p = 1. / ((double)(K));
+    steps = 0;
+    for (int i = 0;i < n;i++) {
+        double r = ((double)gen64() - gen64.min()) / (gen64.max() - gen64.min());// random number from 0 to 1
+        if (r < p)
+            steps++;
+    }
+}
 
 
 void LEAP::integrate() {
@@ -54,6 +69,7 @@ void LEAP::integrate() {
 //////////////////////////////////////////////////////////////////////////////
 OMF2::OMF2(YAML::Node doc, params_class params) :
     integrator_type(doc, params), lambda(0.1938), oneminus2lambda(1. - 2. * lambda) {
+    // todo: check lambda= 0.1931833275037836
 }
 
 

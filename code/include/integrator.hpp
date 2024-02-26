@@ -7,16 +7,19 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 #include "particles.hpp"
+#include <random>
 
 class integrator_type {
 
 public:
     particles_type* particles;
+    int average_steps;
     int steps;
     double dt;
 
     integrator_type() = delete;
     integrator_type(YAML::Node doc, params_class params);
+    void set_binomial_steps(std::mt19937_64 &gen64);
     virtual void integrate() = 0;
 
 };

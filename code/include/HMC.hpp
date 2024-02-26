@@ -12,6 +12,7 @@ public:
     int thermalization_steps;
     int save_every;
     int acceptance;
+    bool randomize_traj = false;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
     std::string rng_host_state;
