@@ -8,11 +8,13 @@
 #include "read_infile.hpp"
 #include "particles.hpp"
 #include <random>
+#include "atom.hpp"
 
 class integrator_type {
 
 public:
     particles_type* particles;
+    atom_type* atoms;
     int average_steps;
     int steps;
     double dt;

@@ -32,6 +32,7 @@ public:
     double sigma;
     double eps;
     double cutoff;
+    double cutoff_squared;
     const std::string name = "identical_particles";
     std::string name_xyz;
 

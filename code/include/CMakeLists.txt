@@ -3,6 +3,7 @@ set(chemHMC_header
     particles.hpp
     binning.hpp
     identical_particles.hpp
+    non_identical_particles.hpp
     read_infile.hpp
     HMC.hpp
     integrator.hpp
@@ -13,6 +14,7 @@ set(chemHMC_scr
     ../modules/particles.cpp
     ../modules/binning.cpp
     ../modules/identical_particles.cpp
+    ../modules/non_identical_particles.cpp
     ../modules/identical_particles_binning.cpp
     ../modules/quick_sort.cpp
     ../modules/read_infile.cpp

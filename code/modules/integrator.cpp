@@ -2,6 +2,7 @@
 #include "integrator.hpp"
 #include "read_infile.hpp"
 #include "identical_particles.hpp"
+#include "non_identical_particles.hpp"
 
 
 integrator_type::integrator_type(YAML::Node doc, params_class params) {
@@ -10,6 +11,9 @@ integrator_type::integrator_type(YAML::Node doc, params_class params) {
         std::string name = check_and_assign_value<std::string>(doc["particles"], "name");
         if (name == "identical_particles")
             particles = new identical_particles(doc, params);
+        else if (name == "non_identical_particles") {
+            particles = new non_identical_particles(doc, params);
+        }
         else {
             printf("no valid name for particles: ");
             std::cout << doc["particles"].as<std::string>() << std::endl;

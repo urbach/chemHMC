@@ -22,6 +22,7 @@ struct params_class { // Just the thing that holds all variables
   std::string nameout;
   std::string rng_host_state;
   std::string rng_device_state;
+  std::string parameter_file;
 
   std::string name_RDF;
   

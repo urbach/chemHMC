@@ -60,6 +60,7 @@ IF(NOT yaml-cpp_FOUND)
     MESSAGE(FATAL_ERROR)
 ENDIF()
 
+include_directories(${PROJECT_SOURCE_DIR}/include)
 ######################################################
 # ###################### fmt: formating library ######################
 

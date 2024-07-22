@@ -111,7 +111,14 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
     if (rng_device_state == nameout) Kokkos::abort("rng_device_state must be different from output_file\n");
     if (rng_host_state == nameout) Kokkos::abort("rng_host_state must be different from output_file\n");
 
+    parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");  
+
+    printf("parameter_file:");
+    printf("parameter_file: %s\n", parameter_file.c_str());
+
     append = check_and_assign_value<bool>(doc, "append");
+    
+    // Sanity check
     if (append == true) {
         if (StartCondition != "read") {
             printf("error: append=true so the start condition must be read, while in the inputfile StartCondition=%s\n", StartCondition.c_str());
@@ -133,6 +140,7 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
             error_if_file_exist(rng_device_state);
             error_if_can_not_open_file_to_write(rng_host_state);
             error_if_can_not_open_file_to_write(rng_device_state);
+            error_if_can_not_open_file_to_write(parameter_file);
         }
     }
 

@@ -24,13 +24,14 @@ public:
     double coeff_x;
     double L[dim_space];
 
-    type_x  x;
-    type_p  p;
-    type_f  f;
+    type_x  x;      ///< Kokkos view containing the positions
+    type_p  p;      ///< Kokkos view containing the momenta
+    type_f  f;      ///< Kokkos view containing the forces
+    type_id id;     ///< Kokkos view containing the type_ids 
     bool initHostMirror;
     // the host mirror of x is used to restore the position before the MD in case of a rejection
-    type_x::HostMirror h_x;
-    type_p::HostMirror h_p;
+    type_x::HostMirror h_x;     ///< Host mirror of x (positions).
+    type_p::HostMirror h_p;     ///< Host_mirror of p (momenta)
 
     int nbin[dim_space], bintot;
     double sizebin[dim_space];

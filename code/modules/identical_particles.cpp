@@ -21,6 +21,7 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
     beta = check_and_assign_value<double>(doc["particles"], "beta");
     sbeta = sqrt(beta);
     cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
+    cutoff_squared = cutoff * cutoff;
     eps = check_and_assign_value<double>(doc["particles"], "eps");
     sigma = check_and_assign_value<double>(doc["particles"], "sigma");
     name_xyz = check_and_assign_value<std::string>(doc["particles"], "name_xyz");
@@ -67,7 +68,7 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
         printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
         Kokkos::abort("aborting");
     }
-    std::cout << "partilces_type:" << std::endl;
+    std::cout << "particles_type:" << std::endl;
     std::cout << "name:" << name << std::endl;
     std::cout << "mass:" << mass << std::endl;
     std::cout << "beta:" << beta << std::endl;
@@ -134,10 +135,10 @@ void identical_particles::read_xyz(params_class params) {
         count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
         // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
     }
-    if (name_xyz.compare(id) != 0) {
+    /* if (name_xyz.compare(id) != 0) {
         printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
         Kokkos::abort("abort");
-    }
+    } */
     // printf("%d  %d\n", count, N);
     if (count != N * 4) { Kokkos::abort("error in reading the file"); }
     fclose(file);

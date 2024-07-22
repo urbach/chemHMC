@@ -17,9 +17,11 @@ typedef typename RandPoolType::generator_type gen_type;
 typedef Kokkos::View<double* [dim_space]> type_x;
 typedef Kokkos::View<double* [dim_space]> type_p;
 typedef Kokkos::View<double* [dim_space]> type_f;
+typedef Kokkos::View<int*> type_id;
 typedef Kokkos::View<const double* [dim_space]> type_const_x;
 typedef Kokkos::View<const double* [dim_space]> type_const_p;
 typedef Kokkos::View<const double* [dim_space]> type_const_f;
+typedef Kokkos::View<const int*> type_const_id;
 
 
 #endif
