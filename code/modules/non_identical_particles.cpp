@@ -55,62 +55,34 @@ non_identical_particles::non_identical_particles(YAML::Node doc, params_class pa
         RDF = t_RDF("RDF", NbRDF);
         h_RDF = Kokkos::create_mirror(RDF);
     }
-
 }
 
-KOKKOS_FUNCTION
-void non_identical_particles::operator() (check_in_volume, const int i) const {
-    for (int dir = 0; dir < dim_space;dir++) {
-        if (x(i, dir) < 0 || x(i, dir) >= L[dir]) {
-            printf("error: particle position x(%d, %d)= %g  outside the box of length %g\n", i, dir, x(i, dir), L[dir]);
-            Kokkos::abort("aborting");
-        }
+void non_identical_particles::get_parameters(YAML::Node& doc, std::vector<atom_type>& atom_type_list) {
+
+    parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");
+
+    std::ifstream infile(parameter_file);
+    if (!infile) {
+        throw std::runtime_error("Unable to open parameter file: " + parameter_file);
     }
-};
 
-double non_identical_particles::potential_all_neighbour_inner_parallel() {
-    double result;
+    std::string line;
+    // Skip the header line
+    std::getline(infile, line);
 
-    Kokkos::parallel_reduce("identical_particles-LJ-potential-all-inner-parallel",
-        Kokkos::TeamPolicy<Tag_potential_all_inner_parallel>(N, Kokkos::AUTO), *this, result);
-    // 2 *eps instead of 4 *eps because we count the couples i,j twice
-    return 2 * result;
-}
+    while (std::getline(infile, line)) {
+        std::istringstream iss(line);
+        std::string label;
+        double mass, charge, epsilon, sigma;
+        int index;
 
+        iss >> index >> label >> mass >> charge >> epsilon >> sigma;
+        //label = trim(label); // Trim any extraneous whitespace from label
 
-KOKKOS_FUNCTION
-void non_identical_particles::operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const {
-    const int i = teamMember.league_rank();
-    double tmpV;
-    int type_i = id[i]-1;
-    
-    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& innerV) {
-        for (int bx = -1; bx < 2; bx++) {
-            for (int by = -1; by < 2; by++) {
-                for (int bz = -1; bz < 2; bz++) {
-                    if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
-                        int type_j = id[j]-1;
-                        double  rij = x(i, 0) - (x(j, 0) + bx * L[0]);
-                        double  r2 = rij * rij;
-                        rij = x(i, 1) - (x(j, 1) + by * L[1]);
-                        r2 += rij * rij;
-                        rij = x(i, 2) - (x(j, 2) + bz * L[2]);
-                        r2 += rij * rij;
-
-
-                        if (r2 < cutoff_squared) {
-                            double sr2 = sigma_mat[id[i]-1][id[j]-1] * sigma_mat[id[i]-1][id[j]-1] / r2;
-                            double sr6 = sr2 * sr2 * sr2;
-                            innerV += epsilon_mat[id[i]-1][id[j]-1] * sr6 * (sr6 - 1.0);
-                        }
-                    }
-                }
-            }
-        }
-    }, tmpV);
-    Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
-        V += tmpV;
-        });
+        // Create an atom_type instance and add it to the vector
+        atom_type atom(label, mass, charge, index, epsilon, sigma);
+        atom_type_list.push_back(atom);
+    }
 }
 
 void non_identical_particles::mix_parameters(YAML::Node& doc) {
@@ -150,7 +122,7 @@ void non_identical_particles::assign_algorithm(YAML::Node& doc) {
     else if (algorithm.compare("all_neighbour_inner_parallel") == 0) {
         potential_strategy = std::bind(&non_identical_particles::potential_all_neighbour_inner_parallel, this);
         potential_without_binning_strategy = std::bind(&non_identical_particles::potential_all_neighbour_inner_parallel, this);
-        force_strategy = std::bind(&identical_particles::compute_force_all_inner_parallel, this);
+        force_strategy = std::bind(&non_identical_particles::compute_force_all_inner_parallel, this);
     }
     else if (algorithm.compare("binning_serial") == 0) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
@@ -278,30 +250,101 @@ void non_identical_particles::update_positions(const double dt_) {
     Kokkos::parallel_for("update_position", Kokkos::RangePolicy(0, N), functor_update_pos_non_identical(dt_, coeff_x, x, p, id, L));
 }
 
-void non_identical_particles::get_parameters(YAML::Node& doc, std::vector<atom_type>& atom_type_list) {
-
-    parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");
-
-    std::ifstream infile(parameter_file);
-    if (!infile) {
-        throw std::runtime_error("Unable to open parameter file: " + parameter_file);
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (check_in_volume, const int i) const {
+    for (int dir = 0; dir < dim_space;dir++) {
+        if (x(i, dir) < 0 || x(i, dir) >= L[dir]) {
+            printf("error: particle position x(%d, %d)= %g  outside the box of length %g\n", i, dir, x(i, dir), L[dir]);
+            Kokkos::abort("aborting");
+        }
     }
+};
 
-    std::string line;
-    // Skip the header line
-    std::getline(infile, line);
+double non_identical_particles::potential_all_neighbour_inner_parallel() {
+    double result;
+    Kokkos::parallel_reduce("identical_particles-LJ-potential-all-inner-parallel",
+        Kokkos::TeamPolicy<Tag_potential_all_inner_parallel>(N, Kokkos::AUTO), *this, result);
+    // 2 *eps instead of 4 *eps because we count the couples i,j twice
+    return 2 * result;
+}
 
-    while (std::getline(infile, line)) {
-        std::istringstream iss(line);
-        std::string label;
-        double mass, charge, epsilon, sigma;
-        int index;
 
-        iss >> index >> label >> mass >> charge >> epsilon >> sigma;
-        //label = trim(label); // Trim any extraneous whitespace from label
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const {
+    const int i = teamMember.league_rank();
+    double tmpV;
+    int type_i = id[i]-1;
+    
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& innerV) {
+        for (int bx = -1; bx < 2; bx++) {
+            for (int by = -1; by < 2; by++) {
+                for (int bz = -1; bz < 2; bz++) {
+                    if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
+                        int type_j = id[j]-1;
+                        double  rij = x(i, 0) - (x(j, 0) + bx * L[0]);
+                        double  r2 = rij * rij;
+                        rij = x(i, 1) - (x(j, 1) + by * L[1]);
+                        r2 += rij * rij;
+                        rij = x(i, 2) - (x(j, 2) + bz * L[2]);
+                        r2 += rij * rij;
 
-        // Create an atom_type instance and add it to the vector
-        atom_type atom(label, mass, charge, index, epsilon, sigma);
-        atom_type_list.push_back(atom);
-    }
+
+                        if (r2 < cutoff_squared) {
+                            double sr2 = sigma_mat[type_i][type_j] * sigma_mat[type_i][type_j] / r2;
+                            double sr6 = sr2 * sr2 * sr2;
+                            innerV += epsilon_mat[type_i][type_j] * sr6 * (sr6 - 1.0);
+                        }
+                    }
+                }
+            }
+        }
+    }, tmpV);
+    Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
+        V += tmpV;
+        });
+}
+
+void non_identical_particles::compute_force_all_inner_parallel() {
+    typedef Kokkos::TeamPolicy<Tag_force_inner_parallel>  team_policy;
+    Kokkos::parallel_for("identical_particles-LJ-force-all-inner-parall", team_policy(N, Kokkos::AUTO), *this);
+}
+
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (Tag_force_inner_parallel, const member_type& teamMember) const {
+    const int i = teamMember.league_rank();// bin id
+    f(i, 0) = 0;
+    f(i, 1) = 0;
+    f(i, 2) = 0;
+    int type_i = id[i]-1;
+    space_vector  fv;
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, space_vector& innerfv) {
+        for (int bx = -1; bx < 2; bx++) {
+            for (int by = -1; by < 2; by++) {
+                for (int bz = -1; bz < 2; bz++) {
+                    if (!(i == j && bx == 0 && by == 0 && bz == 0)) {
+                        int type_j = id[j]-1;
+                        double  rij = x(i, 0) - (x(j, 0) + bx * L[0]);
+                        double r2 = rij * rij;
+                        rij = x(i, 1) - (x(j, 1) + by * L[1]);
+                        r2 += rij * rij;
+                        rij = x(i, 2) - (x(j, 2) + bz * L[2]);
+                        r2 += rij * rij;
+
+                        if (r2 < cutoff_squared) {
+                            double sr2 = sigma_mat[type_i][type_j] * sigma_mat[type_i][type_j] / r2;
+                            double sr6 = sr2 * sr2 * sr2;
+                            sr2 = sr6 * (-sr6 + 0.5) / r2;
+                            innerfv.the_array[0] += epsilon_mat[type_i][type_j] * sr2 * (x(i, 0) - (x(j, 0) + bx * L[0]));
+                            innerfv.the_array[1] += epsilon_mat[type_i][type_j] * sr2 * (x(i, 1) - (x(j, 1) + by * L[1]));
+                            innerfv.the_array[2] += epsilon_mat[type_i][type_j] * sr2 * (x(i, 2) - (x(j, 2) + bz * L[2]));
+                        }
+                    }
+                }
+            }
+        }
+        }, fv);
+    f(i, 0) = fv.the_array[0] * 48;
+    f(i, 1) = fv.the_array[1] * 48;
+    f(i, 2) = fv.the_array[2] * 48;
+
 }

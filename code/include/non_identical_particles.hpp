@@ -14,6 +14,8 @@
 class non_identical_particles : public identical_particles {
 
 public:
+    struct Tag_potential_MIC_inner_parallel {};
+
     const std::string name = "non_identical_particles";
     std::vector<atom_type> atom_type_list;
     std::string parameter_file; ///< name of file containing force field parameters
@@ -35,10 +37,18 @@ public:
     void compute_coeff_position();
 
     double potential_all_neighbour_inner_parallel();
+    //double potential_MICANIP(); ///< all_neighbour_inner_parallel with minimum image convention
 
+    void compute_force_all_inner_parallel();
+
+    // Misc.
     KOKKOS_FUNCTION void operator() (check_in_volume, const int i) const;
 
+    // Potential calculation
     KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
+
+    // Force calculation
+    KOKKOS_FUNCTION void operator() (Tag_force_inner_parallel, const member_type& teamMember) const;
     
 
     // Destructor
