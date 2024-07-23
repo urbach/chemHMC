@@ -70,7 +70,7 @@ void non_identical_particles::operator() (check_in_volume, const int i) const {
 
 double non_identical_particles::potential_all_neighbour_inner_parallel() {
     double result;
-    
+
     Kokkos::parallel_reduce("identical_particles-LJ-potential-all-inner-parallel",
         Kokkos::TeamPolicy<Tag_potential_all_inner_parallel>(N, Kokkos::AUTO), *this, result);
     // 2 *eps instead of 4 *eps because we count the couples i,j twice
@@ -99,19 +99,19 @@ void non_identical_particles::operator() (Tag_potential_all_inner_parallel, cons
 
 
                         if (r2 < cutoff_squared) {
-                            double sr2 = sigma_mat[i][j] * sigma_mat[i][j] / r2;
+                            double sr2 = sigma_mat[id[i]-1][id[j]-1] * sigma_mat[id[i]-1][id[j]-1] / r2;
                             double sr6 = sr2 * sr2 * sr2;
-                            innerV += epsilon_mat[i][j] * sr6 * (sr6 - 1.0);
+                            innerV += epsilon_mat[id[i]-1][id[j]-1] * sr6 * (sr6 - 1.0);
                         }
                     }
                 }
             }
         }
-        }, tmpV);
+    }, tmpV);
     Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
         V += tmpV;
         });
-};
+}
 
 void non_identical_particles::mix_parameters(YAML::Node& doc) {
 
@@ -130,7 +130,7 @@ void non_identical_particles::mix_parameters(YAML::Node& doc) {
     double epsilon;
     for(int i = 0; i < atom_type_list.size(); i++)  {
         for(int j = i+1; j < atom_type_list.size(); j++) {
-            epsilon = sqrt(epsilon_mat[i][i]*epsilon_mat[j][j]); //Berthelot rule
+            epsilon = sqrt(epsilon_mat[i][i]*epsilon_mat[j][j]); //Berthelots rule
             sigma = 0.5*(sigma_mat[i][i]+sigma_mat[j][j]); // Lorentz rule
             epsilon_mat[i][j] = epsilon;
             epsilon_mat[j][i] = epsilon;
@@ -274,7 +274,6 @@ public:
         }
     };
 };
-
 void non_identical_particles::update_positions(const double dt_) {
     Kokkos::parallel_for("update_position", Kokkos::RangePolicy(0, N), functor_update_pos_non_identical(dt_, coeff_x, x, p, id, L));
 }
