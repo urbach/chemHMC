@@ -57,19 +57,13 @@ non_identical_particles::non_identical_particles(YAML::Node doc, params_class pa
     }
 }
 
-void non_identical_particles::get_parameters(YAML::Node& doc, std::vector<atom_type>& atom_type_list) {
-
+void non_identical_particles::get_parameters(YAML::Node& doc, Kokkos::View<atom_type*>& atom_type_list) {
     parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");
 
     std::ifstream infile(parameter_file);
-    if (!infile) {
-        throw std::runtime_error("Unable to open parameter file: " + parameter_file);
-    }
-
     std::string line;
-    // Skip the header line
-    std::getline(infile, line);
-
+    std::getline(infile, line); // Skip the first line
+    std::vector<atom_type> temp_atom_type_list;
     while (std::getline(infile, line)) {
         std::istringstream iss(line);
         std::string label;
@@ -77,47 +71,61 @@ void non_identical_particles::get_parameters(YAML::Node& doc, std::vector<atom_t
         int index;
 
         iss >> index >> label >> mass >> charge >> epsilon >> sigma;
-        //label = trim(label); // Trim any extraneous whitespace from label
 
         // Create an atom_type instance and add it to the vector
-        atom_type atom(label, mass, charge, index, epsilon, sigma);
-        atom_type_list.push_back(atom);
+        atom_type atom(label.c_str(), mass, charge, index, epsilon, sigma);
+        temp_atom_type_list.push_back(atom);
     }
+    h_atom_type_list = Kokkos::create_mirror_view(Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size()));
+    for (size_t i = 0; i < temp_atom_type_list.size(); ++i) {
+        h_atom_type_list(i) = temp_atom_type_list[i];
+    }
+    atom_type_list = Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size());
+
+    Kokkos::deep_copy(atom_type_list, h_atom_type_list);
 }
 
 void non_identical_particles::mix_parameters(YAML::Node& doc) {
 
-    // resize parameter matrices to correct size
-    epsilon_mat.resize(atom_type_list.size(), std::vector<double>(atom_type_list.size()));
-    sigma_mat.resize(atom_type_list.size(), std::vector<double>(atom_type_list.size()));
+    // assign correct size to parameter matrices
+    int num_atom_types = atom_type_list.extent(0);
+    sigma_mat = Kokkos::View<double**>("sigma_mat", num_atom_types, num_atom_types);
+    epsilon_mat = Kokkos::View<double**>("epsilon_mat", num_atom_types, num_atom_types);
 
-    // fill known diagonal elements
-    for(int i = 0; i<atom_type_list.size(); i++) {
-        epsilon_mat[i][i]=atom_type_list[i].LJ_epsilon;
-        sigma_mat[i][i]=atom_type_list[i].LJ_sigma;
+    // Initialize host mirrors
+    h_sigma_mat = Kokkos::create_mirror_view(sigma_mat);
+    h_epsilon_mat = Kokkos::create_mirror_view(epsilon_mat);
+
+
+    // Fill known diagonal elements
+    for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
+        h_epsilon_mat(i, i) = h_atom_type_list(i).LJ_epsilon;
+        h_sigma_mat(i, i) = h_atom_type_list(i).LJ_sigma;
     }
 
-    // apply Lorentz-Berthelot mixing rules
-    double sigma;
-    double epsilon;
-    for(int i = 0; i < atom_type_list.size(); i++)  {
-        for(int j = i+1; j < atom_type_list.size(); j++) {
-            epsilon = sqrt(epsilon_mat[i][i]*epsilon_mat[j][j]); //Berthelots rule
-            sigma = 0.5*(sigma_mat[i][i]+sigma_mat[j][j]); // Lorentz rule
-            epsilon_mat[i][j] = epsilon;
-            epsilon_mat[j][i] = epsilon;
-            sigma_mat[i][j] = sigma;
-            sigma_mat[j][i] = sigma;
+    // Apply Lorentz-Berthelot mixing rules
+    for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
+        for(int j = i + 1; j < h_atom_type_list.extent(0); ++j) {
+            double epsilon = sqrt(h_epsilon_mat(i, i) * h_epsilon_mat(j, j)); // Berthelots rule
+            double sigma = 0.5 * (h_sigma_mat(i, i) + h_sigma_mat(j, j)); // Lorentz rule
+            h_epsilon_mat(i, j) = epsilon;
+            h_epsilon_mat(j, i) = epsilon;
+            h_sigma_mat(i, j) = sigma;
+            h_sigma_mat(j, i) = sigma;
         }
+
     }
+
+    // Copy the updated data to device memory
+    Kokkos::deep_copy(sigma_mat, h_sigma_mat);
+    Kokkos::deep_copy(epsilon_mat, h_epsilon_mat);
 }
 
 void non_identical_particles::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
     if (algorithm.compare("all_neighbour") == 0) {
-        potential_strategy = std::bind(&identical_particles::potential_all_neighbour, this);
-        potential_without_binning_strategy = std::bind(&identical_particles::potential_all_neighbour, this);
-        force_strategy = std::bind(&identical_particles::compute_force_all, this);
+        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
+        Kokkos::abort("aborting");
     }
     else if (algorithm.compare("all_neighbour_inner_parallel") == 0) {
         potential_strategy = std::bind(&non_identical_particles::potential_all_neighbour_inner_parallel, this);
@@ -125,31 +133,16 @@ void non_identical_particles::assign_algorithm(YAML::Node& doc) {
         force_strategy = std::bind(&non_identical_particles::compute_force_all_inner_parallel, this);
     }
     else if (algorithm.compare("binning_serial") == 0) {
-        binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
-        binning_geometry();
-        binning_strategy = std::bind(&identical_particles::serial_binning, this);
-        serial_binning_init();
-        potential_strategy = std::bind(&identical_particles::potential_binning, this);
-        potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
-        force_strategy = std::bind(&identical_particles::compute_force_binning, this);
+        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
+        Kokkos::abort("aborting");
     }
     else if (algorithm.compare("parallel_binning") == 0) {
-        binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
-        binning_geometry();
-        binning_strategy = std::bind(&identical_particles::parallel_binning, this);
-        parallel_binning_init();
-        potential_strategy = std::bind(&identical_particles::potential_binning, this);
-        potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
-        force_strategy = std::bind(&identical_particles::compute_force_binning, this);
+        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
+        Kokkos::abort("aborting");
     }
     else if (algorithm.compare("quick_sort") == 0) {
-        binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
-        binning_geometry();
-        binning_strategy = std::bind(&identical_particles::create_quick_sort, this);
-        quick_sort_init();
-        potential_strategy = std::bind(&identical_particles::potential_binning, this);
-        potential_without_binning_strategy = std::bind(&identical_particles::potential_with_binning_set, this);
-        force_strategy = std::bind(&identical_particles::compute_force_binning, this);
+        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
+        Kokkos::abort("aborting");
     }
     else {
         printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
@@ -157,7 +150,7 @@ void non_identical_particles::assign_algorithm(YAML::Node& doc) {
     }
 }
 
-void non_identical_particles::assign_ids(type_id& id) {
+void non_identical_particles::assign_ids() {
     // this function reads in the atom types from the start_configuration_file
     // and assigns each an atom_type_id defined in the atom_type_list.
 
@@ -184,9 +177,9 @@ void non_identical_particles::assign_ids(type_id& id) {
         iss >> type;
         
         // find matching id and assign it
-        for (int j = 0; j < atom_type_list.size(); j++) {
-            if(type == atom_type_list[j].label) {
-                id[i] = atom_type_list[j].type_index;
+        for (int j = 0; j < h_atom_type_list.extent(0); j++) {
+            if(type == h_atom_type_list[j].label) {
+                h_id[i] = h_atom_type_list[j].type_index;
                 break;
             }
         }
@@ -203,8 +196,10 @@ void non_identical_particles::InitX(params_class params) {
 
     // save atom_type id for each particle
     id = type_id("id", N);
-    assign_ids(id);
-    
+    h_id = Kokkos::create_mirror(id);
+    assign_ids();
+    Kokkos::deep_copy(id, h_id);
+
     if (params.StartCondition == "read") {
         read_xyz(params);
     }
@@ -219,21 +214,40 @@ void non_identical_particles::InitX(params_class params) {
 }
 
 void non_identical_particles::compute_coeff_position() {
+
+    // inititalize device and host views
+    coeff_x = Kokkos::View<double*>("coeff_x",h_atom_type_list.extent(0));
+    h_coeff_x = Kokkos::create_mirror_view(coeff_x);
+    
     //Since we have different particles we need to compute one coefficient for each type
-    for(int i = 0;i < atom_type_list.size();i++) {
-        coeff_x.push_back(beta / (atom_type_list[i].mass));
+    for(int i = 0;i < h_atom_type_list.extent(0);i++) {
+        h_coeff_x[i] = beta / (h_atom_type_list[i].mass);
     }
+
+    //copy to device
+    Kokkos::deep_copy(coeff_x, h_coeff_x);
 }
+
+double non_identical_particles::compute_kinetic_E() {
+    double K = 0;
+    Kokkos::parallel_reduce("identical-particles-LJ-kinetic-E", Kokkos::RangePolicy<kinetic>(0, N), *this, K);
+    return K;
+}
+
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (kinetic, const int& i, double& sum) const {
+    sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * atom_type_list[id[i]-1].mass);
+};
 
 class functor_update_pos_non_identical {
 public:
     const double dt;
-    std::vector<double> c;
+    Kokkos::View<double*> c;
     type_x x;
     type_id id;
     type_const_p p;
     const double L[dim_space];
-    functor_update_pos_non_identical(double dt_, std::vector<double> c_, type_x& x_, type_p& p_, type_id& id_,const double L_[]) : dt(dt_), c(c_), x(x_), p(p_), id(id_),
+    functor_update_pos_non_identical(double dt_, Kokkos::View<double*> c_, type_x& x_, type_p& p_, type_id& id_,const double L_[]) : dt(dt_), c(c_), x(x_), p(p_), id(id_),
         L{ L_[0], L_[1], L_[2] } {
     };
 
@@ -290,9 +304,9 @@ void non_identical_particles::operator() (Tag_potential_all_inner_parallel, cons
 
 
                         if (r2 < cutoff_squared) {
-                            double sr2 = sigma_mat[type_i][type_j] * sigma_mat[type_i][type_j] / r2;
+                            double sr2 = sigma_mat(type_i,type_j) * sigma_mat(type_i,type_j) / r2;
                             double sr6 = sr2 * sr2 * sr2;
-                            innerV += epsilon_mat[type_i][type_j] * sr6 * (sr6 - 1.0);
+                            innerV += epsilon_mat(type_i,type_j) * sr6 * (sr6 - 1.0);
                         }
                     }
                 }
@@ -331,12 +345,12 @@ void non_identical_particles::operator() (Tag_force_inner_parallel, const member
                         r2 += rij * rij;
 
                         if (r2 < cutoff_squared) {
-                            double sr2 = sigma_mat[type_i][type_j] * sigma_mat[type_i][type_j] / r2;
+                            double sr2 = sigma_mat(type_i,type_j) * sigma_mat(type_i,type_j) / r2;
                             double sr6 = sr2 * sr2 * sr2;
                             sr2 = sr6 * (-sr6 + 0.5) / r2;
-                            innerfv.the_array[0] += epsilon_mat[type_i][type_j] * sr2 * (x(i, 0) - (x(j, 0) + bx * L[0]));
-                            innerfv.the_array[1] += epsilon_mat[type_i][type_j] * sr2 * (x(i, 1) - (x(j, 1) + by * L[1]));
-                            innerfv.the_array[2] += epsilon_mat[type_i][type_j] * sr2 * (x(i, 2) - (x(j, 2) + bz * L[2]));
+                            innerfv.the_array[0] += epsilon_mat(type_i,type_j) * sr2 * (x(i, 0) - (x(j, 0) + bx * L[0]));
+                            innerfv.the_array[1] += epsilon_mat(type_i,type_j) * sr2 * (x(i, 1) - (x(j, 1) + by * L[1]));
+                            innerfv.the_array[2] += epsilon_mat(type_i,type_j) * sr2 * (x(i, 2) - (x(j, 2) + bz * L[2]));
                         }
                     }
                 }

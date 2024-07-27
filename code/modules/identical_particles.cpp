@@ -135,10 +135,10 @@ void identical_particles::read_xyz(params_class params) {
         count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
         // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
     }
-    /* if (name_xyz.compare(id) != 0) {
+    if (name_xyz.compare(id) != 0) {
         printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
         Kokkos::abort("abort");
-    } */
+    } 
     // printf("%d  %d\n", count, N);
     if (count != N * 4) { Kokkos::abort("error in reading the file"); }
     fclose(file);
