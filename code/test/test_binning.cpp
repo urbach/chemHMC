@@ -5,6 +5,7 @@
 #include "git_version.hpp"
 #include "HMC.hpp"
 #include "identical_particles.hpp"
+#include "non_identical_particles.hpp"
 
 void add_error(std::vector<std::string>& errors, std::string s) {
     errors.emplace_back(s);
@@ -184,14 +185,16 @@ int main(int argc, char** argv) {
 
         doc["particles"]["algorithm"] = "binning_serial";
         particles2 = new identical_particles(doc, params);
-        doc["particles"]["algorithm"] = "quick_sort";
+        doc["particles"]["algorithm"] = "MICAIP";
+        particles_type* particles3 = new non_identical_particles(doc,params);
+        //doc["particles"]["algorithm"] = "quick_sort";
         // doc["rng_host_state"] = "tmp7";
         // doc["rng_device_state"] = "tmp8";
         // doc["output_file"] = "tmp9";
-        particles_type* particles3 = new identical_particles(doc, params);
+        //particles_type* particles3 = new identical_particles(doc, params);
         doc["particles"]["algorithm"] = "parallel_binning";
         particles_type* particles4 = new identical_particles(doc, params);
-
+        
         //// init the positions
         particles1->InitX(params);
         particles2->InitX(params);
@@ -228,7 +231,7 @@ int main(int argc, char** argv) {
         Kokkos::Timer timer3;
         double V3 = particles3->compute_potential();
         Kokkos::fence();
-        printf("total time quick_sort = %gs   \n", timer3.seconds());
+        printf("total time non_identical_all_neighbour = %gs   \n", timer3.seconds());
         Kokkos::Timer timer4;
         particles4->create_binning();
         double V4 = particles4->compute_potential();
@@ -243,7 +246,7 @@ int main(int argc, char** argv) {
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V3) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V3);
-            add_error(errors, "error: the potential all_neighbour does not match quick_sort");
+            add_error(errors, "error: the potential all_neighbour does not match non_identical_all_neighbour");
         }
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V4) / V1) > 1e-6) {
@@ -258,14 +261,14 @@ int main(int argc, char** argv) {
         Kokkos::fence();
         printf("time to bin  serial = %g s\n", timer2.seconds());
         /////////////////////
-        Kokkos::Timer t3b;
-        particles3->create_binning();
-        Kokkos::fence();
-        printf("time to bin quick_sort  %gs\n", t3b.seconds());
-        Kokkos::Timer t3bb;
-        particles3->create_binning();
-        Kokkos::fence();
-        printf("time to bin quick_sort second time: %gs\n", t3bb.seconds());
+        //Kokkos::Timer t3b;
+        //particles3->create_binning();
+        //Kokkos::fence();
+        //printf("time to bin quick_sort  %gs\n", t3b.seconds());
+        //Kokkos::Timer t3bb;
+        //particles3->create_binning();
+        //Kokkos::fence();
+        //printf("time to bin quick_sort second time: %gs\n", t3bb.seconds());
         ////////////////////////////
         Kokkos::Timer t4b;
         particles4->create_binning();
@@ -274,7 +277,7 @@ int main(int argc, char** argv) {
         Kokkos::fence();
 
         check_binning(particles2, particles4, "binning_serial  agains parallel_binning", errors);
-        check_binning(particles2, particles3, "binning_serial  agains quick_sort", errors);
+        //check_binning(particles2, particles3, "binning_serial  agains quick_sort", errors);
 
         /////////////////////////////////////////////////////////////////////////////////////////
         printf("###################################################################################################\n");
@@ -291,7 +294,7 @@ int main(int argc, char** argv) {
         timer3.reset();
         particles3->compute_force();
         Kokkos::fence();
-        printf("time force quick_sort = %f s\n", timer3.seconds());
+        printf("time force non_identical_all_neighbour = %f s\n", timer3.seconds());
 
         timer4.reset();
         particles4->compute_force();
@@ -299,12 +302,12 @@ int main(int argc, char** argv) {
         printf("time force parallel_binning = %f s\n", timer4.seconds());
 
         check_force(particles1, particles2, "all_neighbour  agains serial_binning", errors);
-        check_force(particles1, particles3, "all_neighbour  agains quick_sort", errors);
+        check_force(particles1, particles3, "all_neighbour  agains non_identical_all_neighbour", errors);
         check_force(particles1, particles4, "all_neighbour  agains parallel_binning", errors);
         //////////////////////////////////////////////////////////////////////////////////////////
 
         check_force_with_num_der(particles1, errors);
-        // check_force_with_num_der(particles2, errors);
+        check_force_with_num_der(particles3, errors);
         check_force_with_num_der(particles4, errors);
 
         //////////////////////////////////////////////////////////////////////////////////////////

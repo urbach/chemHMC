@@ -36,6 +36,11 @@ non_identical_particles::non_identical_particles(YAML::Node doc, params_class pa
     name_xyz = check_and_assign_value<std::string>(doc["particles"], "name_xyz");
     start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
 
+    // get inverse halved box size (needed for MIC algorithm)
+    inverse_halved_L[0] = 2.0/L[0];
+    inverse_halved_L[1] = 2.0/L[1];
+    inverse_halved_L[2] = 2.0/L[2];
+
     assign_algorithm(doc);
 
     std::cout << "particles_type:" << std::endl;
@@ -131,6 +136,11 @@ void non_identical_particles::assign_algorithm(YAML::Node& doc) {
         potential_strategy = std::bind(&non_identical_particles::potential_all_neighbour_inner_parallel, this);
         potential_without_binning_strategy = std::bind(&non_identical_particles::potential_all_neighbour_inner_parallel, this);
         force_strategy = std::bind(&non_identical_particles::compute_force_all_inner_parallel, this);
+    }
+    else if (algorithm.compare("MICAIP") == 0) {
+        potential_strategy = std::bind(&non_identical_particles::potential_MICAIP, this);
+        potential_without_binning_strategy = std::bind(&non_identical_particles::potential_MICAIP, this);
+        force_strategy = std::bind(&non_identical_particles::compute_force_MICAIP, this);
     }
     else if (algorithm.compare("binning_serial") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
@@ -274,19 +284,101 @@ void non_identical_particles::operator() (check_in_volume, const int i) const {
     }
 };
 
+double non_identical_particles::potential_MICAIP() {
+    double result;
+    Kokkos::parallel_reduce("non_identical_particles-LJ-potential-MICAIP",
+        Kokkos::TeamPolicy<Tag_potential_MIC_inner_parallel>(N, Kokkos::AUTO), *this, result);
+    // 2 *eps instead of 4 *eps because we count the couples i,j twice
+    return 2 * result;
+}
+
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const {
+    const int i = teamMember.league_rank();
+    double tmpV = 0;
+    int type_i = id[i]-1;
+    
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& innerV) {
+        if (!(i == j)) {
+            int type_j = id[j]-1;
+            double rij = x(i, 0) - x(j, 0);
+            rij -= int(rij*inverse_halved_L[0]) * L[0];
+            double  r2 = rij * rij;
+            rij = x(i, 1) - x(j, 1);
+            rij -= int(rij*inverse_halved_L[1]) * L[1];
+            r2 += rij * rij;
+            rij = x(i, 2) - x(j, 2);
+            rij -= int(rij*inverse_halved_L[2]) * L[2];
+            r2 += rij * rij;
+
+            if (r2 < cutoff_squared) {
+                double sr2 = sigma_mat(type_i,type_j) * sigma_mat(type_i,type_j) / r2;
+                double sr6 = sr2 * sr2 * sr2;
+                innerV += epsilon_mat(type_i,type_j) * sr6 * (sr6 - 1.0);
+            }
+        }
+    }, tmpV);
+    Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
+        V += tmpV;
+        });
+}
+
+void non_identical_particles::compute_force_MICAIP() {
+    typedef Kokkos::TeamPolicy<Tag_force_MIC_inner_parallel>  team_policy;
+    Kokkos::parallel_for("non_identical_particles-LJ-force-MICAIP", team_policy(N, Kokkos::AUTO), *this);
+}
+
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const {
+    const int i = teamMember.league_rank();// bin id
+    f(i, 0) = 0;
+    f(i, 1) = 0;
+    f(i, 2) = 0;
+    int type_i = id[i]-1;
+    space_vector  fv;
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, space_vector& innerfv) {
+        if (!(i == j)) {
+            int type_j = id[j]-1;
+            // calculate minimum image distance in each direction
+            double rx = x(i, 0) - x(j, 0);
+            rx -= int(rx*inverse_halved_L[0]) * L[0];
+            double r2 = rx*rx;
+            double ry = x(i, 1) - x(j, 1);
+            ry -= int(ry*inverse_halved_L[1]) * L[1];
+            r2 += ry * ry;
+            double rz = x(i, 2) - x(j, 2);
+            rz -= int(rz*inverse_halved_L[2]) * L[2];
+            r2 += rz * rz;
+
+
+            if (r2 < cutoff_squared) {
+                double sr2 = sigma_mat(type_i,type_j) * sigma_mat(type_i,type_j) / r2;
+                double sr6 = sr2 * sr2 * sr2;
+                sr2 = sr6 * (-sr6 + 0.5) / r2;
+                innerfv.the_array[0] += epsilon_mat(type_i,type_j) * sr2 * rx;
+                innerfv.the_array[1] += epsilon_mat(type_i,type_j) * sr2 * ry;
+                innerfv.the_array[2] += epsilon_mat(type_i,type_j) * sr2 * rz;
+            }
+        }
+    }, fv);
+    f(i, 0) = fv.the_array[0] * 48;
+    f(i, 1) = fv.the_array[1] * 48;
+    f(i, 2) = fv.the_array[2] * 48;
+
+}
+
 double non_identical_particles::potential_all_neighbour_inner_parallel() {
     double result;
-    Kokkos::parallel_reduce("identical_particles-LJ-potential-all-inner-parallel",
+    Kokkos::parallel_reduce("non_identical_particles-LJ-potential-all-inner-parallel",
         Kokkos::TeamPolicy<Tag_potential_all_inner_parallel>(N, Kokkos::AUTO), *this, result);
     // 2 *eps instead of 4 *eps because we count the couples i,j twice
     return 2 * result;
 }
 
-
 KOKKOS_FUNCTION
 void non_identical_particles::operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const {
     const int i = teamMember.league_rank();
-    double tmpV;
+    double tmpV = 0;
     int type_i = id[i]-1;
     
     Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& innerV) {
@@ -320,7 +412,7 @@ void non_identical_particles::operator() (Tag_potential_all_inner_parallel, cons
 
 void non_identical_particles::compute_force_all_inner_parallel() {
     typedef Kokkos::TeamPolicy<Tag_force_inner_parallel>  team_policy;
-    Kokkos::parallel_for("identical_particles-LJ-force-all-inner-parall", team_policy(N, Kokkos::AUTO), *this);
+    Kokkos::parallel_for("non_identical_particles-LJ-force-all-inner-parallel", team_policy(N, Kokkos::AUTO), *this);
 }
 
 KOKKOS_FUNCTION

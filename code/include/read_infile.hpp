@@ -7,6 +7,7 @@
 struct params_class { // Just the thing that holds all variables
   
   double L[dim_space];
+  double inverse_halved_L[dim_space];
   // run parameter
   bool append;
   int seed;

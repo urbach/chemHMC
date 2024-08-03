@@ -15,6 +15,7 @@ class non_identical_particles : public identical_particles {
 
 public:
     struct Tag_potential_MIC_inner_parallel {};
+    struct Tag_force_MIC_inner_parallel {};
 
     const std::string name = "non_identical_particles";
     Kokkos::View<atom_type*> atom_type_list; ///< view containing mass/charge/index of atom types
@@ -44,9 +45,10 @@ public:
     double compute_kinetic_E();
 
     double potential_all_neighbour_inner_parallel();
-    //double potential_MICANIP(); ///< all_neighbour_inner_parallel with minimum image convention
+    double potential_MICAIP(); ///< all_neighbour_inner_parallel with minimum image convention
 
     void compute_force_all_inner_parallel();
+    void compute_force_MICAIP();
 
     KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& sum) const;
 
@@ -55,10 +57,11 @@ public:
 
     // Potential calculation
     KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const;
 
     // Force calculation
     KOKKOS_FUNCTION void operator() (Tag_force_inner_parallel, const member_type& teamMember) const;
-    
+    KOKKOS_FUNCTION void operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const;
 
     // Destructor
     ~non_identical_particles() {};

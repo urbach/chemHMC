@@ -88,6 +88,7 @@ void error_if_can_not_open_file_to_write(const std::string& name) {
 
 params_class::params_class(YAML::Node doc, bool check_overwrite) {
 
+    // get box dimensions
     L[0] = check_and_assign_value<double>(doc["geometry"], "Lx");
     L[1] = check_and_assign_value<double>(doc["geometry"], "Ly");
     L[2] = check_and_assign_value<double>(doc["geometry"], "Lz");

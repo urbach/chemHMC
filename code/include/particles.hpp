@@ -23,6 +23,7 @@ public:
     double coeff_p;
     double coeff_x;
     double L[dim_space];
+    double inverse_halved_L[dim_space];
 
     type_x  x;      ///< Kokkos view containing the positions
     type_p  p;      ///< Kokkos view containing the momenta
