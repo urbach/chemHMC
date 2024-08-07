@@ -44,6 +44,13 @@ identical_particles::identical_particles(YAML::Node doc, params_class params) :
             Kokkos::abort("aborting");
         }
     }
+    else if (algorithm.compare("AMIC") == 0) {
+        std::string name = check_and_assign_value<std::string>(doc["particles"], "name");
+        if (name != "non_identical_particles") {
+            printf("selected algorithm: %s is only available for non_identical_particles\n", algorithm.c_str());
+            Kokkos::abort("aborting");
+        }
+    }
     else if (algorithm.compare("binning_serial") == 0) {
         binning_geometry_strategy = std::bind(&identical_particles::cutoff_binning, this);
         binning_geometry();

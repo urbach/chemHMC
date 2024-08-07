@@ -128,6 +128,7 @@ void non_identical_particles::mix_parameters(YAML::Node& doc) {
 
 void non_identical_particles::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
+    printf("ALGORITHM: %s", algorithm.c_str());
     if (algorithm.compare("all_neighbour") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
         Kokkos::abort("aborting");
@@ -141,6 +142,11 @@ void non_identical_particles::assign_algorithm(YAML::Node& doc) {
         potential_strategy = std::bind(&non_identical_particles::potential_MICAIP, this);
         potential_without_binning_strategy = std::bind(&non_identical_particles::potential_MICAIP, this);
         force_strategy = std::bind(&non_identical_particles::compute_force_MICAIP, this);
+    }
+    else if (algorithm.compare("AMIC") == 0) {
+        potential_strategy = std::bind(&non_identical_particles::potential_AMICAIP, this);
+        potential_without_binning_strategy = std::bind(&non_identical_particles::potential_AMICAIP, this);
+        force_strategy = std::bind(&non_identical_particles::compute_force_AMICAIP, this);
     }
     else if (algorithm.compare("binning_serial") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
@@ -328,6 +334,44 @@ void non_identical_particles::compute_force_MICAIP() {
     Kokkos::parallel_for("non_identical_particles-LJ-force-MICAIP", team_policy(N, Kokkos::AUTO), *this);
 }
 
+double non_identical_particles::potential_AMICAIP() {
+    double result;
+    Kokkos::parallel_reduce("non_identical_particles-LJ-potential-AMICAIP",
+        Kokkos::TeamPolicy<Tag_potential_AMIC_inner_parallel>(N, Kokkos::AUTO), *this, result);
+    return 4 * result;
+}
+
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const {
+    const int i = teamMember.league_rank();
+    double tmpV = 0;
+    int type_i = id[i]-1;
+    
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, i+1,N), [=](const int j, double& innerV) {
+        if (!(i == j)) {
+            int type_j = id[j]-1;
+            double rij = x(i, 0) - x(j, 0);
+            rij -= int(rij*inverse_halved_L[0]) * L[0];
+            double  r2 = rij * rij;
+            rij = x(i, 1) - x(j, 1);
+            rij -= int(rij*inverse_halved_L[1]) * L[1];
+            r2 += rij * rij;
+            rij = x(i, 2) - x(j, 2);
+            rij -= int(rij*inverse_halved_L[2]) * L[2];
+            r2 += rij * rij;
+
+            if (r2 < cutoff_squared) {
+                double sr2 = sigma_mat(type_i,type_j) * sigma_mat(type_i,type_j) / r2;
+                double sr6 = sr2 * sr2 * sr2;
+                innerV += epsilon_mat(type_i,type_j) * sr6 * (sr6 - 1.0);
+            }
+        }
+    }, tmpV);
+    Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
+        V += tmpV;
+        });
+}
+
 KOKKOS_FUNCTION
 void non_identical_particles::operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const {
     const int i = teamMember.league_rank();// bin id
@@ -365,6 +409,52 @@ void non_identical_particles::operator() (Tag_force_MIC_inner_parallel, const me
     f(i, 1) = fv.the_array[1] * 48;
     f(i, 2) = fv.the_array[2] * 48;
 
+}
+
+void non_identical_particles::compute_force_AMICAIP() {
+    typedef Kokkos::TeamPolicy<Tag_force_AMIC_inner_parallel>  team_policy;
+    Kokkos::parallel_for("non_identical_particles-LJ-force-AMICAIP", team_policy(N, Kokkos::AUTO), *this);
+}
+
+KOKKOS_FUNCTION
+void non_identical_particles::operator() (Tag_force_AMIC_inner_parallel, const member_type& teamMember) const {
+    const int i = teamMember.league_rank();// bin id
+    f(i, 0) = 0;
+    f(i, 1) = 0;
+    f(i, 2) = 0;
+    int type_i = id[i]-1;
+    space_vector  fv;
+    Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, i+1 ,N), [=](const int j, space_vector& innerfv) {
+        if (!(i == j)) {
+            int type_j = id[j]-1;
+            // calculate minimum image distance
+            double rx = x(i, 0) - x(j, 0);
+            rx -= int(rx*inverse_halved_L[0]) * L[0];
+            double r2 = rx*rx;
+            double ry = x(i, 1) - x(j, 1);
+            ry -= int(ry*inverse_halved_L[1]) * L[1];
+            r2 += ry * ry;
+            double rz = x(i, 2) - x(j, 2);
+            rz -= int(rz*inverse_halved_L[2]) * L[2];
+            r2 += rz * rz;
+
+
+            if (r2 < cutoff_squared) {
+            double sr2 = sigma_mat(type_i, type_j) * sigma_mat(type_i, type_j) / r2;
+            double sr6 = sr2 * sr2 * sr2;
+            sr2 = sr6 * (-sr6 + 0.5) / r2;
+            double force = 48 * epsilon_mat(type_i, type_j) * sr2;
+
+            Kokkos::atomic_add(&f(i, 0), force * rx);
+            Kokkos::atomic_add(&f(i, 1), force * ry);
+            Kokkos::atomic_add(&f(i, 2), force * rz);
+
+            Kokkos::atomic_add(&f(j, 0), -force * rx);
+            Kokkos::atomic_add(&f(j, 1), -force * ry);
+            Kokkos::atomic_add(&f(j, 2), -force * rz);
+            }
+        }
+    }, fv);
 }
 
 double non_identical_particles::potential_all_neighbour_inner_parallel() {
