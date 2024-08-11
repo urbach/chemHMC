@@ -4,7 +4,7 @@
 #include "global.hpp"
 #include "git_version.hpp"
 #include "HMC.hpp"
-#include "identical_particles.hpp"
+#include "particles.hpp"
 
 void add_error(std::vector<std::string>& errors, std::string s) {
     errors.emplace_back(s);

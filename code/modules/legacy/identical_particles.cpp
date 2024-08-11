@@ -294,7 +294,6 @@ void particles_type::printp() {
         printf("momentum(%d)=%-20.12g %-20.12g %-20.12g\n", i, h_p(i, 0), h_p(i, 1), h_p(i, 2));
 }
 
-
 void identical_particles::hb() {
     Kokkos::parallel_for("hb_momenta", Kokkos::RangePolicy<hbTag>(0, N), *this);
 }
@@ -316,7 +315,6 @@ double identical_particles::potential_all_neighbour() {
     // 2 *eps instead of 4 *eps because we count the couples i,j twice
     return 2 * eps * result;
 }
-
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (Tag_potential_all, const int i, double& V) const {
@@ -346,7 +344,6 @@ void identical_particles::operator() (Tag_potential_all, const int i, double& V)
     }
 };
 
-
 double identical_particles::potential_all_neighbour_inner_parallel() {
     double result;
     Kokkos::parallel_reduce("identical_particles-LJ-potential-all-inner-parallel",
@@ -354,7 +351,6 @@ double identical_particles::potential_all_neighbour_inner_parallel() {
     // 2 *eps instead of 4 *eps because we count the couples i,j twice
     return 2 * eps * result;
 }
-
 
 KOKKOS_FUNCTION
 void identical_particles::operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const {
@@ -387,7 +383,6 @@ void identical_particles::operator() (Tag_potential_all_inner_parallel, const me
         V += tmpV;
         });
 };
-
 
 double identical_particles::potential_binning() {
     // double result = 0;
@@ -468,9 +463,6 @@ void identical_particles::operator() (Tag_potential_binning, const member_type& 
         });
 };
 
-
-
-
 double identical_particles::compute_kinetic_E() {
     double K = 0;
     Kokkos::parallel_reduce("identical-particles-LJ-kinetic-E", Kokkos::RangePolicy<kinetic>(0, N), *this, K);
@@ -481,9 +473,6 @@ KOKKOS_FUNCTION
 void identical_particles::operator() (kinetic, const int& i, double& sum) const {
     sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
 };
-
-
-
 
 void identical_particles::compute_force_all() {
     Kokkos::parallel_for("identical_particles-LJ-force", Kokkos::RangePolicy<force>(0, N), *this);
@@ -523,7 +512,6 @@ void identical_particles::operator() (force, const int i) const {
     f(i, 1) *= 48 * eps;
     f(i, 2) *= 48 * eps;
 }
-
 
 void identical_particles::compute_force_all_inner_parallel() {
     typedef Kokkos::TeamPolicy<Tag_force_inner_parallel>  team_policy;
@@ -568,8 +556,6 @@ void identical_particles::operator() (Tag_force_inner_parallel, const member_typ
     f(i, 2) = fv.the_array[2] * 48 * eps;
 
 }
-
-
 
 void identical_particles::compute_force_binning() {
     create_binning();

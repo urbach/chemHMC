@@ -36,11 +36,6 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     int seed = check_and_assign_value<int>(doc, "seed");
 
     gen64.seed(seed);
-    if (params.append == true) {
-        std::cout << std::endl << "Loading rng host...\n";
-        std::ifstream fin(params.rng_host_state);
-        fin >> gen64;
-    }
 
     acceptance = 0;
 }
@@ -48,15 +43,6 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
 double HMC_class::gen_random() {
     return (((double)gen64() - gen64.min()) / (gen64.max() - gen64.min()));// random number from 0 to 1
 };
-
-void HMC_class::save_host_rng_state() {
-    // save state
-    std::cout << "Saving rng host...\n";
-    {
-        std::ofstream fout(params.rng_host_state);
-        fout << gen64;
-    }
-}
 
 void HMC_class::run() {
 
@@ -119,8 +105,6 @@ void HMC_class::run() {
             if ((i % save_every == 0)) {
                 printf("saving conf\n");
                 integrator->particles->print_xyz(params, i, Ki, Vi);
-                save_host_rng_state();
-                integrator->particles->save_device_rng();
             }
         }
 #ifdef DEBUG
@@ -132,11 +116,19 @@ void HMC_class::run() {
     printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories - thermalization_steps)));
     printf("time for HMC: %g  s\n", timer.seconds());
 
-
 }
 
+/* void HMC_class::save_host_rng_state() {
+    // save state
+    std::cout << "Saving rng host...\n";
+    {
+        std::ofstream fout(params.rng_host_state);
+        fout << gen64;
+    }
+} */
 
-void HMC_class::measure() {
+
+/* void HMC_class::measure() {
     auto& p = integrator->particles;
     FILE* file = NULL;
     file = fopen(params.nameout.c_str(), "r");
@@ -163,4 +155,4 @@ void HMC_class::measure() {
     }
     fclose(file_RDF);
     fclose(file);
-}
+} */

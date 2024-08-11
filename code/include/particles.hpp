@@ -1,118 +1,161 @@
-#ifndef PARTICLES_H
-#define PARTICLES_H
+#ifndef particles_H
+#define particles_H
 
 #include <functional>
+#include <vector>
+#include <atom.hpp>
 #include "yaml-cpp/yaml.h"
 #include <Kokkos_Core.hpp>
-#include "global.hpp"
-#include "read_infile.hpp"
+#include "particles_type.hpp"
 
-typedef Kokkos::View<double*> t_RDF;
-typedef Kokkos::View<int*> t_bincount;
-typedef Kokkos::View<int*> t_binoffsets;
-typedef Kokkos::View<int*> t_permute_vector;
-typedef Kokkos::View<bool*> t_bool;
-typedef Kokkos::View<int*> t_prefix;
-
-class particles_type {
+class particles_instance : public particles_type {
 
 public:
+    struct cold {};
+    struct hot {};
+    struct hbTag {};
+    
+    struct kinetic {};
 
-    int N;
-    int seed;
-    double coeff_p;
-    double coeff_x;
-    double L[dim_space];
-    double inverse_halved_L[dim_space];
+    struct Tag_potential_all_inner_parallel {};
+    struct Tag_potential_MIC_inner_parallel {};
+    struct Tag_potential_AMIC_inner_parallel {};
 
-    type_x  x;      ///< Kokkos view containing the positions
-    type_p  p;      ///< Kokkos view containing the momenta
-    type_f  f;      ///< Kokkos view containing the forces
-    type_id id;     ///< Kokkos view containing the type_ids 
-    bool initHostMirror;
-    // the host mirror of x is used to restore the position before the MD in case of a rejection
-    type_x::HostMirror h_x;     ///< Host mirror of x (positions).
-    type_p::HostMirror h_p;     ///< Host_mirror of p (momenta)
+    struct force {};
+    struct Tag_force_inner_parallel {};
+    struct Tag_force_MIC_inner_parallel {};
+    struct Tag_force_AMIC_inner_parallel {};
 
-    int nbin[dim_space], bintot;
-    double sizebin[dim_space];
-    std::string rng_device_state;
-    std::string algorithm;
+    struct check_in_volume {};
 
-    t_bincount bincount;
-    t_binoffsets binoffsets;
-    t_permute_vector permute_vector;
-    t_permute_vector permute_vector_temp;
+    typedef Kokkos::TeamPolicy<>::member_type  member_type;
 
-    t_bincount::HostMirror h_bincount;
-    t_binoffsets::HostMirror h_binoffsets;
-    t_permute_vector::HostMirror h_permute_vector;
-
-    t_bool before;
-    t_bool after;
-
-    //RDF
-    int NbRDF;
-    double LmaxRDF;
-    double size_bRDF;
-    std::string filename_RDF;
-    t_RDF RDF;
-    t_RDF::HostMirror h_RDF;
-
-    // rng
-    RandPoolType rand_pool;
-    using device_type = typename Kokkos::DefaultExecutionSpace::device_type;
-    using state_data_type = Kokkos::View<uint64_t**, device_type>;
-    int padding;
-    typename state_data_type::HostMirror hs;
+    double mass;
+    double beta;
+    double sbeta;// sqrt(beta)
+    double sigma;
+    double eps;
+    double cutoff;
+    double cutoff_squared;
+    std::string name_xyz;
 
 
-    void save_device_rng();
-    void load_device_rng();
+    
+    
+    
+
+    const std::string name = "particles";
+    Kokkos::View<atom_type*> atom_type_list; ///< view containing mass/charge/index of atom types
+    Kokkos::View<atom_type*>::HostMirror h_atom_type_list; ///< host mirror of atom_type_list
+    std::string parameter_file; ///< name of file containing force field parameters
+    std::string start_configuration_file; ///< name of file containing initial configuration
+    Kokkos::View<double**> epsilon_mat; ///< matrix containing the LJ_epsilon parameters
+    Kokkos::View<double**> sigma_mat; ///< matrix containing the LJ_sigma parameters
+    Kokkos::View<double**>::HostMirror h_epsilon_mat; ///< host mirror of epsilon_mat
+    Kokkos::View<double**>::HostMirror h_sigma_mat; ///< host mirror of sigma_mat
+    Kokkos::View<double*> coeff_x;    ///< list of coefficients for the position calculation
+    Kokkos::View<double*>::HostMirror h_coeff_x;    ///< host mirror of coeff_x
+    type_id::HostMirror h_id; ///< host mirror of id
+    double T;   ///< temperature
+
     // constructor
-    particles_type(YAML::Node doc, params_class params);
+    particles_instance(YAML::Node doc, params_class params);
 
-    virtual double get_beta() = 0;
-    virtual void InitX(params_class params) = 0;
+    double get_beta() { return beta; };
+    void print_xyz(params_class params, int traj, double K, double V) override;
+    void read_xyz(params_class params) override;
+    int how_many_confs_xyz(FILE* file) override;
+    void read_next_confs_xyz(FILE* file) override;
 
-    void printx();
-    void printp();
-    virtual void print_xyz(params_class params, int traj, double K, double V) = 0;
-    virtual void read_xyz(params_class params) = 0;
-    virtual int how_many_confs_xyz(FILE* file) = 0;
-    virtual void read_next_confs_xyz(FILE* file) = 0;
+    void InitX(params_class params) override;
+    void hb() override;
 
+    void assign_ids();
+    void assign_algorithm(YAML::Node& doc);
+    void update_positions(const double dt_) override;
+    void update_momenta(const double dt_) override;
+    void mix_parameters(YAML::Node& doc);
+    void get_parameters(YAML::Node& parameter_file, Kokkos::View<atom_type*>& atom_type_list);
+    void compute_coeff_position();
+    void compute_coeff_momenta();
 
-    virtual void hb() = 0;
-    virtual double compute_potential() = 0;
-    virtual double evaluate_potential() = 0;
-    virtual double compute_kinetic_E() = 0;
-    virtual void compute_force() = 0;
-    virtual void compute_coeff_momenta() = 0;
-    virtual void compute_coeff_position() = 0;
-    virtual void update_momenta(const double dt_) = 0;
-    virtual void update_positions(const double dt_) = 0;
-    virtual void binning_geometry() = 0;
-    virtual void create_binning() = 0;
-    virtual void compute_RDF() = 0;
-    virtual void print_RDF() = 0;
-    virtual void write_header_RDF(FILE* file, int confs) = 0;
-    virtual void write_RDF(FILE* file, int iconf) = 0;
+    double compute_kinetic_E() override;
 
-    KOKKOS_INLINE_FUNCTION void lextoc(int ib, int& bx, int& by, int& bz) const {
-        bz = ib / (nbin[0] * nbin[1]);
-        by = (ib - bz * nbin[0] * nbin[1]) / (nbin[0]);
-        bx = ib - nbin[0] * (by + bz * nbin[1]);
+    std::function<double()>  potential_strategy;
+    double potential_all_neighbour_inner_parallel();
+    double potential_MICAIP(); ///< all_neighbour_inner_parallel with minimum image convention
+    double potential_AMICAIP();
+    double compute_potential() override {
+        return potential_strategy();
     };
-    KOKKOS_INLINE_FUNCTION int ctolex(int& bx, int& by, int& bz)  const {
-        return bx + nbin[0] * (by + bz * nbin[1]);
+    std::function<double()>  potential_without_binning_strategy;
+    double evaluate_potential() override {
+        return potential_without_binning_strategy();
     };
-    KOKKOS_INLINE_FUNCTION int which_bin(type_x  x, int i) const {
-        int bx = floor(x(i, 0) / sizebin[0]);
-        int by = floor(x(i, 1) / sizebin[1]);
-        int bz = floor(x(i, 2) / sizebin[2]);
-        return ctolex(bx, by, bz);
+
+    std::function<void()>  force_strategy;
+    void compute_force_all_inner_parallel();
+    void compute_force_MICAIP();
+    void compute_force_AMICAIP();
+    void compute_force() override {
+        force_strategy();
     };
+
+    KOKKOS_FUNCTION void operator() (cold, const int i) const;
+    KOKKOS_FUNCTION void operator() (hot, const int i) const;
+    KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
+
+    KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& sum) const;
+
+    // Misc.
+    KOKKOS_FUNCTION void operator() (check_in_volume, const int i) const;
+
+    // Potential calculation
+    KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const;
+
+    // Force calculation
+    KOKKOS_FUNCTION void operator() (Tag_force_inner_parallel, const member_type& teamMember) const;
+    KOKKOS_FUNCTION void operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const;
+    KOKKOS_FUNCTION void operator() (Tag_force_AMIC_inner_parallel, const member_type& teamMember) const;
+
+    // Destructor
+    ~particles_instance() {};
 };
+
+
+// we need a ruduction of 3 double array
+template< class ScalarType, int N >
+struct array_type {
+    ScalarType the_array[N];
+
+    KOKKOS_INLINE_FUNCTION   // Default constructor - Initialize to 0's
+        array_type() {
+        for (int i = 0; i < N; i++) { the_array[i] = 0; }
+    }
+    KOKKOS_INLINE_FUNCTION   // Copy Constructor
+        array_type(const array_type& rhs) {
+        for (int i = 0; i < N; i++) {
+            the_array[i] = rhs.the_array[i];
+        }
+    }
+    KOKKOS_INLINE_FUNCTION   // add operator
+        array_type& operator += (const array_type& src) {
+        for (int i = 0; i < N; i++) {
+            the_array[i] += src.the_array[i];
+        }
+        return *this;
+    }
+};
+typedef array_type<double, dim_space> space_vector;  // used to simplify code below
+namespace Kokkos { //reduction identity must be defined in Kokkos namespace
+    template<>
+    struct reduction_identity< space_vector > {
+        KOKKOS_FORCEINLINE_FUNCTION static space_vector sum() {
+            return space_vector();
+        }
+    };
+}
 
 #endif

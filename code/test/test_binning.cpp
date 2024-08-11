@@ -4,8 +4,7 @@
 #include "global.hpp"
 #include "git_version.hpp"
 #include "HMC.hpp"
-#include "identical_particles.hpp"
-#include "non_identical_particles.hpp"
+#include "particles.hpp"
 
 void add_error(std::vector<std::string>& errors, std::string s) {
     errors.emplace_back(s);
@@ -181,19 +180,19 @@ int main(int argc, char** argv) {
         particles_type* particles1, * particles2;
 
         doc["particles"]["algorithm"] = "all_neighbour_inner_parallel";
-        particles1 = new identical_particles(doc, params);
+        particles1 = new particles_instance(doc, params);
 
         doc["particles"]["algorithm"] = "binning_serial";
-        particles2 = new identical_particles(doc, params);
-        doc["particles"]["algorithm"] = "MICAIP";
-        particles_type* particles3 = new non_identical_particles(doc,params);
+        particles2 = new particles_instance(doc, params);
+        doc["particles"]["algorithm"] = "AMIC";
+        particles_type* particles3 = new particles_instance(doc,params);
         //doc["particles"]["algorithm"] = "quick_sort";
         // doc["rng_host_state"] = "tmp7";
         // doc["rng_device_state"] = "tmp8";
         // doc["output_file"] = "tmp9";
-        //particles_type* particles3 = new identical_particles(doc, params);
+        //particles_type* particles3 = particles_instance(doc, params);
         doc["particles"]["algorithm"] = "parallel_binning";
-        particles_type* particles4 = new identical_particles(doc, params);
+        particles_type* particles4 = particles_instance(doc, params);
         
         //// init the positions
         particles1->InitX(params);
@@ -231,7 +230,7 @@ int main(int argc, char** argv) {
         Kokkos::Timer timer3;
         double V3 = particles3->compute_potential();
         Kokkos::fence();
-        printf("total time non_identical_all_neighbour = %gs   \n", timer3.seconds());
+        printf("total AMIC = %gs   \n", timer3.seconds());
         Kokkos::Timer timer4;
         particles4->create_binning();
         double V4 = particles4->compute_potential();
@@ -246,7 +245,7 @@ int main(int argc, char** argv) {
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V3) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V3);
-            add_error(errors, "error: the potential all_neighbour does not match non_identical_all_neighbour");
+            add_error(errors, "error: the potential all_neighbour does not match AMIC");
         }
         else printf("Test passed: the potential is the same\n");
         if (fabs((V1 - V4) / V1) > 1e-6) {
@@ -294,7 +293,7 @@ int main(int argc, char** argv) {
         timer3.reset();
         particles3->compute_force();
         Kokkos::fence();
-        printf("time force non_identical_all_neighbour = %f s\n", timer3.seconds());
+        printf("time force AMIC = %f s\n", timer3.seconds());
 
         timer4.reset();
         particles4->compute_force();
@@ -302,7 +301,7 @@ int main(int argc, char** argv) {
         printf("time force parallel_binning = %f s\n", timer4.seconds());
 
         check_force(particles1, particles2, "all_neighbour  agains serial_binning", errors);
-        check_force(particles1, particles3, "all_neighbour  agains non_identical_all_neighbour", errors);
+        check_force(particles1, particles3, "all_neighbour  agains AMIC", errors);
         check_force(particles1, particles4, "all_neighbour  agains parallel_binning", errors);
         //////////////////////////////////////////////////////////////////////////////////////////
 

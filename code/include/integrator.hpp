@@ -7,6 +7,7 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 #include "particles.hpp"
+#include "particles_type.hpp"
 #include <random>
 #include "atom.hpp"
 

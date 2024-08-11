@@ -12,7 +12,7 @@
 
 #include "global.hpp"
 #include "yaml-cpp/yaml.h"
-#include "particles.hpp"
+#include "particles_type.hpp"
 
 
 
@@ -54,7 +54,6 @@ int check_and_assign_value(YAML::Node doc, const char* tag) {
 template double check_and_assign_value<double>(YAML::Node, const char*);
 // template int check_and_assign_value<int>(YAML::Node, const char*);
 template std::string check_and_assign_value<std::string>(YAML::Node, const char*);
-
 
 inline bool file_exist(const std::string& name) {
     std::ifstream f(name.c_str());
@@ -106,11 +105,6 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
     }
     fileout = NULL;
     nameout = check_and_assign_value<std::string>(doc, "output_file");
-    rng_host_state = check_and_assign_value<std::string>(doc, "rng_host_state");
-    rng_device_state = check_and_assign_value<std::string>(doc, "rng_device_state");
-    if (rng_device_state == rng_host_state) Kokkos::abort("rng_device_state must be different from rng_host_state\n");
-    if (rng_device_state == nameout) Kokkos::abort("rng_device_state must be different from output_file\n");
-    if (rng_host_state == nameout) Kokkos::abort("rng_host_state must be different from output_file\n");
 
     parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");  
 
@@ -131,17 +125,11 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
             printf("output_file             = %s\n", nameout.c_str());
             Kokkos::abort("aborting");
         }
-        error_if_can_not_open_file_to_read(rng_host_state);
-        error_if_can_not_open_file_to_read(rng_device_state);
+        error_if_can_not_open_file_to_read(parameter_file);
     }
     else {
         if (check_overwrite) {
             error_if_file_exist(nameout);
-            error_if_file_exist(rng_host_state);
-            error_if_file_exist(rng_device_state);
-            error_if_can_not_open_file_to_write(rng_host_state);
-            error_if_can_not_open_file_to_write(rng_device_state);
-            error_if_can_not_open_file_to_write(parameter_file);
         }
     }
 
@@ -157,7 +145,6 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
     }
 
 }
-
 
 YAML::Node read_params(int argc, char** argv) {
     int opt = -1;

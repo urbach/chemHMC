@@ -1,24 +1,12 @@
 #include <iostream> 
 #include "integrator.hpp"
 #include "read_infile.hpp"
-#include "identical_particles.hpp"
-#include "non_identical_particles.hpp"
-
+#include "particles.hpp"
 
 integrator_type::integrator_type(YAML::Node doc, params_class params) {
 
     if (doc["particles"]) {
-        std::string name = check_and_assign_value<std::string>(doc["particles"], "name");
-        if (name == "identical_particles")
-            particles = new identical_particles(doc, params);
-        else if (name == "non_identical_particles") {
-            particles = new non_identical_particles(doc, params);
-        }
-        else {
-            printf("no valid name for particles: ");
-            std::cout << doc["particles"].as<std::string>() << std::endl;
-            exit(1);
-        }
+        particles = new particles_instance(doc, params);
         particles->InitX(params);
     }
     else {
@@ -33,9 +21,7 @@ integrator_type::integrator_type(YAML::Node doc, params_class params) {
 
 }
 
-LEAP::LEAP(YAML::Node doc, params_class params) : integrator_type(doc, params) {
-
-}
+LEAP::LEAP(YAML::Node doc, params_class params) : integrator_type(doc, params) {}
 
 // binomial distribution with average n*p= average_steps
 void integrator_type::set_binomial_steps(std::mt19937_64 &gen64) {
