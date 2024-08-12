@@ -5,6 +5,7 @@ set(chemHMC_header
     integrator.hpp
     particles_type.hpp
     particles.hpp
+    atom.hpp
     # binning.hpp
     # identical_particles.hpp
     # quick_sort.hpp
@@ -14,8 +15,9 @@ set(chemHMC_scr
     ../modules/HMC.cpp
     ../modules/read_infile.cpp
     ../modules/integrator.cpp
-    ../modules/particles_type.cpp
-    ../modules/particles.cpp
+    ../modules/particles/particles_type.cpp
+    ../modules/particles/particles.cpp
+    ../modules/particles/non_bonded_interactions/lennard_jones.cpp
     #../modules/identical_particles_binning.cpp
     # ../modules/binning.cpp
     #../modules/identical_particles.cpp

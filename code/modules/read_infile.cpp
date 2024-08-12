@@ -139,11 +139,6 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
         Kokkos::abort("abort");
     }
     istart = 0;
-
-    if (doc["particles"]["RDF"]) {
-        name_RDF = check_and_assign_value<std::string>(doc["particles"]["RDF"], "output_file");
-    }
-
 }
 
 YAML::Node read_params(int argc, char** argv) {

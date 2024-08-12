@@ -126,33 +126,3 @@ void HMC_class::run() {
         fout << gen64;
     }
 } */
-
-
-/* void HMC_class::measure() {
-    auto& p = integrator->particles;
-    FILE* file = NULL;
-    file = fopen(params.nameout.c_str(), "r");
-    if (file == NULL) {
-        printf("error in opening file %s\n", params.nameout.c_str());
-        Kokkos::abort("abort");
-    }
-    int confs = p->how_many_confs_xyz(file);
-    printf("the input file contains %d configurations \n", confs);
-    ////////////////////
-    FILE* file_RDF = NULL;
-    file_RDF = fopen(p->filename_RDF.c_str(), "w");
-    if (file_RDF == NULL) {
-        printf("error in opening file %s\n", p->filename_RDF.c_str());
-        Kokkos::abort("abort");
-    }
-    p->write_header_RDF(file_RDF, confs);
-
-    ///////////////////////
-    for (int i = 0; i < confs; i++) {
-        p->read_next_confs_xyz(file);
-        p->compute_RDF();
-        p->write_RDF(file_RDF, i);
-    }
-    fclose(file_RDF);
-    fclose(file);
-} */

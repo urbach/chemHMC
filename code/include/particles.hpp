@@ -11,23 +11,6 @@
 class particles_instance : public particles_type {
 
 public:
-    struct cold {};
-    struct hot {};
-    struct hbTag {};
-    
-    struct kinetic {};
-
-    struct Tag_potential_all_inner_parallel {};
-    struct Tag_potential_MIC_inner_parallel {};
-    struct Tag_potential_AMIC_inner_parallel {};
-
-    struct force {};
-    struct Tag_force_inner_parallel {};
-    struct Tag_force_MIC_inner_parallel {};
-    struct Tag_force_AMIC_inner_parallel {};
-
-    struct check_in_volume {};
-
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
 
     double mass;
@@ -38,11 +21,6 @@ public:
     double cutoff;
     double cutoff_squared;
     std::string name_xyz;
-
-
-    
-    
-    
 
     const std::string name = "particles";
     Kokkos::View<atom_type*> atom_type_list; ///< view containing mass/charge/index of atom types
@@ -61,25 +39,54 @@ public:
     // constructor
     particles_instance(YAML::Node doc, params_class params);
 
-    double get_beta() { return beta; };
+
+    // file interaction
     void print_xyz(params_class params, int traj, double K, double V) override;
     void read_xyz(params_class params) override;
     int how_many_confs_xyz(FILE* file) override;
     void read_next_confs_xyz(FILE* file) override;
+    void get_parameters(YAML::Node& parameter_file, Kokkos::View<atom_type*>& atom_type_list);
+
+
+    // initialization related stuff
+    struct cold {};
+    struct hot {};
+    struct check_in_volume {};
 
     void InitX(params_class params) override;
-    void hb() override;
-
+    double get_beta() { return beta; };
     void assign_ids();
     void assign_algorithm(YAML::Node& doc);
-    void update_positions(const double dt_) override;
-    void update_momenta(const double dt_) override;
     void mix_parameters(YAML::Node& doc);
-    void get_parameters(YAML::Node& parameter_file, Kokkos::View<atom_type*>& atom_type_list);
     void compute_coeff_position();
     void compute_coeff_momenta();
 
+    KOKKOS_FUNCTION void operator() (cold, const int i) const;
+    KOKKOS_FUNCTION void operator() (hot, const int i) const;
+    KOKKOS_FUNCTION void operator() (check_in_volume, const int i) const;
+    
+
+    // integrator related stuff
+    struct hbTag {};
+
+    void hb() override;
+    void update_positions(const double dt_) override;
+    void update_momenta(const double dt_) override;
+
+    KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
+    
+    // kinetic energy calculation
+    struct kinetic {};
+
     double compute_kinetic_E() override;
+
+    KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& sum) const;
+
+
+    // potential energy calculation
+    struct Tag_potential_all_inner_parallel {};
+    struct Tag_potential_MIC_inner_parallel {};
+    struct Tag_potential_AMIC_inner_parallel {};
 
     std::function<double()>  potential_strategy;
     double potential_all_neighbour_inner_parallel();
@@ -93,6 +100,17 @@ public:
         return potential_without_binning_strategy();
     };
 
+    KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const;
+
+
+    // force calculation
+    struct force {};
+    struct Tag_force_inner_parallel {};
+    struct Tag_force_MIC_inner_parallel {};
+    struct Tag_force_AMIC_inner_parallel {};
+
     std::function<void()>  force_strategy;
     void compute_force_all_inner_parallel();
     void compute_force_MICAIP();
@@ -101,24 +119,10 @@ public:
         force_strategy();
     };
 
-    KOKKOS_FUNCTION void operator() (cold, const int i) const;
-    KOKKOS_FUNCTION void operator() (hot, const int i) const;
-    KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
-
-    KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& sum) const;
-
-    // Misc.
-    KOKKOS_FUNCTION void operator() (check_in_volume, const int i) const;
-
-    // Potential calculation
-    KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
-    KOKKOS_FUNCTION void operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const;
-    KOKKOS_FUNCTION void operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const;
-
-    // Force calculation
     KOKKOS_FUNCTION void operator() (Tag_force_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_AMIC_inner_parallel, const member_type& teamMember) const;
+
 
     // Destructor
     ~particles_instance() {};

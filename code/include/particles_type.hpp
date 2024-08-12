@@ -7,7 +7,6 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 
-typedef Kokkos::View<double*> t_RDF;
 typedef Kokkos::View<int*> t_bincount;
 typedef Kokkos::View<int*> t_binoffsets;
 typedef Kokkos::View<int*> t_permute_vector;
@@ -50,14 +49,6 @@ public:
 
     t_bool before;
     t_bool after;
-
-    //RDF
-    int NbRDF;
-    double LmaxRDF;
-    double size_bRDF;
-    std::string filename_RDF;
-    t_RDF RDF;
-    t_RDF::HostMirror h_RDF;
 
     // rng
     RandPoolType rand_pool;
