@@ -117,12 +117,3 @@ void HMC_class::run() {
     printf("time for HMC: %g  s\n", timer.seconds());
 
 }
-
-/* void HMC_class::save_host_rng_state() {
-    // save state
-    std::cout << "Saving rng host...\n";
-    {
-        std::ofstream fout(params.rng_host_state);
-        fout << gen64;
-    }
-} */
