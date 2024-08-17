@@ -278,6 +278,9 @@ void particles_instance::init_cell_list(YAML::Node& doc) {
         h_cell_size(dim) = L[dim] / h_cells_per_dim(dim);
     }
     int total_cells = h_cells_per_dim(0) * h_cells_per_dim(1) * h_cells_per_dim(2);
+    if (total_cells < 27) {
+        Kokkos::abort("ERROR: Lennard-Jones cutoff distance must be smaller than 1/3 of the smallest cell dimension! aborting...");
+    }
     Kokkos::deep_copy(cell_size, h_cell_size);
     Kokkos::deep_copy(cells_per_dim, h_cells_per_dim);
     // Get max particles per cell
@@ -286,15 +289,15 @@ void particles_instance::init_cell_list(YAML::Node& doc) {
         max_particles_per_cell = check_and_assign_value<int>(doc["particles"], "MaxParticlesPerCell");
     } else {
         // If no user value is supplied, we make a generous estimate
-        double estimated_cell_volume = 1.5 * cutoff * 1.5 * cutoff * 1.5 * cutoff;
+        double cell_volume = h_cell_size(0) * h_cell_size(1) * h_cell_size(2);
         double min_sigma = 10.0;
         for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
             if (h_atom_type_list[i].LJ_sigma < min_sigma) {
                 min_sigma = h_atom_type_list[i].LJ_sigma;
             }
         }
-        double estimated_atomic_volume = 0.8 * min_sigma * 0.8 * min_sigma * 0.8 * min_sigma;
-        max_particles_per_cell = estimated_cell_volume / estimated_atomic_volume;
+        double estimated_atomic_volume = min_sigma * min_sigma * min_sigma;
+        max_particles_per_cell = cell_volume / estimated_atomic_volume;
     }
     // Allocate the cell list and cell count views
     cell_list = Kokkos::View<int**>("cell_list",h_cells_per_dim(0) * 
