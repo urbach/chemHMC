@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
             double  r = Kokkos::sqrt((x1(i, 0) - x2(i, 0)) * (x1(i, 0) - x2(i, 0)) +
                 (x1(i, 1) - x2(i, 1)) * (x1(i, 1) - x2(i, 1)) +
                 (x1(i, 2) - x2(i, 2)) * (x1(i, 2) - x2(i, 2)));
-            if (r > 1e-8) {
+            if (r > 1e-6) {
                 printf("different position x1=(%g,%g%g)  x2=(%g,%g,%g)\n", x1(i, 0), x1(i, 1), x1(i, 2), x2(i, 0), x2(i, 1), x2(i, 2));
                 update += 1;
             }
@@ -144,38 +144,38 @@ int main(int argc, char** argv) {
         Kokkos::Timer timer1;
         double V1 = particles1->compute_potential();
         Kokkos::fence();
-        printf("time all_neighbour = %f s\n", timer1.seconds());
+        printf("time AMIC = %f s\n", timer1.seconds());
         Kokkos::Timer timer2;
         double V2 = particles2->compute_potential();
         Kokkos::fence();
-        printf("time AMIC = %f s\n", timer2.seconds());
+        printf("time cell_list = %f s\n", timer2.seconds());
 
         std::vector<std::string> errors(0);
         if (fabs((V1 - V2) / V1) > 1e-6) {
             printf("%.12g   %.12g\n", V1, V2);
-            add_error(errors, "error: the potential all_neighbour does not match AMIC");
+            add_error(errors, "error: the potential AMIC does not match cell_list");
         }
         else printf("Test passed: the potential is the same\n");
         printf("###################################################################################################\n");
-        /* timer1.reset();
+        timer1.reset();
         particles1->compute_force();
         Kokkos::fence();
-        printf("time force all_neighbour = %f s\n", timer1.seconds());
+        printf("time force AMIC = %f s\n", timer1.seconds());
 
         timer2.reset();
         particles2->compute_force();
         Kokkos::fence();
-        printf("time force AMIC= %f s\n", timer2.seconds());
+        printf("time force cell_list= %f s\n", timer2.seconds());
 
-        check_force(particles1, particles2, "all_neighbour against AMIC", errors);
+        check_force(particles1, particles2, "cell_list against AMIC", errors);
         //////////////////////////////////////////////////////////////////////////////////////////
         timer1.reset();
         check_force_with_num_der(particles1, errors);
-        printf("time for all_neighbour = %f s\n", timer1.seconds());
+        printf("time for AMIC = %f s\n", timer1.seconds());
 
         timer2.reset();
         check_force_with_num_der(particles2, errors);
-        printf("time for AMIC = %f s\n", timer2.seconds()); */
+        printf("time for cell_list = %f s\n", timer2.seconds());
         //////////////////////////////////////////////////////////////////////////////////////////
         printf("\nerror recap:\n");
         if (errors.size() > 0) {
