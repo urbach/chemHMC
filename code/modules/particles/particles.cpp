@@ -223,7 +223,7 @@ void particles_instance::mix_parameters(YAML::Node& doc) {
 
 void particles_instance::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
-    printf("ALGORITHM: %s", algorithm.c_str());
+    printf("ALGORITHM: %s \n", algorithm.c_str());
     if (algorithm.compare("all_neighbour") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
         Kokkos::abort("aborting");
@@ -243,9 +243,11 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         potential_without_binning_strategy = std::bind(&particles_instance::potential_AMICAIP, this);
         force_strategy = std::bind(&particles_instance::compute_force_AMICAIP, this);
     }
-    else if (algorithm.compare("binning_serial") == 0) {
-        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
-        Kokkos::abort("aborting");
+    else if (algorithm.compare("cell_list") == 0) {
+        particles_instance::init_cell_list(doc);
+        potential_strategy = std::bind(&particles_instance::potential_cell_list, this);
+        potential_without_binning_strategy = std::bind(&particles_instance::potential_cell_list, this);
+        force_strategy = std::bind(&particles_instance::compute_force_cell_list, this);
     }
     else if (algorithm.compare("parallel_binning") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
@@ -260,6 +262,54 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         Kokkos::abort("aborting");
     }
 }
+
+void particles_instance::init_cell_list(YAML::Node& doc) {
+    // calculate size of the cells and allocate the needed views
+    cell_size = Kokkos::View<double*>("cell_size", dim_space);
+    cells_per_dim = Kokkos::View<int*>("cells_per_dim", dim_space);
+
+    h_cell_size = Kokkos::create_mirror_view(cell_size);
+    h_cells_per_dim = Kokkos::create_mirror_view(cells_per_dim);
+
+    for (int dim = 0; dim < 3; ++dim) {
+        h_cells_per_dim(dim) = static_cast<int>(L[dim] / cutoff);
+    }
+    for (int dim = 0; dim < 3; ++dim) {
+        h_cell_size(dim) = L[dim] / h_cells_per_dim(dim);
+    }
+    int total_cells = h_cells_per_dim(0) * h_cells_per_dim(1) * h_cells_per_dim(2);
+    Kokkos::deep_copy(cell_size, h_cell_size);
+    Kokkos::deep_copy(cells_per_dim, h_cells_per_dim);
+    // Get max particles per cell
+    int max_particles_per_cell;
+    if (doc["particles"]["MaxParticlesPerCell"]) {
+        max_particles_per_cell = check_and_assign_value<int>(doc["particles"], "MaxParticlesPerCell");
+    } else {
+        // If no user value is supplied, we make a generous estimate
+        double estimated_cell_volume = 1.5 * cutoff * 1.5 * cutoff * 1.5 * cutoff;
+        double min_sigma = 10.0;
+        for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
+            if (h_atom_type_list[i].LJ_sigma < min_sigma) {
+                min_sigma = h_atom_type_list[i].LJ_sigma;
+            }
+        }
+        double estimated_atomic_volume = 0.8 * min_sigma * 0.8 * min_sigma * 0.8 * min_sigma;
+        max_particles_per_cell = estimated_cell_volume / estimated_atomic_volume;
+    }
+    // Allocate the cell list and cell count views
+    cell_list = Kokkos::View<int**>("cell_list",h_cells_per_dim(0) * 
+                                    h_cells_per_dim(1) * h_cells_per_dim(2),max_particles_per_cell);
+    cell_count = Kokkos::View<int*>("cell_count", h_cells_per_dim(0) * 
+                                    h_cells_per_dim(1) * h_cells_per_dim(2));
+
+    h_cell_list = Kokkos::create_mirror_view(cell_list);
+    h_cell_count = Kokkos::create_mirror_view(cell_count);
+
+    Kokkos::deep_copy(h_cell_count, 0);
+    Kokkos::deep_copy(cell_count, h_cell_count);
+    Kokkos::deep_copy(cell_list, 0);
+}
+
 
 void particles_instance::assign_ids() {
     // this function reads in the atom types from the start_configuration_file

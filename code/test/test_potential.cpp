@@ -114,9 +114,9 @@ int main(int argc, char** argv) {
         params_class params(doc,false);
         particles_type* particles1, * particles2;
 
-        doc["particles"]["algorithm"] = "all_neighbour_inner_parallel";
-        particles1 = new particles_instance(doc, params);
         doc["particles"]["algorithm"] = "AMIC";
+        particles1 = new particles_instance(doc, params);
+        doc["particles"]["algorithm"] = "cell_list";
         particles2 = new particles_instance(doc,params);
         
         //// init the positions
@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
         }
         else printf("Test passed: the potential is the same\n");
         printf("###################################################################################################\n");
-        timer1.reset();
+        /* timer1.reset();
         particles1->compute_force();
         Kokkos::fence();
         printf("time force all_neighbour = %f s\n", timer1.seconds());
@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
 
         timer2.reset();
         check_force_with_num_der(particles2, errors);
-        printf("time for AMIC = %f s\n", timer2.seconds());
+        printf("time for AMIC = %f s\n", timer2.seconds()); */
         //////////////////////////////////////////////////////////////////////////////////////////
         printf("\nerror recap:\n");
         if (errors.size() > 0) {

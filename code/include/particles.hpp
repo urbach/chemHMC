@@ -4,6 +4,8 @@
 #include <functional>
 #include <vector>
 #include <atom.hpp>
+#include <iostream>
+#include <iomanip>
 #include "yaml-cpp/yaml.h"
 #include <Kokkos_Core.hpp>
 #include "particles_type.hpp"
@@ -35,6 +37,18 @@ public:
     Kokkos::View<double*>::HostMirror h_coeff_x;    ///< host mirror of coeff_x
     type_id::HostMirror h_id; ///< host mirror of id
     double T;   ///< temperature
+
+
+    // cell_list related stuff
+    Kokkos::View<int*> cells_per_dim;
+    Kokkos::View<int*>::HostMirror h_cells_per_dim;
+    Kokkos::View<double*> cell_size;   // Size of each cell
+    Kokkos::View<double*>::HostMirror h_cell_size;
+    Kokkos::View<int**> cell_list;
+    Kokkos::View<int**>::HostMirror h_cell_list;
+    Kokkos::View<int*> cell_count; // Store the number of particles in each cell
+    Kokkos::View<int*>::HostMirror h_cell_count;
+
 
     // constructor
     particles_instance(YAML::Node doc, params_class params);
@@ -87,11 +101,13 @@ public:
     struct Tag_potential_all_inner_parallel {};
     struct Tag_potential_MIC_inner_parallel {};
     struct Tag_potential_AMIC_inner_parallel {};
+    struct Tag_potential_cell {};
 
     std::function<double()>  potential_strategy;
     double potential_all_neighbour_inner_parallel();
     double potential_MICAIP(); ///< all_neighbour_inner_parallel with minimum image convention
     double potential_AMICAIP();
+    double potential_cell_list();
     double compute_potential() override {
         return potential_strategy();
     };
@@ -103,18 +119,20 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_all_inner_parallel, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const;
-
+    KOKKOS_FUNCTION void operator() (Tag_potential_cell, const member_type& teamMember, double& V) const;
 
     // force calculation
     struct force {};
     struct Tag_force_inner_parallel {};
     struct Tag_force_MIC_inner_parallel {};
     struct Tag_force_AMIC_inner_parallel {};
+    struct Tag_force_cell {};
 
     std::function<void()>  force_strategy;
     void compute_force_all_inner_parallel();
     void compute_force_MICAIP();
     void compute_force_AMICAIP();
+    void compute_force_cell_list();
     void compute_force() override {
         force_strategy();
     };
@@ -122,6 +140,18 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_force_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_AMIC_inner_parallel, const member_type& teamMember) const;
+    KOKKOS_FUNCTION void operator() (Tag_force_cell, const member_type& teamMember) const;
+
+    // Cell list
+    void init_cell_list(YAML::Node& doc);
+    void populate_cell_list();
+    int compute_cell_index(double x, double y, double z) const;
+
+    struct Tag_populate_cell_list {};
+
+    KOKKOS_FUNCTION void operator()(Tag_populate_cell_list, const int i) const;
+    KOKKOS_FUNCTION void compute_inner_potential(int particle_i, int particle_j, int type_p_i, double& local_innerV) const;
+    KOKKOS_INLINE_FUNCTION int compute_neighbor_cell_index(int cell_index, int dx, int dy, int dz) const;
 
 
     // Destructor
