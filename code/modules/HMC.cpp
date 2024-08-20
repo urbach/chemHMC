@@ -5,7 +5,7 @@
 
 void HMC_class::init(int argc, char** argv, bool check_overwrite) {
 
-    YAML::Node doc = read_params(argc, argv);
+    doc = read_params(argc, argv);
     params = params_class(doc, check_overwrite);
 
     if (doc["integrator"]) {
@@ -47,6 +47,12 @@ double HMC_class::gen_random() {
 void HMC_class::run() {
 
     Kokkos::Timer timer;
+    
+    // perform a loose energy minimization to remove energy hotspots
+    if (doc["minimization"]) {
+        integrator->particles->minimize_energy(doc);
+    }
+    
     if (integrator->particles->algorithm == "verlet_list") integrator->particles->build_verlet_list();
     double Vi = integrator->particles->compute_potential();
 
@@ -121,3 +127,4 @@ void HMC_class::run() {
     printf("time for HMC: %g  s\n", timer.seconds());
 
 }
+

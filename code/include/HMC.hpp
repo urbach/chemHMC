@@ -1,6 +1,7 @@
 #ifndef HMC_H
 #define HMC_H
 #include "read_infile.hpp"
+#include "yaml-cpp/yaml.h"
 #include "particles_type.hpp"
 #include "particles.hpp"
 #include "integrator.hpp"
@@ -14,6 +15,7 @@ public:
     int save_every;
     int acceptance;
     bool randomize_traj = false;
+    YAML::Node doc;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
     params_class params;
@@ -23,7 +25,5 @@ public:
 
     void run();
     double gen_random();
-
-    void measure();
 };
 #endif // !HMC_H

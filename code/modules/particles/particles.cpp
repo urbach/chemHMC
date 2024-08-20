@@ -274,7 +274,7 @@ void particles_instance::init_verlet_list(YAML::Node& doc) {
     if (doc["particles"]["MaxNeighbors"]) {
         max_neighbors = check_and_assign_value<int>(doc["particles"], "MaxNeighbors");
     } else {
-        max_neighbors = 50; // A typical number; adjust as needed.
+        max_neighbors = 50; // should be replaced by good estimate
     }
     
     verlet_list = Kokkos::View<int**>("verlet_list", N, max_neighbors);
@@ -528,4 +528,36 @@ void particles_instance::operator() (hbTag, const int i) const {
     p(i, 1) = rgen.normal() * Kokkos::sqrt(mass / beta);
     p(i, 2) = rgen.normal() * Kokkos::sqrt(mass / beta);
     rand_pool.free_state(rgen);
+}
+
+void particles_instance::minimize_energy(YAML::Node& doc) {
+
+    // get config
+    int max_iter = 0;
+    if (doc["minimization"]["max_iter"]) {
+        max_iter = check_and_assign_value<int>(doc["minimization"],"max_iter");
+    } else {
+        max_iter = 1000; //default value for maximum iterations
+    }
+    double tolerance = 0.0;
+    if (doc["minimization"]["tolerance"]) {
+        tolerance = check_and_assign_value<double>(doc["minimization"],"tolerance");
+    } else {
+        tolerance = 1e-6; //default value for energy tolerance
+    }
+    double dt = 5 * check_and_assign_value<double>(doc["integrator"],"dt");
+    // get initial potential energy
+    if (algorithm == "verlet_list") build_verlet_list();
+    double V = compute_potential();
+    double V_new;
+    // Start energy minimization
+    for (int i = 0; i < max_iter; i++) {
+        Kokkos::deep_copy(p,0);
+        compute_force();
+        update_momenta(dt);
+        update_positions(dt);
+        V_new = compute_potential();
+        if(abs(V_new - V) < tolerance) break;
+        V = V_new;
+    }
 }

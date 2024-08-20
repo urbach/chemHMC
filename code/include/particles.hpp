@@ -130,6 +130,9 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_verlet, const member_type& teamMember, double& V) const;
 
 
+    void minimize_energy(YAML::Node& doc) override;
+
+
     // force calculation
     struct force {};
     struct Tag_force_inner_parallel {};
@@ -172,6 +175,10 @@ public:
     struct Tag_build_verlet_list {};
 
     KOKKOS_FUNCTION void operator() (Tag_build_verlet_list, const member_type& teamMember) const;
+
+
+    
+
 
     // Destructor
     ~particles_instance() {};
