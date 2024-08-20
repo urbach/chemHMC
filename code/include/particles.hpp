@@ -49,6 +49,11 @@ public:
     Kokkos::View<int*> cell_count; // Store the number of particles in each cell
     Kokkos::View<int*>::HostMirror h_cell_count;
 
+    // verlet_list related stuff
+    Kokkos::View<int*> neighbour_count;
+    Kokkos::View<int*>::HostMirror h_neighbour_count;
+    Kokkos::View<int**> verlet_list;
+    Kokkos::View<int**>::HostMirror h_verlet_list;
 
     // constructor
     particles_instance(YAML::Node doc, params_class params);
@@ -102,12 +107,14 @@ public:
     struct Tag_potential_MIC_inner_parallel {};
     struct Tag_potential_AMIC_inner_parallel {};
     struct Tag_potential_cell {};
+    struct Tag_potential_verlet {};
 
     std::function<double()>  potential_strategy;
     double potential_all_neighbour_inner_parallel();
     double potential_MICAIP(); ///< all_neighbour_inner_parallel with minimum image convention
     double potential_AMICAIP();
     double potential_cell_list();
+    double potential_verlet_list();
     double compute_potential() override {
         return potential_strategy();
     };
@@ -120,6 +127,8 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_MIC_inner_parallel, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_cell, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_verlet, const member_type& teamMember, double& V) const;
+
 
     // force calculation
     struct force {};
@@ -127,12 +136,14 @@ public:
     struct Tag_force_MIC_inner_parallel {};
     struct Tag_force_AMIC_inner_parallel {};
     struct Tag_force_cell {};
+    struct Tag_force_verlet {};
 
     std::function<void()>  force_strategy;
     void compute_force_all_inner_parallel();
     void compute_force_MICAIP();
     void compute_force_AMICAIP();
     void compute_force_cell_list();
+    void compute_force_verlet_list();
     void compute_force() override {
         force_strategy();
     };
@@ -141,6 +152,7 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_AMIC_inner_parallel, const member_type& teamMember) const;
     KOKKOS_FUNCTION void operator() (Tag_force_cell, const member_type& teamMember) const;
+    KOKKOS_FUNCTION void operator() (Tag_force_verlet, const member_type& teamMember) const;
 
     // Cell list
     void init_cell_list(YAML::Node& doc);
@@ -150,9 +162,16 @@ public:
     struct Tag_populate_cell_list {};
 
     KOKKOS_FUNCTION void operator()(Tag_populate_cell_list, const int i) const;
-    KOKKOS_FUNCTION void compute_inner_potential(int particle_i, int particle_j, int type_p_i, double& local_innerV) const;
     KOKKOS_INLINE_FUNCTION int compute_neighbor_cell_index(int cell_index, int dx, int dy, int dz) const;
 
+
+    // Verlet list
+    void init_verlet_list(YAML::Node& doc);
+    void build_verlet_list() override;
+
+    struct Tag_build_verlet_list {};
+
+    KOKKOS_FUNCTION void operator() (Tag_build_verlet_list, const member_type& teamMember) const;
 
     // Destructor
     ~particles_instance() {};

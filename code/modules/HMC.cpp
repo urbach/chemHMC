@@ -47,6 +47,7 @@ double HMC_class::gen_random() {
 void HMC_class::run() {
 
     Kokkos::Timer timer;
+    if (integrator->particles->algorithm == "verlet_list") integrator->particles->build_verlet_list();
     double Vi = integrator->particles->compute_potential();
 
     double beta = integrator->particles->get_beta();
@@ -68,6 +69,9 @@ void HMC_class::run() {
         if (randomize_traj) {
             integrator->set_binomial_steps(gen64);
             printf("trajectory: steps= %d  dt= %g  traj_len= %g\n", integrator->steps, integrator->dt, integrator->steps * integrator->dt);
+        }
+        if (integrator->particles->algorithm == "verlet_list") {
+            integrator->particles->build_verlet_list();
         }
         integrator->integrate();
 

@@ -249,6 +249,12 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         potential_without_binning_strategy = std::bind(&particles_instance::potential_cell_list, this);
         force_strategy = std::bind(&particles_instance::compute_force_cell_list, this);
     }
+    else if (algorithm.compare("verlet_list") == 0) {
+        particles_instance::init_verlet_list(doc);
+        potential_strategy = std::bind(&particles_instance::potential_verlet_list, this);
+        potential_without_binning_strategy = std::bind(&particles_instance::potential_verlet_list, this);
+        force_strategy = std::bind(&particles_instance::compute_force_verlet_list, this);
+    }
     else if (algorithm.compare("parallel_binning") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
         Kokkos::abort("aborting");
@@ -261,6 +267,24 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
         Kokkos::abort("aborting");
     }
+}
+
+void particles_instance::init_verlet_list(YAML::Node& doc) {
+    int max_neighbors;
+    if (doc["particles"]["MaxNeighbors"]) {
+        max_neighbors = check_and_assign_value<int>(doc["particles"], "MaxNeighbors");
+    } else {
+        max_neighbors = 50; // A typical number; adjust as needed.
+    }
+    
+    verlet_list = Kokkos::View<int**>("verlet_list", N, max_neighbors);
+    h_verlet_list = Kokkos::create_mirror_view(verlet_list);
+
+    Kokkos::deep_copy(h_verlet_list, 0);
+    Kokkos::deep_copy(verlet_list, h_verlet_list);
+
+    neighbour_count = Kokkos::View<int*>("neighbour_count", N);
+    h_neighbour_count = Kokkos::create_mirror_view(neighbour_count);
 }
 
 void particles_instance::init_cell_list(YAML::Node& doc) {
@@ -312,7 +336,6 @@ void particles_instance::init_cell_list(YAML::Node& doc) {
     Kokkos::deep_copy(cell_count, h_cell_count);
     Kokkos::deep_copy(cell_list, 0);
 }
-
 
 void particles_instance::assign_ids() {
     // this function reads in the atom types from the start_configuration_file

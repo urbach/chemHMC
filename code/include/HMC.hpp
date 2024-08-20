@@ -2,6 +2,7 @@
 #define HMC_H
 #include "read_infile.hpp"
 #include "particles_type.hpp"
+#include "particles.hpp"
 #include "integrator.hpp"
 #include <random>
 
