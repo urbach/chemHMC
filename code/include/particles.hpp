@@ -55,6 +55,14 @@ public:
     Kokkos::View<int**> verlet_list;
     Kokkos::View<int**>::HostMirror h_verlet_list;
 
+
+    // bond related stuff
+    Kokkos::View<int*[3]> bond_list;
+    Kokkos::View<int*[3]>::HostMirror h_bond_list;
+    Kokkos::View<double*[2]> bond_parameters;
+    Kokkos::View<double*[2]>::HostMirror h_bond_parameters;
+
+
     // constructor
     particles_instance(YAML::Node doc, params_class params);
 
@@ -177,7 +185,25 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_build_verlet_list, const member_type& teamMember) const;
 
 
-    
+    // Ewald sum
+    double ewald_alpha;
+    int k_max;
+    int ewald_n_max;
+    Kokkos::View<double*> charge;
+    Kokkos::View<double*>::HostMirror h_charge;
+
+    void init_ewald_sum(YAML::Node& doc);
+    double potential_ewald_sum();
+    double compute_ewald_real();
+    double compute_ewald_reciprocal();
+    double compute_ewald_self();
+
+    struct Tag_potential_ewald_real {};
+    struct Tag_potential_ewald_reciprocal {};
+    struct Tag_potential_ewald_self {};
+    KOKKOS_FUNCTION void operator() (Tag_potential_ewald_real, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_ewald_reciprocal, const member_type& teamMember, double& V) const;
+    KOKKOS_FUNCTION void operator() (Tag_potential_ewald_self, const member_type& teamMember, double& V) const;
 
 
     // Destructor

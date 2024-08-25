@@ -24,14 +24,10 @@ particles_instance::particles_instance(YAML::Node doc, params_class params) :
     // generate mixed pair parameters
     mix_parameters(doc);
 
-    mass = check_and_assign_value<double>(doc["particles"], "mass");
     beta = check_and_assign_value<double>(doc["particles"], "beta");
     sbeta = sqrt(beta);
     cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
     cutoff_squared = cutoff * cutoff;
-    eps = check_and_assign_value<double>(doc["particles"], "eps");
-    sigma = check_and_assign_value<double>(doc["particles"], "sigma");
-    name_xyz = check_and_assign_value<std::string>(doc["particles"], "name_xyz");
     start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
 
     // get inverse halved box size (needed for MIC algorithm)
@@ -98,10 +94,10 @@ void particles_instance::read_xyz(params_class params) {
         count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
         // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
     }
-    if (name_xyz.compare(id) != 0) {
+    /*if (name_xyz.compare(id) != 0) {
         printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
         Kokkos::abort("abort");
-    } 
+    }*/ 
     // printf("%d  %d\n", count, N);
     if (count != N * 4) { Kokkos::abort("error in reading the file"); }
     fclose(file);
@@ -254,6 +250,12 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         potential_strategy = std::bind(&particles_instance::potential_verlet_list, this);
         potential_without_binning_strategy = std::bind(&particles_instance::potential_verlet_list, this);
         force_strategy = std::bind(&particles_instance::compute_force_verlet_list, this);
+    }
+    else if (algorithm.compare("ewald_sum") == 0) {
+        particles_instance::init_ewald_sum(doc);
+        potential_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
+        potential_without_binning_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
+        force_strategy = std::bind(&particles_instance::compute_force_all_inner_parallel, this);
     }
     else if (algorithm.compare("parallel_binning") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
@@ -524,9 +526,9 @@ void particles_instance::operator() (hbTag, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
     // we need to divide by sqrt(2) in order to have exp(-p^2)
     // normal() produced distribution exp(-p^2/2)
-    p(i, 0) = rgen.normal() * Kokkos::sqrt(mass / beta);
-    p(i, 1) = rgen.normal() * Kokkos::sqrt(mass / beta);
-    p(i, 2) = rgen.normal() * Kokkos::sqrt(mass / beta);
+    p(i, 0) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]-1].mass / beta);
+    p(i, 1) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]-1].mass / beta);
+    p(i, 2) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]-1].mass / beta);
     rand_pool.free_state(rgen);
 }
 
