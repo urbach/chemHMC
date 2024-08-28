@@ -208,6 +208,7 @@ void particles_instance::mix_parameters(YAML::Node& doc) {
             h_epsilon_mat(j, i) = epsilon;
             h_sigma_mat(i, j) = sigma;
             h_sigma_mat(j, i) = sigma;
+            printf("i: %d j: %d eps: %f sig: %f",i,j,epsilon,sigma);
         }
 
     }
@@ -255,7 +256,14 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         particles_instance::init_ewald_sum(doc);
         potential_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
         potential_without_binning_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
-        force_strategy = std::bind(&particles_instance::compute_force_all_inner_parallel, this);
+        force_strategy = std::bind(&particles_instance::compute_force_AMICAIP, this);
+    }
+    else if (algorithm.compare("bonds_angles") == 0) {
+        particles_instance::init_verlet_list(doc);
+        particles_instance::read_bonds_angles("data.lmp");
+        potential_strategy = std::bind(&particles_instance::potential_bonds_angles, this);
+        potential_without_binning_strategy = std::bind(&particles_instance::potential_bonds_angles, this);
+        force_strategy = std::bind(&particles_instance::compute_force_bonds_angles, this);
     }
     else if (algorithm.compare("parallel_binning") == 0) {
         printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
@@ -403,7 +411,7 @@ void particles_instance::InitX(params_class params) {
 }
 
 void particles_instance::compute_coeff_momenta() {
-    coeff_p = beta;
+    coeff_p = 1.0;//beta;
 }
 
 void particles_instance::compute_coeff_position() {
@@ -414,7 +422,7 @@ void particles_instance::compute_coeff_position() {
     
     //Since we have different particles we need to compute one coefficient for each type
     for(int i = 0;i < h_atom_type_list.extent(0);i++) {
-        h_coeff_x[i] = beta / (h_atom_type_list[i].mass);
+        h_coeff_x[i] = 1.0 / (h_atom_type_list[i].mass);//beta / (h_atom_type_list[i].mass);
     }
 
     //copy to device
@@ -547,9 +555,10 @@ void particles_instance::minimize_energy(YAML::Node& doc) {
     } else {
         tolerance = 1e-6; //default value for energy tolerance
     }
-    double dt = 5 * check_and_assign_value<double>(doc["integrator"],"dt");
+    double dt = check_and_assign_value<double>(doc["integrator"],"dt");
     // get initial potential energy
     if (algorithm == "verlet_list") build_verlet_list();
+    if (algorithm == "bonds_angles") build_bondless_verlet_list();
     double V = compute_potential();
     double V_new;
     // Start energy minimization

@@ -77,6 +77,7 @@ public:
     virtual void update_momenta(const double dt_) = 0;
     virtual void update_positions(const double dt_) = 0;
     virtual void build_verlet_list() = 0;
+    virtual void build_bondless_verlet_list() = 0;
     virtual void minimize_energy(YAML::Node& doc) = 0;
     KOKKOS_INLINE_FUNCTION void lextoc(int ib, int& bx, int& by, int& bz) const {
         bz = ib / (nbin[0] * nbin[1]);

@@ -469,7 +469,6 @@ int particles_instance::compute_cell_index(double x, double y, double z) const {
 
 double particles_instance::potential_verlet_list() {
     double result = 0.0;
-    // rebuild verlet list after every step
     Kokkos::parallel_reduce("particles-LJ-potential-verlet-list",
         Kokkos::TeamPolicy<Tag_potential_verlet>(N, Kokkos::AUTO), *this, result);
     //printf("RESULT: %f \n", result);
@@ -568,7 +567,7 @@ void particles_instance::build_verlet_list() {
     /* Kokkos::deep_copy(h_neighbour_count, neighbour_count);
     for (int i = 0; i < N; i++) {
         printf("COUNT: %d \n", h_neighbour_count(i));
-    } */
+    }*/
 }
 
 KOKKOS_FUNCTION

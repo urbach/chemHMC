@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
 
         doc["particles"]["algorithm"] = "AMIC";
         particles1 = new particles_instance(doc, params);
-        doc["particles"]["algorithm"] = "verlet_list";
+        doc["particles"]["algorithm"] = "bonds_angles";
         particles2 = new particles_instance(doc,params);
         
         //// init the positions

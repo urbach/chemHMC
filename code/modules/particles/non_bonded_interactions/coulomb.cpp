@@ -19,16 +19,14 @@ void particles_instance::init_ewald_sum(YAML::Node& doc) {
     Kokkos::deep_copy(charge, h_charge);
 }
 
-
 double particles_instance::potential_ewald_sum() {
-    const double conversion_factor = 332.062934; //conversion to kcal/mol
+    const double conversion_factor = 1.0;//332.062934; //conversion to kcal/mol
     double V_real = compute_ewald_real();
     double V_reciprocal = compute_ewald_reciprocal();
     double V_self = compute_ewald_self();
 
-    double E_ewald = conversion_factor*(V_real + V_reciprocal + V_self);
+    return conversion_factor*(V_real + V_reciprocal + V_self);
 }
-
 
 double particles_instance::compute_ewald_real() {
     double result = 0.0;
@@ -69,7 +67,6 @@ void particles_instance::operator() (Tag_potential_ewald_real, const member_type
         V += tmpV;
     });
 }
-
 
 double particles_instance::compute_ewald_reciprocal() {
     double result = 0.0;
@@ -121,7 +118,7 @@ double particles_instance::compute_ewald_self() {
     Kokkos::parallel_reduce("ewald-self-energy",
         Kokkos::TeamPolicy<Tag_potential_ewald_self>(N, Kokkos::AUTO), *this, result);
 
-    return -ewald_alpha * result / sqrt(M_PI);  // The negative sign accounts for self-interaction correction
+    return -ewald_alpha * result / sqrt(M_PI);  // The negative sign accounts for self-interaction
 }
 
 KOKKOS_FUNCTION

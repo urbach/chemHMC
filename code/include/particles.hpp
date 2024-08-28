@@ -10,6 +10,37 @@
 #include <Kokkos_Core.hpp>
 #include "particles_type.hpp"
 
+// Structure to hold bond type data
+struct BondType {
+    int type;
+    double k;    // Force constant
+    double r0;   // Equilibrium distance
+};
+
+// Structure to hold angle type data
+struct AngleType {
+    int type;
+    double k;    // Force constant
+    double theta0; // Equilibrium angle (in degrees)
+};
+
+// Structure to hold bond data
+struct Bond {
+    int id;
+    int type;
+    int atom1;
+    int atom2;
+};
+
+// Structure to hold angle data
+struct Angle {
+    int id;
+    int type;
+    int atom1;
+    int atom2;
+    int atom3;
+};
+
 class particles_instance : public particles_type {
 
 public:
@@ -204,6 +235,41 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_ewald_real, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_ewald_reciprocal, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_ewald_self, const member_type& teamMember, double& V) const;
+
+
+    // Bonds/angles
+    void read_bonds_angles(const std::string& filename);
+    Kokkos::View<Bond*> bonds;
+    Kokkos::View<Bond*>::HostMirror h_bonds;
+    Kokkos::View<BondType*> bondTypes;
+    Kokkos::View<BondType*>::HostMirror h_bondTypes;
+    Kokkos::View<AngleType*> angleTypes;
+    Kokkos::View<AngleType*>::HostMirror h_angleTypes;
+    Kokkos::View<Angle*> angles;
+    Kokkos::View<Angle*>::HostMirror h_angles;
+
+    double potential_bonds_angles();
+
+    void build_bondless_verlet_list() override;
+    struct Tag_verlet_remove_bonds {};
+    KOKKOS_FUNCTION void operator() (Tag_verlet_remove_bonds, const member_type& teamMember) const;
+
+    double potential_bonds();
+    struct Tag_potential_bonds {};
+    KOKKOS_FUNCTION void operator() (Tag_potential_bonds, const member_type& team_member, double& V) const;
+
+    double potential_angles();
+    struct Tag_potential_angles {};
+    KOKKOS_FUNCTION void operator() (Tag_potential_angles, const member_type& team_member, double& V) const;
+    
+    void compute_force_bonds_angles();
+    void compute_force_bonds();
+    struct Tag_force_bonds {};
+    KOKKOS_FUNCTION void operator() (Tag_force_bonds, const member_type& team_member) const;
+
+    void compute_force_angles();
+    struct Tag_force_angles {};
+    KOKKOS_FUNCTION void operator() (const int i)const;
 
 
     // Destructor

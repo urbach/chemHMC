@@ -54,6 +54,7 @@ void HMC_class::run() {
     }
     
     if (integrator->particles->algorithm == "verlet_list") integrator->particles->build_verlet_list();
+    if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
     double Vi = integrator->particles->compute_potential();
 
     double beta = integrator->particles->get_beta();
@@ -79,6 +80,7 @@ void HMC_class::run() {
         if (integrator->particles->algorithm == "verlet_list") {
             integrator->particles->build_verlet_list();
         }
+        if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
         integrator->integrate();
 
         // accept/reject
