@@ -7,156 +7,248 @@
 #include <sstream>
 
 void particles_instance::read_bonds_angles(const std::string& filename) {
-    // parser for lammps style datafiles
     std::ifstream infile(filename);
     std::string line;
 
-    int numBonds = 0, numAngles = 0, numBondTypes = 0, numAngleTypes = 0;
+    int numBonds = 0, numAngles = 0, numDihedrals = 0;
+    int numBondTypes = 0, numAngleTypes = 0, numDihedralTypes;
 
     while (std::getline(infile, line)) {
         std::istringstream iss(line);
         std::string keyword;
         int count;
         
-        iss >> count >> keyword;
+        // Read the entire line and check for keywords
+        if (iss >> count) {
+            std::getline(iss, keyword);  // Get the rest of the line as the keyword
 
-        if (keyword == "bonds") {
-            numBonds = count;
-        } else if (keyword == "angles") {
-            numAngles = count;
-        } else if (keyword == "BondTypes") {
-            numBondTypes = count;
-        } else if (keyword == "AngleTypes") {
-            numAngleTypes = count;
-        }
+            // Trim leading whitespace from keyword
+            keyword = keyword.substr(keyword.find_first_not_of(" \t"));
 
-        if (numBonds > 0 && numAngles > 0 && numBondTypes > 0 && numAngleTypes > 0) {
-            break;
+            if (keyword == "bonds") {
+                numBonds = count;
+            } else if (keyword == "angles") {
+                numAngles = count;
+            } else if (keyword == "dihedrals") {
+                numDihedrals = count;
+            } else if (keyword == "atom types") {
+                // Just skipping atom types for now
+            } else if (keyword == "bond types") {
+                numBondTypes = count;
+            } else if (keyword == "angle types") {
+                numAngleTypes = count;
+            } else if (keyword == "dihedral types") {
+                numDihedralTypes = count;
+            }
         }
     }
 
     bonds = Kokkos::View<Bond*>("bonds", numBonds);
     angles = Kokkos::View<Angle*>("angles", numAngles);
+    dihedrals = Kokkos::View<Dihedral*>("dihedrals", numDihedrals);
     bondTypes = Kokkos::View<BondType*>("bondTypes", numBondTypes);
     angleTypes = Kokkos::View<AngleType*>("angleTypes", numAngleTypes);
+    dihedralTypes = Kokkos::View<DihedralType*>("dihedralTypes", numDihedralTypes);
 
     h_bonds = Kokkos::create_mirror_view(bonds);
     h_angles = Kokkos::create_mirror_view(angles);
+    h_dihedrals = Kokkos::create_mirror_view(dihedrals);
     h_bondTypes = Kokkos::create_mirror_view(bondTypes);
     h_angleTypes = Kokkos::create_mirror_view(angleTypes);
+    h_dihedralTypes = Kokkos::create_mirror_view(dihedralTypes);
 
-    bool inBondSection = false, inAngleSection = false, inBondTypeSection = false, inAngleTypeSection = false;
+    bool inBondSection = false, inAngleSection = false, inDihedralSection = false;
+    bool inBondTypeSection = false, inAngleTypeSection = false, inDihedralTypeSection = false;
 
-    int bondIndex = 0, angleIndex = 0, bondTypeIndex = 0, angleTypeIndex = 0;
+    int bondIndex = 0, angleIndex = 0, dihedralIndex = 0;
+    int bondTypeIndex = 0, angleTypeIndex = 0, dihedralTypeIndex = 0;
+
+    infile.clear();  // Reset the stream to start reading again
+    infile.seekg(0); // Go back to the beginning of the file
 
     while (std::getline(infile, line)) {
         if (line.empty()) continue;
         std::istringstream iss(line);
 
-        // Read Bond Types section
-        if (line.find("Bond Types") != std::string::npos) {
+        // Section identification
+        if (line.find("Bond Coeffs") != std::string::npos) {
             inBondTypeSection = true;
             inAngleTypeSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
             inBondSection = false;
             inAngleSection = false;
             continue;
         }
-
-        // Read Angle Types section
-        if (line.find("Angle Types") != std::string::npos) {
+        if (line.find("Angle Coeffs") != std::string::npos) {
             inAngleTypeSection = true;
             inBondTypeSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
             inBondSection = false;
             inAngleSection = false;
             continue;
         }
-
-        // Read Bonds section
+        if (line.find("Dihedral Coeffs") != std::string::npos) {
+            inAngleTypeSection = false;
+            inBondTypeSection = false;
+            inDihedralTypeSection = true;
+            inDihedralSection = false;
+            inBondSection = false;
+            inAngleSection = false;
+            continue;
+        }
         if (line.find("Bonds") != std::string::npos) {
             inBondSection = true;
             inAngleSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
             inBondTypeSection = false;
             inAngleTypeSection = false;
             continue;
         }
-
-        // Read Angles section
         if (line.find("Angles") != std::string::npos) {
             inAngleSection = true;
             inBondSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
+            inBondTypeSection = false;
+            inAngleTypeSection = false;
+            continue;
+        }
+        if (line.find("Dihedrals") != std::string::npos) {
+            inBondSection = false;
+            inAngleSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = true;
             inBondTypeSection = false;
             inAngleTypeSection = false;
             continue;
         }
 
-        // Parse bond type data if in Bond Types section
+
+        // Parse bond type data
         if (inBondTypeSection && bondTypeIndex < numBondTypes) {
             int type;
             double k, r0;
-            iss >> type >> k >> r0;
-            h_bondTypes(bondTypeIndex).type = type;
-            h_bondTypes(bondTypeIndex).k = k;
-            h_bondTypes(bondTypeIndex).r0 = r0;
-            bondTypeIndex++;
+            if (iss >> type >> k >> r0) {
+                h_bondTypes(bondTypeIndex).type = type;
+                h_bondTypes(bondTypeIndex).k = k;
+                h_bondTypes(bondTypeIndex).r0 = r0;
+                bondTypeIndex++;
+            }
         }
 
-        // Parse angle type data if in Angle Types section
+        // Parse angle type data
         if (inAngleTypeSection && angleTypeIndex < numAngleTypes) {
             int type;
             double k, theta0;
-            iss >> type >> k >> theta0;
-            h_angleTypes(angleTypeIndex).type = type;
-            h_angleTypes(angleTypeIndex).k = k;
-            h_angleTypes(angleTypeIndex).theta0 = theta0 * M_PI/180.0;
-            angleTypeIndex++;
+            if (iss >> type >> k >> theta0) {
+                h_angleTypes(angleTypeIndex).type = type;
+                h_angleTypes(angleTypeIndex).k = k;
+                h_angleTypes(angleTypeIndex).theta0 = theta0 * M_PI/180.0;
+                angleTypeIndex++;
+            }
         }
 
-        // Parse bond data if in Bonds section
+        // Parse dihedral type data
+        if (inDihedralTypeSection && dihedralTypeIndex < numDihedralTypes) {
+            int type;
+            double k1, k2, k3, k4;
+            if (iss >> type >> k1 >> k2 >> k3 >> k4) {
+                h_dihedralTypes(dihedralTypeIndex).type = type;
+                h_dihedralTypes(dihedralTypeIndex).k1 = k1;
+                h_dihedralTypes(dihedralTypeIndex).k2 = k2;
+                h_dihedralTypes(dihedralTypeIndex).k3 = k3;
+                h_dihedralTypes(dihedralTypeIndex).k4 = k4;
+                dihedralTypeIndex++;
+            }
+        }
+
+        // Parse bond data
         if (inBondSection && bondIndex < numBonds) {
             int id, type, atom1, atom2;
-            iss >> id >> type >> atom1 >> atom2;
-            h_bonds(bondIndex).id = id;
-            h_bonds(bondIndex).type = type;
-            h_bonds(bondIndex).atom1 = atom1;
-            h_bonds(bondIndex).atom2 = atom2;
-            bondIndex++;
+            if (iss >> id >> type >> atom1 >> atom2) {
+                h_bonds(bondIndex).id = id;
+                h_bonds(bondIndex).type = type;
+                h_bonds(bondIndex).atom1 = atom1;
+                h_bonds(bondIndex).atom2 = atom2;
+                bondIndex++;
+            }
         }
 
-        // Parse angle data if in Angles section
+        // Parse angle data
         if (inAngleSection && angleIndex < numAngles) {
             int id, type, atom1, atom2, atom3;
-            iss >> id >> type >> atom1 >> atom2 >> atom3;
-            h_angles(angleIndex).id = id;
-            h_angles(angleIndex).type = type;
-            h_angles(angleIndex).atom1 = atom1;
-            h_angles(angleIndex).atom2 = atom2;
-            h_angles(angleIndex).atom3 = atom3;
-            angleIndex++;
+            if (iss >> id >> type >> atom1 >> atom2 >> atom3) {
+                h_angles(angleIndex).id = id;
+                h_angles(angleIndex).type = type;
+                h_angles(angleIndex).atom1 = atom1;
+                h_angles(angleIndex).atom2 = atom2;
+                h_angles(angleIndex).atom3 = atom3;
+                angleIndex++;
+            }
+        }
+
+        // Parse dihedral data
+        if (inDihedralSection && dihedralIndex < numDihedrals) {
+            int id, type, atom1, atom2, atom3, atom4;
+            if (iss >> id >> type >> atom1 >> atom2 >> atom3 >> atom4) {
+                h_dihedrals(dihedralIndex).id = id;
+                h_dihedrals(dihedralIndex).type = type;
+                h_dihedrals(dihedralIndex).atom1 = atom1;
+                h_dihedrals(dihedralIndex).atom2 = atom2;
+                h_dihedrals(dihedralIndex).atom3 = atom3;
+                h_dihedrals(dihedralIndex).atom4 = atom4;
+                dihedralIndex++;
+            }
         }
     }
 
     // Copy data to device
     Kokkos::deep_copy(bonds, h_bonds);
     Kokkos::deep_copy(angles, h_angles);
+    Kokkos::deep_copy(dihedrals, h_dihedrals);
     Kokkos::deep_copy(bondTypes, h_bondTypes);
     Kokkos::deep_copy(angleTypes, h_angleTypes);
+    Kokkos::deep_copy(dihedralTypes, h_dihedralTypes);
 
-    // Output the counts and confirm the data read
-    std::cout << "Number of Bonds: " << numBonds << std::endl;
+    /*std::cout << "Number of Bonds: " << numBonds << std::endl;
     std::cout << "Number of Angles: " << numAngles << std::endl;
+    std::cout << "Number of Dihedrals: " << numDihedrals << std::endl;
     std::cout << "Actual Bonds Read: " << bondIndex << std::endl;
     std::cout << "Actual Angles Read: " << angleIndex << std::endl;
+    std::cout << "Actual Dihedrals Read: " << dihedralIndex << std::endl;
     std::cout << "Number of Bond Types: " << numBondTypes << std::endl;
     std::cout << "Number of Angle Types: " << numAngleTypes << std::endl;
+    std::cout << "Number of Dihedral Types: " << numDihedralTypes << std::endl;
 
     for (int i = 0; i < bonds.extent(0); i++) {
         printf("bond number: %d \n", i);
-        printf("atom1: %d atom2: %d k: %f r0: %f\n",h_bonds(i).atom1,h_bonds(i).atom2,h_bondTypes(h_bonds(i).type-1).k,h_bondTypes(h_bonds(i).type-1).r0);
+        printf("bond type: %d \n", h_bonds(i).type);
+        printf("atom1: %d atom2: %d k: %f r0: %f\n", h_bonds(i).atom1, h_bonds(i).atom2, h_bondTypes(h_bonds(i).type-1).k, h_bondTypes(h_bonds(i).type-1).r0);
     }
-    for (int i = 0; i < angles.extent(0); i++) {
-        printf("bond number: %d \n", i);
-        printf("atom1: %d atom2: %d atom3: %d k: %f theta0: %f\n",h_angles(i).atom1,h_angles(i).atom2,h_angles(i).atom3,h_angleTypes(h_angles(i).type-1).k,h_angleTypes(h_angles(i).type-1).theta0);
+    
+    for (int i = 0; i < bondTypes.extent(0); i++) {
+        printf("bond type number: %d \n", i);
+        printf("type: %d k: %f r0: %f\n", h_bondTypes(i).type, h_bondTypes(i).k, h_bondTypes(i).r0);
     }
+    
+    */for (int i = 0; i < angles.extent(0); i++) {
+        printf("angle number: %d \n", i);
+        printf("atom1: %d atom2: %d atom3: %d k: %f theta0: %f\n", h_angles(i).atom1, h_angles(i).atom2, h_angles(i).atom3, h_angleTypes(h_angles(i).type-1).k, h_angleTypes(h_angles(i).type-1).theta0);
+    }/*
+    printf("EXTENT: %d", dihedrals.extent(0));
+    for (int i = 0; i < dihedrals.extent(0); i++) {
+        printf("dihedral number: %d \n", i);
+        printf("atom1: %d atom2: %d atom3: %d atom4: %d\n", h_dihedrals(i).atom1, h_dihedrals(i).atom2, h_dihedrals(i).atom3, h_dihedrals(i).atom4);
+    }
+
+    for (int i = 0; i < dihedralTypes.extent(0); i++) {
+        printf("dihedral number: %d \n", i);
+        printf("atom1: %f atom2: %f atom3: %f atom4: %f\n", h_dihedralTypes(i).k1, h_dihedralTypes(i).k2, h_dihedralTypes(i).k3, h_dihedralTypes(i).k4);
+    }*/
+
 }
 
 void particles_instance::compute_force_bonds_angles() {
@@ -288,20 +380,154 @@ void particles_instance::operator() (const int i) const {
     Kokkos::atomic_add(&f(atom3, 2), f3z);
 }
 
+void particles_instance::compute_force_dihedrals() {
+    Kokkos::parallel_for("dihedral-force",
+        Kokkos::TeamPolicy<Tag_force_dihedrals>(h_dihedrals.extent(0), Kokkos::AUTO), *this);
+}
+
+KOKKOS_FUNCTION
+void particles_instance::operator() (Tag_force_dihedrals, const member_type& team_member) const {
+    const int i = team_member.league_rank();
+
+    int atom1 = dihedrals(i).atom1 - 1;
+    int atom2 = dihedrals(i).atom2 - 1;
+    int atom3 = dihedrals(i).atom3 - 1;
+    int atom4 = dihedrals(i).atom4 - 1;
+    int type = dihedrals(i).type - 1;
+
+    double k1 = dihedralTypes(type).k1;
+    double k2 = dihedralTypes(type).k2;
+    double k3 = dihedralTypes(type).k3;
+    double k4 = dihedralTypes(type).k4;
+
+    // Positions of the atoms
+    double x1[3], x2[3], x3[3], x4[3];
+
+    for (int d = 0; d < 3; ++d) {
+        x1[d] = x(atom1,d);
+        x2[d] = x(atom2,d);
+        x3[d] = x(atom3,d);
+        x4[d] = x(atom4,d);
+    }
+
+    // Compute displacement vectors with periodic boundary conditions
+    double r12[3], r23[3], r34[3];
+
+    for (int d = 0; d < 3; ++d) {
+        double dx;
+        dx = x2[d] - x1[d];
+        dx -= round(dx * inverse_L[d]) * L[d];
+        r12[d] = dx;
+
+        dx = x3[d] - x2[d];
+        dx -= round(dx * inverse_L[d]) * L[d];
+        r23[d] = dx;
+
+        dx = x4[d] - x3[d];
+        dx -= round(dx * inverse_L[d]) * L[d];
+        r34[d] = dx;
+    }
+
+    // Compute bond vectors
+    double b1[3], b2[3], b3[3];
+    for (int d = 0; d < 3; ++d) {
+        b1[d] = r12[d];
+        b2[d] = r23[d];
+        b3[d] = r34[d];
+    }
+
+    // Compute cross products
+    double c1[3], c2[3], c1_mag2, c2_mag2, b2_mag2;
+    // c1 = b1 x b2
+    c1[0] = b1[1]*b2[2] - b1[2]*b2[1];
+    c1[1] = b1[2]*b2[0] - b1[0]*b2[2];
+    c1[2] = b1[0]*b2[1] - b1[1]*b2[0];
+
+    // c2 = b2 x b3
+    c2[0] = b2[1]*b3[2] - b2[2]*b3[1];
+    c2[1] = b2[2]*b3[0] - b2[0]*b3[2];
+    c2[2] = b2[0]*b3[1] - b2[1]*b3[0];
+
+    // Compute magnitudes squared
+    c1_mag2 = c1[0]*c1[0] + c1[1]*c1[1] + c1[2]*c1[2];
+    c2_mag2 = c2[0]*c2[0] + c2[1]*c2[1] + c2[2]*c2[2];
+    b2_mag2 = b2[0]*b2[0] + b2[1]*b2[1] + b2[2]*b2[2];
+
+    double c1_mag = sqrt(c1_mag2);
+    double c2_mag = sqrt(c2_mag2);
+
+    // Compute the dihedral angle phi
+    double cos_phi = (c1[0]*c2[0] + c1[1]*c2[1] + c1[2]*c2[2]) / (c1_mag * c2_mag + 1e-8);
+    cos_phi = fmin(fmax(cos_phi, -1.0), 1.0);  // Clamp to [-1,1]
+    double sin_phi = b2[0]*(c1[1]*c2[2] - c1[2]*c2[1]) + b2[1]*(c1[2]*c2[0] - c1[0]*c2[2]) + b2[2]*(c1[0]*c2[1] - c1[1]*c2[0]);
+    sin_phi /= (b2_mag2 * c1_mag * c2_mag + 1e-8);
+
+    double phi = atan2(sin_phi, cos_phi);
+
+    // Compute the derivative of the potential with respect to phi
+    double dV_dphi = k1 * sin(phi) - 2.0 * k2 * sin(2.0 * phi) + 3.0 * k3 * sin(3.0 * phi) - 4.0 * k4 * sin(4.0 * phi);
+
+    // Compute the forces on each atom
+    double df[4][3];  // Forces on atoms 1 to 4
+    double denom = b2_mag2 * c1_mag * c2_mag + 1e-8;
+
+    // Auxiliary terms for force calculations
+    double s1 = 1.0 / (c1_mag2 + 1e-8);
+    double s2 = 1.0 / (c2_mag2 + 1e-8);
+
+    // Calculate the gradients
+    for (int d = 0; d < 3; ++d) {
+        // Terms for atoms 1 and 4
+        double term1 = c1[d] * s1 * b2_mag2;
+        double term2 = c2[d] * s2 * b2_mag2;
+
+        // Atom 1
+        df[0][d] = -dV_dphi * b2_mag2 * term1 / denom;
+
+        // Atom 4
+        df[3][d] = dV_dphi * b2_mag2 * term2 / denom;
+
+        // Terms for atom 2
+        double b1_dot_b2 = b1[0]*b2[0] + b1[1]*b2[1] + b1[2]*b2[2];
+        double b3_dot_b2 = b3[0]*b2[0] + b3[1]*b2[1] + b3[2]*b2[2];
+
+        double term3 = (b1[d] - b2[d] * b1_dot_b2 / b2_mag2) * s1;
+        double term4 = (b3[d] - b2[d] * b3_dot_b2 / b2_mag2) * s2;
+
+        df[1][d] = -dV_dphi * (term3 * b2_mag2 - term1 * (b1_dot_b2 + b2_mag2)) / denom;
+        df[1][d] += dV_dphi * (term4 * b2_mag2 - term2 * b3_dot_b2) / denom;
+
+        // Atom 3
+        df[2][d] = -df[0][d] - df[1][d] - df[3][d];
+    }
+
+    // Update forces using atomic operations
+    for (int d = 0; d < 3; ++d) {
+        Kokkos::atomic_add(&f(atom1,d), df[0][d]);
+        Kokkos::atomic_add(&f(atom2,d), df[1][d]);
+        Kokkos::atomic_add(&f(atom3,d), df[2][d]);
+        Kokkos::atomic_add(&f(atom4,d), df[3][d]);
+    }
+}
+
 double particles_instance::potential_bonds_angles() {
     // add LJ-potential, since it doesnt make sense to compute bonds without it
-    double result = potential_verlet_list();
-    
-    result += potential_bonds();
-    result += potential_angles();
-    return result;
+    // double result = potential_verlet_list();
+    double result = 0.0;
+    double bond_energy = potential_bonds();
+    printf("bond_E: %f ",bond_energy);
+    double angle_energy = potential_angles();
+    printf("angle_energy: %f ",angle_energy);
+    double dihedral_energy = potential_dihedrals();
+    printf("dihedral_energy: %f ",dihedral_energy);
+
+    return bond_energy + angle_energy + dihedral_energy;
 }
 
 double particles_instance::potential_bonds() {
     double result = 0.0;
     Kokkos::parallel_reduce("bond-potential",
         Kokkos::TeamPolicy<Tag_potential_bonds>(h_bonds.extent(0), Kokkos::AUTO), *this, result);
-    
     return result;
 }
 
@@ -309,9 +535,9 @@ KOKKOS_FUNCTION
 void particles_instance::operator() (Tag_potential_bonds, const member_type& team_member, double& V) const {
     const int i = team_member.league_rank();
 
-    int atom1 = bonds(i).atom1 - 1;
-    int atom2 = bonds(i).atom2 - 1;
-    int type = bonds(i).type - 1;
+    int atom1 = bonds(i).atom1-1;
+    int atom2 = bonds(i).atom2-1;
+    int type = bonds(i).type-1;
     double k = bondTypes(type).k;
     double r0 = bondTypes(type).r0;
     double r = (x(atom1,0) - x(atom2,0));
@@ -324,7 +550,7 @@ void particles_instance::operator() (Tag_potential_bonds, const member_type& tea
     r -= int(r * inverse_halved_L[2]) * L[2];
     r2 += r*r;
     r = sqrt(r2);
-    
+
     double dr = r-r0;
     double potential = k*dr*dr;
 
@@ -386,6 +612,86 @@ void particles_instance::operator() (Tag_potential_angles, const member_type& te
 
     // Compute the angle potential
     double potential = k * dtheta * dtheta;
+
+    Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
+        V += potential;
+    });
+}
+
+double particles_instance::potential_dihedrals() {
+    double result = 0.0;
+    Kokkos::parallel_reduce("dihedral-potential",
+        Kokkos::TeamPolicy<Tag_potential_dihedrals>(h_dihedrals.extent(0), Kokkos::AUTO), *this, result);
+    return result;
+}
+
+KOKKOS_FUNCTION
+void particles_instance::operator() (Tag_potential_dihedrals, const member_type& team_member, double& V) const {
+    const int i = team_member.league_rank();
+
+    int atom1 = dihedrals(i).atom1 - 1;
+    int atom2 = dihedrals(i).atom2 - 1;
+    int atom3 = dihedrals(i).atom3 - 1;
+    int atom4 = dihedrals(i).atom4 - 1;
+    int type = dihedrals(i).type - 1;
+
+    double k1 = dihedralTypes(type).k1;
+    double k2 = dihedralTypes(type).k2;
+    double k3 = dihedralTypes(type).k3;
+    double k4 = dihedralTypes(type).k4;
+    //Kokkos::printf("k1: %f\n", k1);
+    //Kokkos::printf("k2: %f\n", k2);
+    //Kokkos::printf("k3: %f\n", k3);
+    //Kokkos::printf("k4: %f\n", k4);
+
+    // Positions and displacement vectors with periodic boundary conditions
+    double x1[3], x2[3], x3[3], x4[3];
+    double r12[3], r23[3], r34[3];
+
+    for (int d = 0; d < 3; ++d) {
+        x1[d] = x(atom1,d);
+        x2[d] = x(atom2,d);
+        x3[d] = x(atom3,d);
+        x4[d] = x(atom4,d);
+
+        double dx;
+        dx = x2[d] - x1[d];
+        dx -= round(dx / L[d]) * L[d];
+        r12[d] = dx;
+
+        dx = x3[d] - x2[d];
+        dx -= round(dx / L[d]) * L[d];
+        r23[d] = dx;
+
+        dx = x4[d] - x3[d];
+        dx -= round(dx / L[d]) * L[d];
+        r34[d] = dx;
+    }
+
+    // Compute cross products
+    double n1[3], n2[3];
+    n1[0] = r12[1]*r23[2] - r12[2]*r23[1];
+    n1[1] = r12[2]*r23[0] - r12[0]*r23[2];
+    n1[2] = r12[0]*r23[1] - r12[1]*r23[0];
+
+    n2[0] = r23[1]*r34[2] - r23[2]*r34[1];
+    n2[1] = r23[2]*r34[0] - r23[0]*r34[2];
+    n2[2] = r23[0]*r34[1] - r23[1]*r34[0];
+
+    // Compute magnitudes
+    double n1_mag = sqrt(n1[0]*n1[0] + n1[1]*n1[1] + n1[2]*n1[2]);
+    double n2_mag = sqrt(n2[0]*n2[0] + n2[1]*n2[1] + n2[2]*n2[2]);
+
+    // Compute the dihedral angle phi
+    double cos_phi = (n1[0]*n2[0] + n1[1]*n2[1] + n1[2]*n2[2]) / (n1_mag * n2_mag + 1e-8);
+    cos_phi = fmin(fmax(cos_phi, -1.0), 1.0);  // Clamp to [-1,1]
+    double sin_phi_sign = ((r12[0]*n2[0] + r12[1]*n2[1] + r12[2]*n2[2]) > 0) ? 1.0 : -1.0;
+    double sin_phi = sin_phi_sign * sqrt(1.0 - cos_phi * cos_phi);
+    double phi = atan2(sin_phi, cos_phi);
+
+    // Compute the potential energy
+    double potential = 0.5*k1*(1 + cos(phi)) + 0.5*k2*(1 - cos(2*phi)) +
+                       0.5*k3*(1 + cos(3*phi)) + 0.5*k4*(1 - cos(4*phi));
 
     Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
         V += potential;

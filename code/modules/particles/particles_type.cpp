@@ -16,16 +16,13 @@
 
 particles_type::particles_type(YAML::Node doc, params_class params)  {
 
-
-    N = check_and_assign_value<int>(doc["particles"], "N");
-
     std::cout << "constructor particles_type" << std::endl;
     L[0] = params.L[0];
     L[1] = params.L[1];
     L[2] = params.L[2];
 
+    N = params.N;
 
-    std::cout << "N:" << N << std::endl;
     initHostMirror = false;
     rand_pool.init(params.seed, N);
     std::cout << "random pool initialised" << std::endl;

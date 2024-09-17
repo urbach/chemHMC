@@ -10,21 +10,26 @@
 #include <Kokkos_Core.hpp>
 #include "particles_type.hpp"
 
-// Structure to hold bond type data
 struct BondType {
     int type;
     double k;    // Force constant
     double r0;   // Equilibrium distance
 };
 
-// Structure to hold angle type data
 struct AngleType {
     int type;
     double k;    // Force constant
     double theta0; // Equilibrium angle (in degrees)
 };
 
-// Structure to hold bond data
+struct DihedralType {
+    int type;
+    double k1;    // OPLS stye Force constants
+    double k2;
+    double k3;
+    double k4;
+};
+
 struct Bond {
     int id;
     int type;
@@ -32,13 +37,21 @@ struct Bond {
     int atom2;
 };
 
-// Structure to hold angle data
 struct Angle {
     int id;
     int type;
     int atom1;
     int atom2;
     int atom3;
+};
+
+struct Dihedral {
+    int id;
+    int type;
+    int atom1;
+    int atom2;
+    int atom3;
+    int atom4;
 };
 
 class particles_instance : public particles_type {
@@ -107,8 +120,6 @@ public:
 
 
     // initialization related stuff
-    struct cold {};
-    struct hot {};
     struct check_in_volume {};
 
     void InitX(params_class params) override;
@@ -119,8 +130,6 @@ public:
     void compute_coeff_position();
     void compute_coeff_momenta();
 
-    KOKKOS_FUNCTION void operator() (cold, const int i) const;
-    KOKKOS_FUNCTION void operator() (hot, const int i) const;
     KOKKOS_FUNCTION void operator() (check_in_volume, const int i) const;
     
 
@@ -168,9 +177,10 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_cell, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_verlet, const member_type& teamMember, double& V) const;
 
-
+    // pot E minimization
     void minimize_energy(YAML::Node& doc) override;
-
+    double gradient_descent_minimzation(YAML::Node& doc);
+    double conjugate_gradient_minimzation(YAML::Node& doc);
 
     // force calculation
     struct force {};
@@ -247,6 +257,10 @@ public:
     Kokkos::View<AngleType*>::HostMirror h_angleTypes;
     Kokkos::View<Angle*> angles;
     Kokkos::View<Angle*>::HostMirror h_angles;
+    Kokkos::View<DihedralType*> dihedralTypes;
+    Kokkos::View<DihedralType*>::HostMirror h_dihedralTypes;
+    Kokkos::View<Dihedral*> dihedrals;
+    Kokkos::View<Dihedral*>::HostMirror h_dihedrals;
 
     double potential_bonds_angles();
 
@@ -262,6 +276,10 @@ public:
     struct Tag_potential_angles {};
     KOKKOS_FUNCTION void operator() (Tag_potential_angles, const member_type& team_member, double& V) const;
     
+    double potential_dihedrals();
+    struct Tag_potential_dihedrals {};
+    KOKKOS_FUNCTION void operator() (Tag_potential_dihedrals, const member_type& team_member, double& V) const;
+
     void compute_force_bonds_angles();
     void compute_force_bonds();
     struct Tag_force_bonds {};
@@ -271,6 +289,11 @@ public:
     struct Tag_force_angles {};
     KOKKOS_FUNCTION void operator() (const int i)const;
 
+    void compute_force_dihedrals();
+    struct Tag_force_dihedrals {};
+    KOKKOS_FUNCTION void operator() (Tag_force_dihedrals, const member_type& team_member) const;
+
+    void save_optimized_geometry(double V) const;
 
     // Destructor
     ~particles_instance() {};

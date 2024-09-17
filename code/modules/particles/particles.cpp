@@ -31,9 +31,15 @@ particles_instance::particles_instance(YAML::Node doc, params_class params) :
     start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
 
     // get inverse halved box size (needed for MIC algorithm)
-    inverse_halved_L[0] = 2.0/L[0];
-    inverse_halved_L[1] = 2.0/L[1];
-    inverse_halved_L[2] = 2.0/L[2];
+    inverse_L[0] = 1.0/L[0];
+    inverse_L[1] = 1.0/L[1];
+    inverse_L[2] = 1.0/L[2];
+    
+    inverse_halved_L[0] = 2.0*inverse_L[0];
+    inverse_halved_L[1] = 2.0*inverse_L[1];
+    inverse_halved_L[2] = 2.0*inverse_L[2];
+
+    
 
     assign_algorithm(doc);
 
@@ -42,67 +48,93 @@ particles_instance::particles_instance(YAML::Node doc, params_class params) :
     std::cout << "mass:" << mass << std::endl;
     std::cout << "beta:" << beta << std::endl;
 
+    
     compute_coeff_momenta();
     compute_coeff_position();
 }
 
 void particles_instance::read_xyz(params_class params) {
-    FILE* file = NULL;
-    file = fopen(params.start_configuration_file.c_str(), "r");
-    if (file == NULL) {
-        printf("error in opening file %s\n", params.start_configuration_file.c_str());
+    // Open the input file using ifstream
+    std::ifstream infile(params.start_configuration_file);
+    if (!infile.is_open()) {
+        std::cerr << "Error opening file " << params.start_configuration_file << std::endl;
         Kokkos::abort("abort");
     }
+
+    // Count the number of lines in the file
     int lines = 0;
-    char c;
-
-    /* count the newline characters */
-    while ((c = fgetc(file)) != EOF) {
-        if (c == '\n')
-            lines++;
+    std::string temp_line;
+    while (std::getline(infile, temp_line)) {
+        lines++;
     }
+
+    // Check if the number of lines is a multiple of N + 2
     if (lines % (N + 2) != 0) {
-        printf("error: input file %s contains %d lines\n", params.start_configuration_file.c_str(), lines);
-        printf("       the number of lines mus be a multiple of N+2=%d\n", N + 2);
+        std::cerr << "Error: input file " << params.start_configuration_file << " contains " << lines << " lines" << std::endl;
+        std::cerr << "       the number of lines must be a multiple of N+2 = " << N + 2 << std::endl;
         Kokkos::abort("abort");
     }
+
+    // Calculate the number of configurations in the file
     int confs = lines / (N + 2);
-    printf("confs in input configuration file %d\n", confs);
-    // go to last configuration and read it 
-    rewind(file);
-    int count = 0;
-    char id[1000];
+    std::cout << "Number of configurations in input file: " << confs << std::endl;
 
-    while ((c = fgetc(file)) != EOF) {
+    // Reset the file stream to the beginning
+    infile.clear();
+    infile.seekg(0, std::ios::beg);
 
-        if (c == '\n') {
-            count++;
-            if (count == (confs - 1) * (N + 2) + 1) {
-                for (int i = 0;i < 11;i++) c = fgetc(file);
-                fscanf(file, " %d", &params.istart);
-                // printf("%d %d\n", params.istart, count);
-                // count++;
-            }
-            if (count == (confs - 1) * (N + 2) + 2) {// if starting of the last conf, count missmatched by fscanf
-                break;
-            }
+    // Skip lines to reach the last configuration
+    int lines_to_skip = (confs - 1) * (N + 2);
+    for (int i = 0; i < lines_to_skip; ++i) {
+        if (!std::getline(infile, temp_line)) {
+            std::cerr << "Error: unexpected end of file while skipping to last configuration" << std::endl;
+            Kokkos::abort("abort");
         }
     }
-    printf("reading last configuration from input file %s\n", params.start_configuration_file.c_str());
-    count = 0;
-    for (int i = 0; i < N;i++) {
-        count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
-        // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
-    }
-    /*if (name_xyz.compare(id) != 0) {
-        printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
+
+    // Read the number of atoms from the first line of the last configuration
+    if (!std::getline(infile, temp_line)) {
+        std::cerr << "Error: unexpected end of file while reading number of atoms" << std::endl;
         Kokkos::abort("abort");
-    }*/ 
-    // printf("%d  %d\n", count, N);
-    if (count != N * 4) { Kokkos::abort("error in reading the file"); }
-    fclose(file);
+    }
+    int num_atoms_in_file = std::stoi(temp_line);
+    if (num_atoms_in_file != N) {
+        std::cerr << "Error: number of atoms in file (" << num_atoms_in_file << ") does not match expected N (" << N << ")" << std::endl;
+        Kokkos::abort("abort");
+    }
+
+    // Read the comment line (we can skip or store it if needed)
+    if (!std::getline(infile, temp_line)) {
+        std::cerr << "Error: unexpected end of file while reading comment line" << std::endl;
+        Kokkos::abort("abort");
+    }
+    // Optionally, store or skip the comment line
+    std::string comment_line = temp_line;
+
+    std::cout << "Reading last configuration from input file " << params.start_configuration_file << std::endl;
+
+    // Read the atom data
+    label_xyz.clear(); // Ensure label_xyz is empty before filling
+    for (int i = 0; i < N; ++i) {
+        if (!std::getline(infile, temp_line)) {
+            std::cerr << "Error: unexpected end of file while reading atom data" << std::endl;
+            Kokkos::abort("abort");
+        }
+        std::istringstream iss(temp_line);
+        std::string id;
+        double x_val, y_val, z_val;
+        if (!(iss >> id >> x_val >> y_val >> z_val)) {
+            std::cerr << "Error parsing atom data on line " << i + 1 << std::endl;
+            Kokkos::abort("Error parsing xyz file");
+        }
+        label_xyz.push_back(id);
+        h_x(i, 0) = x_val;
+        h_x(i, 1) = y_val;
+        h_x(i, 2) = z_val;
+    }
+
+    infile.close();
     Kokkos::deep_copy(x, h_x);
-    // printx();
 }
 
 int particles_instance::how_many_confs_xyz(FILE* file) {
@@ -208,7 +240,7 @@ void particles_instance::mix_parameters(YAML::Node& doc) {
             h_epsilon_mat(j, i) = epsilon;
             h_sigma_mat(i, j) = sigma;
             h_sigma_mat(j, i) = sigma;
-            printf("i: %d j: %d eps: %f sig: %f",i,j,epsilon,sigma);
+            //printf("i: %d j: %d eps: %f sig: %f",i,j,epsilon,sigma);
         }
 
     }
@@ -419,12 +451,10 @@ void particles_instance::compute_coeff_position() {
     // inititalize device and host views
     coeff_x = Kokkos::View<double*>("coeff_x",h_atom_type_list.extent(0));
     h_coeff_x = Kokkos::create_mirror_view(coeff_x);
-    
-    //Since we have different particles we need to compute one coefficient for each type
+    //Since we have different particles  we need to compute one coefficient for each type
     for(int i = 0;i < h_atom_type_list.extent(0);i++) {
         h_coeff_x[i] = 1.0 / (h_atom_type_list[i].mass);//beta / (h_atom_type_list[i].mass);
     }
-
     //copy to device
     Kokkos::deep_copy(coeff_x, h_coeff_x);
 }
@@ -457,7 +487,7 @@ public:
         for (int dir = 0; dir < 3; dir++) {
             x(i, dir) += dt * c[id[i]-1] * p(i, dir);
             // apply  periodic boundary condition
-            x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
+            //x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
         }
     };
 };
@@ -495,34 +525,11 @@ void particles_instance::operator() (check_in_volume, const int i) const {
     }
 };
 
-KOKKOS_FUNCTION
-void particles_instance::operator() (cold, const int i) const {
-    double N3 = pow(N, 1. / 3.);
-    int iz = (int)i / (N3 * N3);
-    int iy = (int)(i - iz * N3 * N3) / (N3);
-    int ix = (int)(i - iz * N3 * N3 - iy * N3);
-
-    x(i, 0) = L[0] * (ix - N3 * floor(ix / N3)) / (N3 + 1);
-    x(i, 1) = L[1] * (iy - N3 * floor(iy / N3)) / (N3 + 1);
-    x(i, 2) = L[2] * (iz - N3 * floor(iz / N3)) / (N3 + 1);
-};
-
-KOKKOS_FUNCTION
-void particles_instance::operator() (hot, const int i) const {
-    gen_type rgen = rand_pool.get_state(i);
-    x(i, 0) = rgen.drand() * L[0];
-    x(i, 1) = rgen.drand() * L[1];
-    x(i, 2) = rgen.drand() * L[2];
-    rand_pool.free_state(rgen);
-};
-
-// since we are using the hostMirror to store the starting point we don't whant to 
-// deep_copy it here 
 void particles_instance::print_xyz(params_class params, int traj, double K, double V) {
     fprintf(params.fileout, "     %d\n", N);
     fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g\n", traj, K, V);
     for (int i = 0; i < N; i++)
-        fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", name_xyz.c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
+        fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 
 void particles_instance::hb() {
@@ -540,7 +547,93 @@ void particles_instance::operator() (hbTag, const int i) const {
     rand_pool.free_state(rgen);
 }
 
+double dot_product(const int N, const type_p& a, const type_p& b) {
+    double result = 0.0;
+    Kokkos::parallel_reduce("DotProduct", Kokkos::RangePolicy<>(0, N), KOKKOS_LAMBDA(const int i, double& thread_sum) {
+        thread_sum += a(i, 0) * b(i, 0) + a(i, 1) * b(i, 1) + a(i, 2) * b(i, 2);
+    }, result);
+    return result;
+}
+
 void particles_instance::minimize_energy(YAML::Node& doc) {
+    std::string minimization_algorithm = check_and_assign_value<std::string>(doc["minimization"], "algorithm");
+    double V;
+    if (minimization_algorithm == "gradient_descent") {
+        V = gradient_descent_minimzation(doc);
+    }   else if (minimization_algorithm == "conjugate_gradient") {
+        V = conjugate_gradient_minimzation(doc);
+    }
+
+    // Transfer the optimized positions back to the host
+    Kokkos::deep_copy(h_x, x);
+
+    // Save the optimized geometry if requested
+    if (doc["minimization"]["save_geometry"]) {
+        save_optimized_geometry(V);
+    }
+}
+
+double particles_instance::conjugate_gradient_minimzation(YAML::Node& doc) {
+    // Extract configuration values only once
+    int max_iter = doc["minimization"]["max_iter"] ? check_and_assign_value<int>(doc["minimization"], "max_iter") : 1000;
+    double tolerance = doc["minimization"]["tolerance"] ? check_and_assign_value<double>(doc["minimization"], "tolerance") : 1e-6;
+    double dt = check_and_assign_value<double>(doc["integrator"], "dt");
+
+    // Precompute invariant data
+    if (algorithm == "verlet_list") {
+        build_verlet_list();
+    } else if (algorithm == "bonds_angles") {
+        build_bondless_verlet_list();
+    }
+
+    // Initialize variables
+    double V = compute_potential();
+    double V_new;
+
+    // Allocate vectors for CG
+    type_p g("gradient", N);      // Gradient vector (forces)
+    type_p h("direction", N);     // Search direction vector
+    type_p g_old("gradient_old", N);  // Old gradient vector
+    type_p temp("temp_vector", N);    // Temporary vector for calculations
+
+    // Initialize the gradient and search direction
+    compute_force();
+    Kokkos::deep_copy(g, f);  // f stores the forces (negative gradient of the potential)
+    Kokkos::deep_copy(h, g);  // Initial direction is the same as the gradient
+
+    double g_norm2 = dot_product(N, g, g); // Compute norm squared of the gradient
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        // Manually update momenta: p = p + dt * h
+        Kokkos::deep_copy(f, h);
+        update_momenta(dt);
+        update_positions(dt);
+        // Compute new potential
+        V_new = compute_potential();
+        // Check for convergence
+        if (fabs(V_new - V) < tolerance) break;
+        V = V_new;
+        // Compute new gradient
+        Kokkos::deep_copy(g_old, g); // Store old gradient
+        compute_force();             // Update forces
+        Kokkos::deep_copy(g, f);     // Update gradient vector
+
+        double g_new_norm2 = dot_product(N, g, g); // Compute norm squared of new gradient
+        // Compute beta (Polak-Ribiere method)
+        double beta = (g_new_norm2 - dot_product(N, g, g_old)) / g_norm2;
+        g_norm2 = g_new_norm2; // Update g_norm2 for next iteration
+        // Update search direction: h = g + beta * h
+        Kokkos::parallel_for("UpdateDirection", Kokkos::RangePolicy<>(0, N), KOKKOS_LAMBDA(const int i) {
+            for (int d = 0; d < dim_space; d++) {
+                h(i, d) = g(i, d) + beta * h(i, d);
+            }
+        });
+    }
+
+    return V;
+}
+
+double particles_instance::gradient_descent_minimzation(YAML::Node& doc) {
 
     // get config
     int max_iter = 0;
@@ -568,7 +661,26 @@ void particles_instance::minimize_energy(YAML::Node& doc) {
         update_momenta(dt);
         update_positions(dt);
         V_new = compute_potential();
-        if(abs(V_new - V) < tolerance) break;
+        if(abs(V_new - V) < tolerance) {
+            V = V_new;
+            printf("MINIMIZATION CONVERGED \n");
+            break;
+        }
         V = V_new;
+    }
+
+    return V;
+}
+
+void particles_instance::save_optimized_geometry(double V) const {
+    FILE* opt_file = fopen("optimized_structure.xyz", "ab");
+    if (opt_file) {
+        fprintf(opt_file, "     %d\n", N);
+        fprintf(opt_file, "optimized geometry. V=%f\n", V);
+        for (int i = 0; i < N; ++i) {
+            fprintf(opt_file, "%-8s  %20.12g  %20.12g  %20.12g\n",
+                    label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
+        }
+        fclose(opt_file);
     }
 }

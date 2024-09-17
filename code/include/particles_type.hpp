@@ -22,6 +22,7 @@ public:
     double coeff_p;
     double coeff_x;
     double L[dim_space];
+    double inverse_L[dim_space];
     double inverse_halved_L[dim_space];
 
     type_x  x;      ///< Kokkos view containing the positions
@@ -37,6 +38,7 @@ public:
     double sizebin[dim_space];
     std::string rng_device_state;
     std::string algorithm;
+    std::vector<std::string> label_xyz;
 
     t_bincount bincount;
     t_binoffsets binoffsets;

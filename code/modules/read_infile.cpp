@@ -133,6 +133,19 @@ params_class::params_class(YAML::Node doc, bool check_overwrite) {
         }
     }
 
+    // read N from first line of input file
+    std::ifstream xyz_file(nameout);
+    std::string line;
+    if (std::getline(xyz_file, line)) {
+        N = std::atoi(line.c_str());
+        std::cout << "Number of particles (N) read from .xyz file: " << N << std::endl;
+    } else {
+        std::cerr << "Error: Could not read the first line of file " << nameout << std::endl;
+        throw std::runtime_error("File read error");
+    }
+
+    xyz_file.close();
+
     fileout = fopen(nameout.c_str(), "ab");
     if (fileout == NULL || nameout.length() <= 0 || nameout.compare("null") == 0) {
         printf("unable to open file %s\n", nameout.c_str());
