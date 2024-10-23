@@ -8,103 +8,79 @@
 
 
 
-class Foo {
-protected:
-    int val;
+KOKKOS_FUNCTION void times_2(int& i) {
+    i = i * 2;
+}
+
+class myclass_kernel {
 public:
+    struct tag_for {};
+    struct tag_reduce {};
 
-
-    KOKKOS_FUNCTION
-        Foo();
-
-    KOKKOS_FUNCTION
-        virtual int value() { return 0; };
-
-    KOKKOS_FUNCTION
-        virtual ~Foo() {}
-};
-
-class Foo_1 : public Foo {
-public:
-    KOKKOS_FUNCTION
-        Foo_1();
-
-    KOKKOS_FUNCTION
-        int value();
-};
-
-class Foo_2 : public Foo {
-public:
-    KOKKOS_FUNCTION
-        Foo_2();
-
-    KOKKOS_FUNCTION
-        int value();
+    KOKKOS_FUNCTION void operator() (tag_for, const int i) const;
+    KOKKOS_FUNCTION void operator() (tag_reduce, const int i, double &sum) const;
+    void call_for();
+    void call_reduce();
 };
 
 
-KOKKOS_FUNCTION
-Foo::Foo() {
-    val = 0;
-}
+class myclass {
+public:
+    struct tag_for {};
+    struct tag_reduce {};
+    std::string myname = "lalalal";
+    myclass_kernel kernels;
+    // KOKKOS_FUNCTION void operator() (tag_for, const int i) const;
+    // KOKKOS_FUNCTION void operator() (tag_reduce, const int i, double &sum) const;
+    void call_for();
+    void call_reduce();
+};
+
+void myclass::call_for(){
+    kernels.call_for();
+};
+void myclass::call_reduce(){
+    kernels.call_reduce();
+};
+
 
 KOKKOS_FUNCTION
-Foo_1::Foo_1() : Foo() {
-    val = 1;
-}
-
+void myclass_kernel::operator() (tag_for, const int i) const {
+    printf("do nothing %d\n", i);
+    int a = i;
+    times_2(a);
+    printf("a= %d\n", a);
+};
+void myclass_kernel::call_for() {
+    Kokkos::parallel_for("calling for", Kokkos::RangePolicy<tag_for>(0, 10), *this);
+};
 KOKKOS_FUNCTION
-int Foo_1::value() {
-    return val;
-}
+void myclass_kernel::operator() (tag_reduce, const int i, double& sum) const {
+    sum++;
+    printf("do sum %d\n", i);
+    int a = i;
+    times_2(a);
+    printf("a= %d\n", a);
 
-KOKKOS_FUNCTION
-Foo_2::Foo_2() : Foo() {
-    val = 2;
-}
-
-KOKKOS_FUNCTION
-int Foo_2::value() {
-    return val;
-}
-
+};
+void myclass_kernel::call_reduce() {
+    double a = 0;
+    Kokkos::parallel_reduce("calling for", Kokkos::RangePolicy<tag_reduce>(0, 10), *this, a);
+    printf("reduce result= %g\n", a);
+};
 
 
 int main(int argc, char* argv[]) {
     Kokkos::initialize(argc, argv);
 
     {
-        Foo* f_1 = (Foo*)Kokkos::kokkos_malloc(sizeof(Foo_1));
-        Foo* f_2 = (Foo*)Kokkos::kokkos_malloc(sizeof(Foo_2));
+       
 
-        Kokkos::parallel_for("CreateObjects", 1, KOKKOS_LAMBDA(const int&) {
-            new ((Foo_1*)f_1) Foo_1();
-            new ((Foo_2*)f_2) Foo_2();
-        });
+        printf("functor test");
+        myclass a;
+        a.call_for();
+        a.call_reduce();
 
-        int value_1, value_2;
-        Kokkos::parallel_reduce("CheckValues", 1, KOKKOS_LAMBDA(const int&, int& lsum) {
-            lsum = f_1->value();
-        }, value_1);
-
-        Kokkos::parallel_reduce("CheckValues", 1, KOKKOS_LAMBDA(const int&, int& lsum) {
-            lsum = f_2->value();
-        }, value_2);
-
-        printf("Values: %i %i\n", value_1, value_2);
-        Foo* ff_2 = new Foo_2();
-        // Foo* ff_2 = (Foo*)Kokkos::kokkos_malloc(sizeof(Foo_2));
-        value_1 = ff_2->value();
-        // value_2 = ff_1->value();
-        printf("Values: %i %i\n", value_1, value_2);
-
-        Kokkos::parallel_for("DestroyObjects", 1, KOKKOS_LAMBDA(const int&) {
-            f_1->~Foo();
-            f_2->~Foo();
-        });
-
-        Kokkos::kokkos_free(f_1);
-        Kokkos::kokkos_free(f_2);
 
     }
 
