@@ -44,7 +44,7 @@ void check_force(particles_type* particles2, particles_type* particles3, std::st
 void check_force_with_num_der(particles_type* particles, std::vector<std::string>& errors) {
     printf("###################################################################################################\n");
     printf("compare force and derivative of the potential  %s \n", particles->algorithm.c_str());
-    double h = 1e-6;
+    double h = 1e-7;
     type_x tmpx = particles->x;
     int count = 0;
     type_f::HostMirror force_val = Kokkos::create_mirror(particles->f);// force is already computed
@@ -100,7 +100,6 @@ void check_force_with_num_der(particles_type* particles, std::vector<std::string
         add_error(errors, s);
     }
     else { printf("test passed\n"); }
-
 }
 
 int main(int argc, char** argv) {
@@ -116,7 +115,7 @@ int main(int argc, char** argv) {
 
         doc["particles"]["algorithm"] = "AMIC";
         particles1 = new particles_instance(doc, params);
-        doc["particles"]["algorithm"] = "bonds_angles";
+        doc["particles"]["algorithm"] = "ewald_sum";
         particles2 = new particles_instance(doc,params);
         
         //// init the positions

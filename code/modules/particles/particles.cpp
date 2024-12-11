@@ -24,7 +24,8 @@ particles_instance::particles_instance(YAML::Node doc, params_class params) :
     // generate mixed pair parameters
     mix_parameters(doc);
 
-    beta = check_and_assign_value<double>(doc["particles"], "beta");
+    T = check_and_assign_value<double>(doc["particles"], "temperature");
+    beta = 1/(kB*T);
     sbeta = sqrt(beta);
     cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
     cutoff_squared = cutoff * cutoff;
@@ -43,14 +44,11 @@ particles_instance::particles_instance(YAML::Node doc, params_class params) :
 
     assign_algorithm(doc);
 
-    std::cout << "particles_type:" << std::endl;
-    std::cout << "name:" << name << std::endl;
-    std::cout << "mass:" << mass << std::endl;
-    std::cout << "beta:" << beta << std::endl;
-
+    std::cout << "temperature: " << T << std::endl;
     
     compute_coeff_momenta();
     compute_coeff_position();
+    
 }
 
 void particles_instance::read_xyz(params_class params) {
@@ -201,7 +199,7 @@ void particles_instance::get_parameters(YAML::Node& doc, Kokkos::View<atom_type*
         iss >> index >> label >> mass >> charge >> epsilon >> sigma;
 
         // Create an atom_type instance and add it to the vector
-        atom_type atom(label.c_str(), mass, charge, index, epsilon, sigma);
+        atom_type atom(label.c_str(), mass, charge, index, epsilon*kcaltointernal, sigma);
         temp_atom_type_list.push_back(atom);
     }
     h_atom_type_list = Kokkos::create_mirror_view(Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size()));
@@ -288,7 +286,7 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         particles_instance::init_ewald_sum(doc);
         potential_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
         potential_without_binning_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
-        force_strategy = std::bind(&particles_instance::compute_force_AMICAIP, this);
+        force_strategy = std::bind(&particles_instance::compute_force_ewald, this);
     }
     else if (algorithm.compare("bonds_angles") == 0) {
         particles_instance::init_verlet_list(doc);
@@ -297,13 +295,13 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         potential_without_binning_strategy = std::bind(&particles_instance::potential_bonds_angles, this);
         force_strategy = std::bind(&particles_instance::compute_force_bonds_angles, this);
     }
-    else if (algorithm.compare("parallel_binning") == 0) {
-        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
-        Kokkos::abort("aborting");
-    }
-    else if (algorithm.compare("quick_sort") == 0) {
-        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
-        Kokkos::abort("aborting");
+    else if (algorithm.compare("opls") == 0) {
+        particles_instance::init_verlet_list(doc);
+        particles_instance::init_ewald_sum(doc);
+        particles_instance::read_bonds_angles("data.lmp");
+        potential_strategy = std::bind(&particles_instance::potential_opls, this);
+        potential_without_binning_strategy = std::bind(&particles_instance::potential_opls, this);
+        force_strategy = std::bind(&particles_instance::compute_force_opls, this);
     }
     else {
         printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
@@ -487,7 +485,7 @@ public:
         for (int dir = 0; dir < 3; dir++) {
             x(i, dir) += dt * c[id[i]-1] * p(i, dir);
             // apply  periodic boundary condition
-            //x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
+            x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
         }
     };
 };
@@ -527,7 +525,7 @@ void particles_instance::operator() (check_in_volume, const int i) const {
 
 void particles_instance::print_xyz(params_class params, int traj, double K, double V) {
     fprintf(params.fileout, "     %d\n", N);
-    fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g\n", traj, K, V);
+    fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g\n", traj, K/kcaltointernal, V/kcaltointernal);
     for (int i = 0; i < N; i++)
         fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }

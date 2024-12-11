@@ -7,6 +7,12 @@
 #define EXTERN extern
 #endif
 
+// Useful constants
+static const double N_A = 6.02214076e23;
+static const double kcaltointernal = 4.184e-4; //conversion from kcal/mol to amu * A^2/fs^2
+static const double kjtointernal = 1.0e-4; //conversion from kJ/mol to amu * A^2/fs^2
+static const double kB_J = 1.380649e-23; //boltzmann constant in J/K
+static const double kB = kB_J * 1e-3 * N_A * kjtointernal; //boltzmann constant in amu * A^2/(fs^2*K)
 
 #define dim_space 3
 

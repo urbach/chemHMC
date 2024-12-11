@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iomanip>
 #include "yaml-cpp/yaml.h"
+#include "global.hpp"
 #include <Kokkos_Core.hpp>
 #include "particles_type.hpp"
 
@@ -181,6 +182,7 @@ public:
     void minimize_energy(YAML::Node& doc) override;
     double gradient_descent_minimzation(YAML::Node& doc);
     double conjugate_gradient_minimzation(YAML::Node& doc);
+    void save_optimized_geometry(double V) const;
 
     // force calculation
     struct force {};
@@ -227,9 +229,13 @@ public:
 
 
     // Ewald sum
-    double ewald_alpha;
+    double ewald_alpha; // width of the gaussians
+    double sqrt_ewald_alpha;
+    double r_c; // real-space cutoff for the ewald sum
+    double r_c2;
+    double ewald_accuracy; // rms accuracy of the ewald sum
     int k_max;
-    int ewald_n_max;
+    double V_self = 0.0; // self interaction energy in the ewald sum is precomputed and stored.
     Kokkos::View<double*> charge;
     Kokkos::View<double*>::HostMirror h_charge;
 
@@ -246,6 +252,15 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_ewald_reciprocal, const member_type& teamMember, double& V) const;
     KOKKOS_FUNCTION void operator() (Tag_potential_ewald_self, const member_type& teamMember, double& V) const;
 
+    void compute_force_ewald();
+    void compute_ewald_real_forces();
+    void compute_ewald_reciprocal_forces();
+
+    struct Tag_force_ewald_real {};
+    struct Tag_force_ewald_reciprocal {};
+
+    KOKKOS_FUNCTION void operator()(Tag_force_ewald_real, const member_type& teamMember) const;
+    KOKKOS_FUNCTION void operator()(Tag_force_ewald_reciprocal, const member_type& teamMember) const;
 
     // Bonds/angles
     void read_bonds_angles(const std::string& filename);
@@ -293,12 +308,15 @@ public:
     struct Tag_force_dihedrals {};
     KOKKOS_FUNCTION void operator() (Tag_force_dihedrals, const member_type& team_member) const;
 
-    void save_optimized_geometry(double V) const;
+    
+
+    // OPLS
+    double potential_opls();
+    void compute_force_opls();
 
     // Destructor
     ~particles_instance() {};
 };
-
 
 // we need a ruduction of 3 double array
 template< class ScalarType, int N >

@@ -133,7 +133,7 @@ void particles_instance::read_bonds_angles(const std::string& filename) {
             double k, r0;
             if (iss >> type >> k >> r0) {
                 h_bondTypes(bondTypeIndex).type = type;
-                h_bondTypes(bondTypeIndex).k = k;
+                h_bondTypes(bondTypeIndex).k = k*kcaltointernal; // convert from kcal/mol to internal units
                 h_bondTypes(bondTypeIndex).r0 = r0;
                 bondTypeIndex++;
             }
@@ -145,7 +145,7 @@ void particles_instance::read_bonds_angles(const std::string& filename) {
             double k, theta0;
             if (iss >> type >> k >> theta0) {
                 h_angleTypes(angleTypeIndex).type = type;
-                h_angleTypes(angleTypeIndex).k = k;
+                h_angleTypes(angleTypeIndex).k = k*kcaltointernal;// convert from kcal/mol to internal units
                 h_angleTypes(angleTypeIndex).theta0 = theta0 * M_PI/180.0;
                 angleTypeIndex++;
             }
@@ -157,10 +157,12 @@ void particles_instance::read_bonds_angles(const std::string& filename) {
             double k1, k2, k3, k4;
             if (iss >> type >> k1 >> k2 >> k3 >> k4) {
                 h_dihedralTypes(dihedralTypeIndex).type = type;
-                h_dihedralTypes(dihedralTypeIndex).k1 = k1;
-                h_dihedralTypes(dihedralTypeIndex).k2 = k2;
-                h_dihedralTypes(dihedralTypeIndex).k3 = k3;
-                h_dihedralTypes(dihedralTypeIndex).k4 = k4;
+                // for some reason lammps files include the usual factor of 0.5 into all k-values
+                // except for the dihedrals so we have to explicitly add it here
+                h_dihedralTypes(dihedralTypeIndex).k1 = 0.5*k1*kcaltointernal;// convert from kcal/mol to internal units
+                h_dihedralTypes(dihedralTypeIndex).k2 = 0.5*k2*kcaltointernal;// convert from kcal/mol to internal units
+                h_dihedralTypes(dihedralTypeIndex).k3 = 0.5*k3*kcaltointernal;// convert from kcal/mol to internal units
+                h_dihedralTypes(dihedralTypeIndex).k4 = 0.5*k4*kcaltointernal;// convert from kcal/mol to internal units
                 dihedralTypeIndex++;
             }
         }
@@ -226,7 +228,7 @@ void particles_instance::read_bonds_angles(const std::string& filename) {
     for (int i = 0; i < bonds.extent(0); i++) {
         printf("bond number: %d \n", i);
         printf("bond type: %d \n", h_bonds(i).type);
-        printf("atom1: %d atom2: %d k: %f r0: %f\n", h_bonds(i).atom1, h_bonds(i).atom2, h_bondTypes(h_bonds(i).type-1).k, h_bondTypes(h_bonds(i).type-1).r0);
+        printf("atom1: %d atom2: %d k: %f r0: %f\n", h_bonds(i).atom1-1, h_bonds(i).atom2-1, h_bondTypes(h_bonds(i).type-1).k, h_bondTypes(h_bonds(i).type-1).r0);
     }
     
     for (int i = 0; i < bondTypes.extent(0); i++) {
@@ -234,10 +236,10 @@ void particles_instance::read_bonds_angles(const std::string& filename) {
         printf("type: %d k: %f r0: %f\n", h_bondTypes(i).type, h_bondTypes(i).k, h_bondTypes(i).r0);
     }
     
-    */for (int i = 0; i < angles.extent(0); i++) {
+    for (int i = 0; i < angles.extent(0); i++) {
         printf("angle number: %d \n", i);
         printf("atom1: %d atom2: %d atom3: %d k: %f theta0: %f\n", h_angles(i).atom1, h_angles(i).atom2, h_angles(i).atom3, h_angleTypes(h_angles(i).type-1).k, h_angleTypes(h_angles(i).type-1).theta0);
-    }/*
+    }
     printf("EXTENT: %d", dihedrals.extent(0));
     for (int i = 0; i < dihedrals.extent(0); i++) {
         printf("dihedral number: %d \n", i);
@@ -255,12 +257,10 @@ void particles_instance::compute_force_bonds_angles() {
     //Reset forces
     Kokkos::deep_copy(f,0);
 
-    //compute LJ-force
-    compute_force_verlet_list();
-
     //compute bonded force
     compute_force_bonds();
     compute_force_angles();
+    compute_force_dihedrals();
 }
 
 void particles_instance::compute_force_bonds() {
@@ -342,18 +342,14 @@ void particles_instance::operator() (const int i) const {
     double rsq2 = delx2 * delx2 + dely2 * dely2 + delz2 * delz2;
     double r2 = sqrt(rsq2);
 
-    // Calculate cosine of the angle
     double c = (delx1 * delx2 + dely1 * dely2 + delz1 * delz2) / (r1 * r2);
-    c = fmin(fmax(c, -1.0), 1.0);  // Clamp c to the range [-1, 1]
+    c = fmin(fmax(c, -1.0), 1.0);
 
-    // Compute the angle deviation from the equilibrium angle
     double dtheta = acos(c) - theta0;
 
-    // Force magnitude: simplified to be physically accurate
     double s = sqrt(1.0 - c * c);
     double a = -2.0 * k * dtheta / (s + 1e-8);
 
-    // Force components
     double f1x = a * (delx2 / r2 - delx1 * c / (r1 * r1));
     double f1y = a * (dely2 / r2 - dely1 * c / (r1 * r1));
     double f1z = a * (delz2 / r2 - delz1 * c / (r1 * r1));
@@ -512,14 +508,12 @@ void particles_instance::operator() (Tag_force_dihedrals, const member_type& tea
 
 double particles_instance::potential_bonds_angles() {
     // add LJ-potential, since it doesnt make sense to compute bonds without it
-    // double result = potential_verlet_list();
-    double result = 0.0;
     double bond_energy = potential_bonds();
-    printf("bond_E: %f ",bond_energy);
+    //printf("bond_E: %f ",bond_energy);
     double angle_energy = potential_angles();
-    printf("angle_energy: %f ",angle_energy);
+    //printf("angle_energy: %f ",angle_energy);
     double dihedral_energy = potential_dihedrals();
-    printf("dihedral_energy: %f ",dihedral_energy);
+    //printf("dihedral_energy: %f ",dihedral_energy);
 
     return bond_energy + angle_energy + dihedral_energy;
 }
@@ -552,7 +546,7 @@ void particles_instance::operator() (Tag_potential_bonds, const member_type& tea
     r = sqrt(r2);
 
     double dr = r-r0;
-    double potential = k*dr*dr;
+    double potential = k*dr*dr; // The usual factor of 0.5 is already part of k
 
     Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
         V += potential;
@@ -611,7 +605,7 @@ void particles_instance::operator() (Tag_potential_angles, const member_type& te
     double dtheta = theta - theta0;
 
     // Compute the angle potential
-    double potential = k * dtheta * dtheta;
+    double potential = k * dtheta * dtheta; // The usual factor of 0.5 is already part of k
 
     Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
         V += potential;
@@ -690,8 +684,8 @@ void particles_instance::operator() (Tag_potential_dihedrals, const member_type&
     double phi = atan2(sin_phi, cos_phi);
 
     // Compute the potential energy
-    double potential = 0.5*k1*(1 + cos(phi)) + 0.5*k2*(1 - cos(2*phi)) +
-                       0.5*k3*(1 + cos(3*phi)) + 0.5*k4*(1 - cos(4*phi));
+    double potential = k1*(1 + cos(phi)) + k2*(1 - cos(2*phi)) +
+                       k3*(1 + cos(3*phi)) + k4*(1 - cos(4*phi)); // The usual factor of 0.5 is already part of k
 
     Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
         V += potential;
@@ -702,72 +696,172 @@ void particles_instance::build_bondless_verlet_list() {
     build_verlet_list();
     Kokkos::deep_copy(h_verlet_list,verlet_list);
     Kokkos::deep_copy(h_neighbour_count,neighbour_count);
+    /*printf("NEIGHBORS: %d \n",h_neighbour_count(3));
+    printf("LIST: %d \n",h_verlet_list(3,0));
+    printf("LIST: %d \n",h_verlet_list(3,1));
+    printf("LIST: %d \n",h_verlet_list(3,2));
+    printf("LIST: %d \n",h_verlet_list(3,3));
+    printf("LIST: %d \n",h_verlet_list(3,4));
+    printf("LIST: %d \n",h_verlet_list(3,5));
+    printf("LIST: %d \n",h_verlet_list(3,6));
+    printf("LIST: %d \n",h_verlet_list(3,7));
+    printf("LIST: %d \n",h_verlet_list(3,8));
+    printf("LIST: %d \n",h_verlet_list(3,9));
+    printf("LIST: %d \n",h_verlet_list(3,10));*/
     // Remove bonded atoms from neighbour list
     Kokkos::parallel_for("verlet_remove_bonds",
         Kokkos::TeamPolicy<Tag_verlet_remove_bonds>(N, Kokkos::AUTO), *this);
+    Kokkos::fence();
     Kokkos::deep_copy(h_verlet_list,verlet_list);
     Kokkos::deep_copy(h_neighbour_count,neighbour_count);
+    /*printf("NEIGHBORS: %d \n",h_neighbour_count(3));
+    printf("LIST: %d \n",h_verlet_list(3,0));
+    printf("LIST: %d \n",h_verlet_list(3,1));
+    printf("LIST: %d \n",h_verlet_list(3,2));
+    printf("LIST: %d \n",h_verlet_list(3,3));
+    printf("LIST: %d \n",h_verlet_list(3,4));
+    printf("LIST: %d \n",h_verlet_list(3,5));
+    printf("LIST: %d \n",h_verlet_list(3,6));
+    printf("LIST: %d \n",h_verlet_list(3,7));
+    printf("LIST: %d \n",h_verlet_list(3,8));
+    printf("LIST: %d \n",h_verlet_list(3,9));
+    printf("LIST: %d \n",h_verlet_list(3,10));*/
 }
 
 KOKKOS_FUNCTION
 void particles_instance::operator()(Tag_verlet_remove_bonds, const member_type& teamMember) const {
     const int i = teamMember.league_rank();
-    //remove atoms from neighbour list of i that are directly bonded to i
+
+    int initial_neighbour_count = neighbour_count(i);
+
     Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, bonds.extent(0)), [=](const int b) {
         int atom1 = bonds(b).atom1 - 1;
         int atom2 = bonds(b).atom2 - 1;
-
         if (atom1 != i) return;
-        //Kokkos::printf("atom1: %d atom2: %d \n", atom1, atom2);
         // Search for atom2 in atom i's verlet list and remove it
         int n = neighbour_count(i);
         for (int k = 0; k < n; k++) {
             if (verlet_list(i, k) == atom2) {
-                // Found the bonded atom, remove it by shifting the remaining elements
-                for (int l = k; l < n - 1; l++) {
-                    verlet_list(i, l) = verlet_list(i, l + 1);
-                }
+                // Found the bonded atom, remove it by setting it to 0
+                // we set it to 0 to first collect all atoms to be removed from the bond list, 
+                // this avoids racing conditions. Since the verlet_list is directional (each bonds occurs
+                // only once), atom "0" can never occur in the bond list and we can safely use the 0 as a placeholder
+                verlet_list(i,k) = 0;
+                
                 // Decrement the neighbor count
                 Kokkos::atomic_fetch_add(&neighbour_count(i),-1);
                 break;
             }
         }
     });
+    // Now we clean up the list on a single thread by finding rach 0
+    // and then shifting all further values in the array "up".
+    Kokkos::single(Kokkos::PerTeam(teamMember), [=]() {
+        int n = initial_neighbour_count; // Start with the initial neighbor count
+        int write_idx = 0; // Index to write the valid elements
 
-    //remove atoms from neighbour list of i that are indirectly bonded to i (angle interactions)
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, angles.extent(0)), [=](const int b) {
-        int atom1 = angles(b).atom1 - 1;
-        int atom2 = angles(b).atom2 - 1;
-        int atom3 = angles(b).atom3 - 1;
+        for (int read_idx = 0; read_idx < n; ++read_idx) {
+            if (verlet_list(i, read_idx) != 0) {
+                // Copy non-zero values to the write index
+                verlet_list(i, write_idx) = verlet_list(i, read_idx);
+                ++write_idx; // Increment the write index for the next valid element
+            }
+        }
+    });
 
+
+    // Remove atoms indirectly bonded to `i` (angle interactions)
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, angles.extent(0)), [=](const int a) {
+        int atom1 = angles(a).atom1 - 1;
+        int atom2 = angles(a).atom2 - 1;
+        int atom3 = angles(a).atom3 - 1;
 
         if (atom1 != i) return;
-        //Kokkos::printf("atom1: %d atom2: %d \n", atom1, atom2);
-        // Search for atom2 in atom i's verlet list and remove it
+
+        // Remove atom2 from verlet list
         int n = neighbour_count(i);
         for (int k = 0; k < n; k++) {
             if (verlet_list(i, k) == atom2) {
-                // Found the bonded atom, remove it by shifting the remaining elements
-                for (int l = k; l < n - 1; l++) {
-                    verlet_list(i, l) = verlet_list(i, l + 1);
-                }
-                // Decrement the neighbor count
-                Kokkos::atomic_fetch_add(&neighbour_count(i),-1);
+                verlet_list(i, k) = 0;  // Mark for removal
+                Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
                 break;
             }
         }
-        // Search for atom3 in atom i's verlet list and remove it
+
+        // Remove atom3 from verlet list
         n = neighbour_count(i);
         for (int k = 0; k < n; k++) {
             if (verlet_list(i, k) == atom3) {
-                // Found the bonded atom, remove it by shifting the remaining elements
-                for (int l = k; l < n - 1; l++) {
-                    verlet_list(i, l) = verlet_list(i, l + 1);
-                }
-                // Decrement the neighbor count
-                Kokkos::atomic_fetch_add(&neighbour_count(i),-1);
+                verlet_list(i, k) = 0;  // Mark for removal
+                Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
                 break;
             }
         }
     });
+
+    // Clean up list after angle removal
+    Kokkos::single(Kokkos::PerTeam(teamMember), [=]() {
+        int n = initial_neighbour_count;
+        int write_idx = 0;
+
+        for (int read_idx = 0; read_idx < n; ++read_idx) {
+            if (verlet_list(i, read_idx) != 0) {
+                verlet_list(i, write_idx) = verlet_list(i, read_idx);
+                ++write_idx;
+            }
+        }
+    });
+
+    // Remove atoms connected via dihedrals (1-4 interactions)
+    /*Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, dihedrals.extent(0)), [=](const int d) {
+        int atom1 = dihedrals(d).atom1 - 1;
+        int atom2 = dihedrals(d).atom2 - 1;
+        int atom3 = dihedrals(d).atom3 - 1;
+        int atom4 = dihedrals(d).atom4 - 1;
+
+        if (atom1 != i) return;
+
+        // Remove atom2
+        int n = neighbour_count(i);
+        for (int k = 0; k < n; k++) {
+            if (verlet_list(i, k) == atom2) {
+                verlet_list(i, k) = 0;  // Mark for removal
+                Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
+                break;
+            }
+        }
+
+        // Remove atom3
+        n = neighbour_count(i);
+        for (int k = 0; k < n; k++) {
+            if (verlet_list(i, k) == atom3) {
+                verlet_list(i, k) = 0;  // Mark for removal
+                Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
+                break;
+            }
+        }
+
+        // Remove atom4
+        n = neighbour_count(i);
+        for (int k = 0; k < n; k++) {
+            if (verlet_list(i, k) == atom4) {
+                verlet_list(i, k) = 0;  // Mark for removal
+                Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
+                break;
+            }
+        }
+    });
+
+    // Clean up list after dihedral removal
+    Kokkos::single(Kokkos::PerTeam(teamMember), [=]() {
+        int n = initial_neighbour_count;
+        int write_idx = 0;
+
+        for (int read_idx = 0; read_idx < n; ++read_idx) {
+            if (verlet_list(i, read_idx) != 0) {
+                verlet_list(i, write_idx) = verlet_list(i, read_idx);
+                ++write_idx;
+            }
+        }
+    });*/
 }

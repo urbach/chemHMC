@@ -471,7 +471,6 @@ double particles_instance::potential_verlet_list() {
     double result = 0.0;
     Kokkos::parallel_reduce("particles-LJ-potential-verlet-list",
         Kokkos::TeamPolicy<Tag_potential_verlet>(N, Kokkos::AUTO), *this, result);
-    //printf("RESULT: %f \n", result);
     return 4 * result;
 }
 
