@@ -26,6 +26,7 @@ public:
     void init(int argc, char** argv, bool check_overwrite = true);
 
     void run();
+    void run2();
     void optimize_stepsize();
     double gen_random();
 };
