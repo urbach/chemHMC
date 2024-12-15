@@ -40,12 +40,9 @@ void integrator_type::set_binomial_steps(std::mt19937_64 &gen64) {
 
 
 void LEAP::integrate() {
-
     // initial half-step for the  momenta
-
-    //calc_manager->compute_force();
-    //particles->compute_force();
-
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(dt / 2.);
     //
     // first full step for the position
@@ -53,17 +50,15 @@ void LEAP::integrate() {
     // nsteps-1 full steps
     for (size_t i = 0; i < steps - 1; i++) {
 
-        //calc_manager->compute_force();
-        //particles->compute_force();
+        calc_manager->compute_force();
+        Kokkos::fence();
         //printf("FOOOOOORCE: %f\n", host_f(0,0));
         particles->update_momenta(dt);
         particles->update_positions(dt);
     }
     // final half-step for the momenta
-
-    //calc_manager->compute_force();
-    //particles->compute_force();
-
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(dt / 2.);
 }
 
@@ -80,19 +75,29 @@ OMF2::OMF2(YAML::Node doc, params_class params) :
 void OMF2::integrate() {
 
     // initial half-step for the  momenta
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(lambda * dt);
 
     // nsteps-1 full steps
     for (size_t i = 0; i < steps - 1; i++) {
         particles->update_positions(dt / 2.);
+        calc_manager->compute_force();
+        Kokkos::fence();
         particles->update_momenta(oneminus2lambda * dt);
         particles->update_positions(dt / 2.);
+        calc_manager->compute_force();
+        Kokkos::fence();
         particles->update_momenta(2. * lambda * dt);
     }
     // final step
     particles->update_positions(dt / 2.);
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(oneminus2lambda * dt);
     particles->update_positions(dt / 2.);
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(lambda * dt);
 }
 //////////////////////////////////////////////////////////////////////////////
