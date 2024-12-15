@@ -16,6 +16,7 @@ void Calc_Manager::initialize() {
 void Calc_Manager::compute_force() {
     // Set forces to 0
     Kokkos::deep_copy(particles->f, 0.0);
+    // Loop over different potentials in calc_list
     for (const auto& calc : calc_list) {
             calc->force( *particles, particles->f );
     }
@@ -23,6 +24,7 @@ void Calc_Manager::compute_force() {
 
 double Calc_Manager::compute_potential() {
     double result = 0;
+    // Loop over different potentials in calc_list
     for (const auto& calc : calc_list) {
             result += calc->potential( *particles );
     }

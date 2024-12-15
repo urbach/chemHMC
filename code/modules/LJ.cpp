@@ -36,10 +36,11 @@ void LJ::init(const particles_instance& particles) {
 
 double LJ::potential(const particles_instance& particles) {
     double result;
+    // Capture all needed members of particle here. We do not want to reference 
+    // any members of particle directly inside of the kernel, as the class contains
+    // functions that are not device safe. This would trigger a lot of compiler warnings.
     auto& x = particles.x;
     auto& id = particles.id;
-
-    // Capture all necessary variables explicitly
     auto& L = this->L;
     auto& inverse_halved_L = this->inverse_halved_L;
     auto& cutoff_squared = this->cutoff_squared;
@@ -98,13 +99,11 @@ double LJ::potential(const particles_instance& particles) {
 }
 
 void LJ::force(const particles_instance& particles, type_f& f) {
-    // Set refs to needed members of particle here. We do not want to reference 
+    // Capture all needed members of particle here. We do not want to reference 
     // any members of particle directly inside of the kernel, as the class contains
-    // functions that are not device safe. This will trigger a lot of compiler warnings.
+    // functions that are not device safe. This would trigger a lot of compiler warnings.
     auto& x = particles.x;
     auto& id = particles.id;
-
-    // explicitly capture all needed members for the kernel
     auto& L = this->L;
     auto& inverse_halved_L = this->inverse_halved_L;
     auto& cutoff_squared = this->cutoff_squared;
@@ -138,18 +137,17 @@ void LJ::force(const particles_instance& particles, type_f& f) {
                     rz -= int(rz * inverse_halved_L[2]) * L[2];
                     r2 += rz * rz;
 
-                    // Apply Lennard-Jones force calculations
                     if (r2 < cutoff_squared) {
                         double sr2 = sigma_mat(type_i, type_j) * sigma_mat(type_i, type_j) / r2;
                         double sr6 = sr2 * sr2 * sr2;
                         sr2 = sr6 * (-sr6 + 0.5) / r2;
                         double force = 48.0 * epsilon_mat(type_i, type_j) * sr2;
 
-                        // Accumulate forces for particle i
+                        // Add forces for particle i
                         Kokkos::atomic_add(&f(i, 0), force * rx);
                         Kokkos::atomic_add(&f(i, 1), force * ry);
                         Kokkos::atomic_add(&f(i, 2), force * rz);
-
+                        // Add  inverse force to particle j
                         Kokkos::atomic_add(&f(j, 0), -force * rx);
                         Kokkos::atomic_add(&f(j, 1), -force * ry);
                         Kokkos::atomic_add(&f(j, 2), -force * rz);
