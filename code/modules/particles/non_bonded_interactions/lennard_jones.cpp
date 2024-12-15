@@ -133,7 +133,7 @@ void particles_instance::compute_force_MICAIP() {
     Kokkos::parallel_for("particles-LJ-force-MICAIP", team_policy(N, Kokkos::AUTO), *this);
 }
 
-KOKKOS_FUNCTION
+KOKKOS_INLINE_FUNCTION
 void particles_instance::operator() (Tag_force_MIC_inner_parallel, const member_type& teamMember) const {
     const int i = teamMember.league_rank();// bin id
     f(i, 0) = 0;
@@ -179,7 +179,7 @@ double particles_instance::potential_AMICAIP() {
     return 4 * result;
 }
 
-KOKKOS_FUNCTION
+KOKKOS_INLINE_FUNCTION
 void particles_instance::operator() (Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) const {
     const int i = teamMember.league_rank();
     double tmpV = 0;

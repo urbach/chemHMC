@@ -42,15 +42,28 @@ void integrator_type::set_binomial_steps(std::mt19937_64 &gen64) {
 void LEAP::integrate() {
 
     // initial half-step for the  momenta
+
+    //calc_manager->compute_force();
+    //particles->compute_force();
+
     particles->update_momenta(dt / 2.);
+    //
     // first full step for the position
     particles->update_positions(dt);
     // nsteps-1 full steps
     for (size_t i = 0; i < steps - 1; i++) {
+
+        //calc_manager->compute_force();
+        //particles->compute_force();
+        //printf("FOOOOOORCE: %f\n", host_f(0,0));
         particles->update_momenta(dt);
         particles->update_positions(dt);
     }
     // final half-step for the momenta
+
+    //calc_manager->compute_force();
+    //particles->compute_force();
+
     particles->update_momenta(dt / 2.);
 }
 

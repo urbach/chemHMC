@@ -6,6 +6,9 @@ set(chemHMC_header
     particles_type.hpp
     particles.hpp
     atom.hpp
+    LJ.hpp
+    Calc.hpp
+    Calc_Manager.hpp
     # binning.hpp
     # identical_particles.hpp
     # quick_sort.hpp
@@ -13,6 +16,8 @@ set(chemHMC_header
 
 set(chemHMC_scr 
     ../modules/HMC.cpp
+    ../modules/LJ.cpp
+    ../modules/Calc_Manager.cpp
     ../modules/read_infile.cpp
     ../modules/integrator.cpp
     ../modules/particles/particles_type.cpp

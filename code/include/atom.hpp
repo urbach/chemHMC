@@ -1,6 +1,7 @@
 #ifndef ATOM_HPP
 #define ATOM_HPP
-
+#include "global.hpp"
+#include <Kokkos_Core.hpp>
 
 /**
  * @class atom_type

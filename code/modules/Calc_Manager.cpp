@@ -8,19 +8,27 @@ void Calc_Manager::addCalc(std::shared_ptr<Calc> calc) {
 void Calc_Manager::initialize() {
     for (const auto& calc : calc_list) {
         if (calc) { // Check if the pointer is valid
-            calc->init();
+            calc->init( *particles );
         }
     }
 }
 
 void Calc_Manager::compute_force() {
+    // Set forces to 0
+    Kokkos::deep_copy(particles->f, 0.0);
     for (const auto& calc : calc_list) {
-            calc->force();
+            calc->force( *particles, particles->f );
     }
 }
 
-void Calc_Manager::compute_potential() {
+double Calc_Manager::compute_potential() {
+    double result = 0;
     for (const auto& calc : calc_list) {
-            calc->potential();
+            result += calc->potential( *particles );
     }
+    return result;
+}
+
+void Calc_Manager::set_particles(std::shared_ptr<particles_instance> particles_in) {
+    particles = particles_in;
 }

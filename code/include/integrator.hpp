@@ -10,11 +10,13 @@
 #include "particles_type.hpp"
 #include <random>
 #include "atom.hpp"
+#include "Calc_Manager.hpp"
 
 class integrator_type {
 
 public:
     particles_type* particles;
+    Calc_Manager* calc_manager = nullptr;
     atom_type* atoms;
     int average_steps;
     int steps;
@@ -25,6 +27,9 @@ public:
     void set_binomial_steps(std::mt19937_64 &gen64);
     virtual void integrate() = 0;
 
+    void set_calc_manager(Calc_Manager& calc_manager_ref) {
+        calc_manager = &calc_manager_ref;
+    }
 };
 
 

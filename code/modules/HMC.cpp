@@ -3,6 +3,11 @@
 #include <iostream>
 #include <fstream>
 #include "read_infile.hpp"
+#include "Calc_Manager.hpp"
+#include "particles_type.hpp"
+#include "particles.hpp"
+#include "LJ.hpp"
+#include <memory>
 
 void HMC_class::init(int argc, char** argv, bool check_overwrite) {
 
@@ -269,4 +274,90 @@ void HMC_class::run() {
     printf("time for HMC: %g  s\n", timer.seconds());
 
     //compute_average_acceptance(Ntrajectories, thermalization_steps, acceptance_vec);
+}
+
+void HMC_class::run2() {
+
+    Kokkos::Timer timer;
+    double tokcal = 1.0/kcaltointernal;
+
+    // Create a Calc_Manager instance
+    Calc_Manager calc_manager;
+    particles_instance* particles_ptr = static_cast<particles_instance*>(integrator->particles);
+    
+    // Create a std::shared_ptr from the raw pointer and pass it to manager.set_particles
+    calc_manager.set_particles(std::shared_ptr<particles_instance>(particles_ptr));
+
+    // Create an LJ object and add it to the manager
+    std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
+    calc_manager.addCalc(ljCalc);
+
+    // Initialize all Calc objects
+    calc_manager.initialize();
+
+    integrator->set_calc_manager(calc_manager);
+
+    double Vi = calc_manager.compute_potential();
+    printf("INITIAL V: %f \n", Vi*tokcal);
+
+    double beta = integrator->particles->get_beta();
+    calc_manager.compute_force();
+    //std::cout << "Lennard-Jones Force: " << force << std::endl;
+    
+    integrator->set_calc_manager(calc_manager);
+
+    Kokkos::fence();
+    int first_traj = params.istart + 1;
+    int last_traj = Ntrajectories + params.istart + 1;
+    // copy the configuration before the MD
+    Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
+    for (int i = first_traj; i < last_traj; i++) {
+        Kokkos::Timer timer_traj;
+        // hb momenta
+        integrator->particles->hb();
+        double Ki = integrator->particles->compute_kinetic_E();
+        // molecular dynamics
+        if (randomize_traj) {
+            integrator->set_binomial_steps(gen64);
+        }
+        integrator->integrate();
+
+        // accept/reject
+        double Vf = calc_manager.compute_potential();
+        double Kf = integrator->particles->compute_kinetic_E();
+
+        double dh = beta * (Kf + Vf - Ki - Vi);
+        double exp_mdh = exp(-dh);
+        if ((i % print_info_every == 0)) {
+            printf("step %d: K = %.12g  V = %.12g \n", i, Kf*tokcal, Vf*tokcal);
+        }
+        Kokkos::fence();
+
+
+        if (i < thermalization_steps) {
+            Vi = Vf;
+            Ki = Kf;
+            Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
+        }
+        else {
+            double r = gen_random();// random number from 0 to 1
+            //acceptance_vec.push_back(exp_mdh);
+            if (r < exp_mdh) {
+                acceptance++;
+                Vi = Vf;
+                Ki = Kf;
+                Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
+            }
+            else {
+                Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
+            }
+            // save
+            if ((i % save_every == 0)) {
+                integrator->particles->print_xyz(params, i, Ki, Vi);
+            }
+        }
+    }
+    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories - thermalization_steps)));
+    printf("final step size: %f\n", integrator->dt);
+    printf("time for HMC: %g  s\n", timer.seconds());
 }

@@ -509,7 +509,7 @@ public:
     };
 };
 void particles_instance::update_momenta(const double dt_) {
-    compute_force();
+    //compute_force();
     Kokkos::parallel_for("update_momenta", Kokkos::RangePolicy(0, N), functor_update_momenta(dt_, coeff_p, p, f));
 }
 

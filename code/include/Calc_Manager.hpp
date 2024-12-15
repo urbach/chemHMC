@@ -3,10 +3,12 @@
 #include "Calc.hpp"
 #include <vector>
 #include <memory>
+#include "particles.hpp"
 
 class Calc_Manager {
 private:
     std::vector<std::shared_ptr<Calc>> calc_list;
+    std::shared_ptr<particles_instance> particles;
 
 public:
     // Add a Calc object to the list
@@ -15,6 +17,7 @@ public:
     // Initialize all Calc objects
     void initialize();
     void compute_force();
-    void compute_potential();
+    double compute_potential();
+    void set_particles(std::shared_ptr<particles_instance> particles_in);
 };
 #endif
