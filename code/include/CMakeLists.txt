@@ -23,12 +23,12 @@ set(chemHMC_scr
     ../modules/Input_reader.cpp
     ../modules/read_infile.cpp
     ../modules/integrator.cpp
-    ../modules/particles/particles_type.cpp
     ../modules/particles/particles.cpp
     ../modules/particles/non_bonded_interactions/lennard_jones.cpp
     ../modules/particles/non_bonded_interactions/coulomb.cpp
     ../modules/particles/bonds/bonds.cpp
     ../modules/particles/bonds/opls.cpp
+    ../modules/particles/particles_type.cpp
     #../modules/identical_particles_binning.cpp
     # ../modules/binning.cpp
     #../modules/identical_particles.cpp

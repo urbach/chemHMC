@@ -16,8 +16,8 @@ void LJ::init(const particles_instance& particles) {
     h_epsilon_mat = particles.h_epsilon_mat;
     h_sigma_mat = particles.h_sigma_mat;
     // Allocate and copy the device views for epsilon_mat and sigma_mat
-    epsilon_mat = Kokkos::View<double**>("epsilon_mat", h_epsilon_mat.extent(0), h_epsilon_mat.extent(1));
-    sigma_mat = Kokkos::View<double**>("sigma_mat", h_sigma_mat.extent(0), h_sigma_mat.extent(1));
+    epsilon_mat = Kokkos::View<double**>("epsilon_mat", particles.h_epsilon_mat.extent(0), particles.h_epsilon_mat.extent(1));
+    sigma_mat = Kokkos::View<double**>("sigma_mat", particles.h_sigma_mat.extent(0), particles.h_sigma_mat.extent(1));
     // Copy data from host to device memory so its accessible in the kernel
     Kokkos::deep_copy(epsilon_mat, h_epsilon_mat); 
     Kokkos::deep_copy(sigma_mat, h_sigma_mat);
@@ -36,7 +36,7 @@ void LJ::init(const particles_instance& particles) {
 double LJ::potential(const particles_instance& particles) {
     double result;
     // Capture all needed members of particle here. We do not want to reference 
-    // any members of particle directly inside of the kernel, as the class contains
+    // any members of particles directly inside of the kernel, as the class contains
     // functions that are not device safe. This would trigger a lot of compiler warnings.
     auto& x = particles.x;
     auto& id = particles.id;
@@ -53,14 +53,14 @@ double LJ::potential(const particles_instance& particles) {
         KOKKOS_LAMBDA(const Tag_potential_AMIC_inner_parallel, const member_type& teamMember, double& V) {
             const int i = teamMember.league_rank();
             double tmpV = 0.0;
-            const int type_i = id(i) - 1;
+            const int type_i = id(i);
 
             // Perform inner reduction outside nested lambda
             Kokkos::parallel_reduce(
                 Kokkos::TeamThreadRange(teamMember, i + 1, x.extent(0)),
                 [&](const int j, double& innerV) {
                     if (i != j) {
-                        const int type_j = id(j) - 1;
+                        const int type_j = id(j);
 
                         double rij = x(i, 0) - x(j, 0);
                         rij -= int(rij * inverse_halved_L[0]) * L[0];
@@ -92,7 +92,7 @@ double LJ::potential(const particles_instance& particles) {
                 V += tmpV;
             });
         },
-        result);
+    result);
 
     return 4.0 * result;
 }

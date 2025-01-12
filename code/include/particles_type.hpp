@@ -29,7 +29,6 @@ public:
     type_p  p;      ///< Kokkos view containing the momenta
     type_f  f;      ///< Kokkos view containing the forces
     type_id id;     ///< Kokkos view containing the type_ids 
-    bool initHostMirror;
     // the host mirror of x is used to restore the position before the MD in case of a rejection
     type_x::HostMirror h_x;     ///< Host mirror of x (positions).
     type_p::HostMirror h_p;     ///< Host_mirror of p (momenta)
@@ -59,15 +58,9 @@ public:
     particles_type(YAML::Node doc, params_class params);
 
     virtual double get_beta() = 0;
-    virtual void InitX(params_class params) = 0;
+    virtual void InitX() = 0;
 
-    void printx();
-    void printp();
     virtual void print_xyz(params_class params, int traj, double K, double V) = 0;
-    virtual void read_xyz(params_class params) = 0;
-    virtual int how_many_confs_xyz(FILE* file) = 0;
-    virtual void read_next_confs_xyz(FILE* file) = 0;
-
 
     virtual void hb() = 0;
     virtual double compute_potential() = 0;

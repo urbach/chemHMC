@@ -8,7 +8,7 @@ integrator_type::integrator_type(YAML::Node doc, params_class params) {
 
     if (doc["particles"]) {
         particles = new particles_instance(doc, params);
-        particles->InitX(params);
+        particles->InitX();
     }
     else {
         Kokkos::abort("no particles in input file");

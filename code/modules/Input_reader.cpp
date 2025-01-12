@@ -1,12 +1,13 @@
 #include "Input_reader.hpp"
 #include "read_infile.hpp"
+#include "atom.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 
 // Constructor: Accepts a pointer to Parameters
-Input_reader::Input_reader(params_class* params, integrator_type*& integrator) 
-                        : params_ptr(params), integrator_ptr(integrator) {
+Input_reader::Input_reader(params_class* params, integrator_type*& integrator, particles_instance*& particles) 
+                        : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles) {
     if (!params) {
         throw std::runtime_error("Error: Null pointer passed as params to Input_reader constructor.");
     }
@@ -59,6 +60,10 @@ void Input_reader::parse_input(int argc, char** argv) {
 
     parse_simulation_parameters(doc);
     parse_integrator_options(doc);
+    particles_ptr = integrator_ptr->particles;
+    parse_particles_options(doc);
+    assign_ids();
+    read_xyz();
 }
 
 void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
@@ -119,4 +124,223 @@ void Input_reader::parse_integrator_options(YAML::Node& doc) {
     }
     integrator_ptr->dt = check_and_assign_value<double>(doc["integrator"], "dt");
     integrator_ptr->steps = check_and_assign_value<int>(doc["integrator"], "steps");
+
+}
+
+void get_atom_types_from_file(YAML::Node& doc, particles_instance*& particles) {
+    std::string parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");
+
+    std::ifstream infile(parameter_file);
+    std::string line;
+    std::getline(infile, line); // Skip the first line
+    std::vector<atom_type> temp_atom_type_list;
+    while (std::getline(infile, line)) {
+        std::istringstream iss(line);
+        std::string label;
+        double mass, charge, epsilon, sigma;
+        int index;
+
+        iss >> index >> label >> mass >> charge >> epsilon >> sigma;
+
+        // Create an atom_type instance and add it to the vector
+        atom_type atom(label.c_str(), mass, charge, index, epsilon*kcaltointernal, sigma);
+        temp_atom_type_list.push_back(atom);
+    }
+    particles->h_atom_type_list = Kokkos::create_mirror_view(Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size()));
+    for (size_t i = 0; i < temp_atom_type_list.size(); ++i) {
+        particles->h_atom_type_list(i) = temp_atom_type_list[i];
+    }
+    particles->atom_type_list = Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size());
+
+    Kokkos::deep_copy(particles->atom_type_list, particles->h_atom_type_list);
+}
+
+void mix_pair_parameters(YAML::Node& doc, particles_instance*& particles) {
+
+    // assign correct size to parameter matrices
+    int num_atom_types = particles->atom_type_list.extent(0);
+    particles->sigma_mat = Kokkos::View<double**>("sigma_mat", num_atom_types, num_atom_types);
+    particles->epsilon_mat = Kokkos::View<double**>("epsilon_mat", num_atom_types, num_atom_types);
+
+    // Initialize host mirrors
+    particles->h_sigma_mat = Kokkos::create_mirror_view(particles->sigma_mat);
+    particles->h_epsilon_mat = Kokkos::create_mirror_view(particles->epsilon_mat);
+
+
+    // Fill known diagonal elements
+    for(int i = 0; i < particles->h_atom_type_list.extent(0); ++i) {
+        particles->h_epsilon_mat(i, i) = particles->h_atom_type_list(i).LJ_epsilon;
+        particles->h_sigma_mat(i, i) = particles->h_atom_type_list(i).LJ_sigma;
+    }
+
+    // Apply Lorentz-Berthelot mixing rules
+    for(int i = 0; i < particles->h_atom_type_list.extent(0); ++i) {
+        for(int j = i + 1; j < particles->h_atom_type_list.extent(0); ++j) {
+            double epsilon = sqrt(particles->h_epsilon_mat(i, i) * particles->h_epsilon_mat(j, j)); // Berthelots rule
+            double sigma = 0.5 * (particles->h_sigma_mat(i, i) + particles->h_sigma_mat(j, j)); // Lorentz rule
+            particles->h_epsilon_mat(i, j) = epsilon;
+            particles->h_epsilon_mat(j, i) = epsilon;
+            particles->h_sigma_mat(i, j) = sigma;
+            particles->h_sigma_mat(j, i) = sigma;
+            //printf("i: %d j: %d eps: %f sig: %f",i,j,epsilon,sigma);
+        }
+
+    }
+
+    // Copy the updated data to device memory
+    Kokkos::deep_copy(particles->sigma_mat, particles->h_sigma_mat);
+    Kokkos::deep_copy(particles->epsilon_mat, particles->h_epsilon_mat);
+}
+
+void Input_reader::parse_particles_options(YAML::Node& doc) {
+    // get interaction parameters from parameter file
+    get_atom_types_from_file(doc, particles_ptr);
+    // generate mixed pair parameters
+    mix_pair_parameters(doc, particles_ptr);
+
+    // get the Rest of the parameters
+    particles_ptr->T = check_and_assign_value<double>(doc["particles"], "temperature");
+    particles_ptr->beta = 1/(kB*particles_ptr->T);
+    particles_ptr->sbeta = sqrt(particles_ptr->beta);
+    particles_ptr->cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
+    particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+    particles_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
+
+    particles_ptr->inverse_L[0] = 1.0/params_ptr->L[0];
+    particles_ptr->inverse_L[1] = 1.0/params_ptr->L[1];
+    particles_ptr->inverse_L[2] = 1.0/params_ptr->L[2];
+    
+    particles_ptr->inverse_halved_L[0] = 2.0*params_ptr->inverse_L[0];
+    particles_ptr->inverse_halved_L[1] = 2.0*params_ptr->inverse_L[1];
+    particles_ptr->inverse_halved_L[2] = 2.0*params_ptr->inverse_L[2];
+
+    particles_ptr->assign_algorithm(doc);
+    
+    particles_ptr->compute_coeff_momenta();
+    particles_ptr->compute_coeff_position();
+
+    particles_ptr->rand_pool.init(params_ptr->seed, particles_ptr->N);
+}
+
+void Input_reader::assign_ids() {
+    // this function reads in the atom types from the start_configuration_file
+    // and assigns each an atom_type_id defined in the atom_type_list.
+    std::ifstream infile(params_ptr->start_configuration_file);
+    if (!infile) {
+        throw std::runtime_error("Unable to open parameter file: " + params_ptr->start_configuration_file);
+    }
+
+    std::string line;
+    // get number of particles from first line
+    std::getline(infile, line);
+    std::istringstream iss(line);
+    int N_particles;
+    iss >> N_particles;
+
+    // skip comment line 
+    std::getline(infile, line);
+    // assign all ids
+    for (int i = 0; i < N_particles; i++) {
+        // get type from current line
+        std::getline(infile, line);
+        std::istringstream iss(line);
+        std::string type;
+        iss >> type;
+        
+        // find matching id and assign it
+        for (int j = 0; j < particles_ptr->h_atom_type_list.extent(0); j++) {
+            if(type == particles_ptr->h_atom_type_list[j].label) {
+                // assign id and shift by -1 so ids allign with indices of parameter views
+                particles_ptr->h_id[i] = particles_ptr->h_atom_type_list[j].type_index-1;
+                break;
+            }
+        }
+    }
+    Kokkos::deep_copy(particles_ptr->id, particles_ptr->h_id);
+    Kokkos::fence();
+}
+
+void Input_reader::read_xyz() {
+    // Open the input file using ifstream
+    std::ifstream infile(params_ptr->start_configuration_file);
+    if (!infile.is_open()) {
+        std::cerr << "Error opening file " << params_ptr->start_configuration_file << std::endl;
+        Kokkos::abort("abort");
+    }
+
+    // Count the number of lines in the file
+    int lines = 0;
+    std::string temp_line;
+    while (std::getline(infile, temp_line)) {
+        lines++;
+    }
+
+    // Check if the number of lines is a multiple of N + 2
+    if (lines % (particles_ptr->N + 2) != 0) {
+        std::cerr << "Error: input file " << params_ptr->start_configuration_file << " contains " << lines << " lines" << std::endl;
+        std::cerr << "       the number of lines must be a multiple of N+2 = " << particles_ptr->N + 2 << std::endl;
+        Kokkos::abort("abort");
+    }
+
+    // Calculate the number of configurations in the file
+    int confs = lines / (particles_ptr->N + 2);
+    std::cout << "Number of configurations in input file: " << confs << std::endl;
+
+    // Reset the file stream to the beginning
+    infile.clear();
+    infile.seekg(0, std::ios::beg);
+
+    // Skip lines to reach the last configuration
+    int lines_to_skip = (confs - 1) * (particles_ptr->N + 2);
+    for (int i = 0; i < lines_to_skip; ++i) {
+        if (!std::getline(infile, temp_line)) {
+            std::cerr << "Error: unexpected end of file while skipping to last configuration" << std::endl;
+            Kokkos::abort("abort");
+        }
+    }
+
+    // Read the number of atoms from the first line of the last configuration
+    if (!std::getline(infile, temp_line)) {
+        std::cerr << "Error: unexpected end of file while reading number of atoms" << std::endl;
+        Kokkos::abort("abort");
+    }
+    int num_atoms_in_file = std::stoi(temp_line);
+    if (num_atoms_in_file != particles_ptr->N) {
+        std::cerr << "Error: number of atoms in file (" << num_atoms_in_file << ") does not match expected N (" << particles_ptr->N << ")" << std::endl;
+        Kokkos::abort("abort");
+    }
+
+    // Read the comment line (we can skip or store it if needed)
+    if (!std::getline(infile, temp_line)) {
+        std::cerr << "Error: unexpected end of file while reading comment line" << std::endl;
+        Kokkos::abort("abort");
+    }
+    // Optionally, store or skip the comment line
+    std::string comment_line = temp_line;
+
+    std::cout << "Reading last configuration from input file " << params_ptr->start_configuration_file << std::endl;
+
+    // Read the atom data
+    std::vector<std::string> label_xyz;
+    label_xyz.clear(); // Ensure label_xyz is empty before filling
+    for (int i = 0; i < particles_ptr->N; ++i) {
+        if (!std::getline(infile, temp_line)) {
+            std::cerr << "Error: unexpected end of file while reading atom data" << std::endl;
+            Kokkos::abort("abort");
+        }
+        std::istringstream iss(temp_line);
+        std::string id;
+        double x_val, y_val, z_val;
+        if (!(iss >> id >> x_val >> y_val >> z_val)) {
+            std::cerr << "Error parsing atom data on line " << i + 1 << std::endl;
+            Kokkos::abort("Error parsing xyz file");
+        }
+        label_xyz.push_back(id);
+        particles_ptr->h_x(i, 0) = x_val;
+        particles_ptr->h_x(i, 1) = y_val;
+        particles_ptr->h_x(i, 2) = z_val;
+    }
+
+    infile.close();
+    Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
 }

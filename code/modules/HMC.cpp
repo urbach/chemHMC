@@ -16,7 +16,7 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     params_o = params_class();
     params = &params_o;
     acceptance = 0;
-    Input_reader input_reader = Input_reader(params, integrator);
+    Input_reader input_reader = Input_reader(params, integrator, particles);
     input_reader.parse_input(argc, argv);
     gen64.seed(params->seed);
 }
@@ -240,10 +240,9 @@ void HMC_class::run2() {
 
     // Create a Calc_Manager instance
     Calc_Manager calc_manager;
-    particles_instance* particles_ptr = static_cast<particles_instance*>(integrator->particles);
     
     // Create a std::shared_ptr from the raw pointer and pass it to manager.set_particles
-    calc_manager.set_particles(std::shared_ptr<particles_instance>(particles_ptr));
+    calc_manager.set_particles(std::shared_ptr<particles_instance>(particles));
 
     // Create an LJ object and add it to the manager
     std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();

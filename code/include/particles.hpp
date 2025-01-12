@@ -114,20 +114,14 @@ public:
 
     // file interaction
     void print_xyz(params_class params, int traj, double K, double V) override;
-    void read_xyz(params_class params) override;
-    int how_many_confs_xyz(FILE* file) override;
-    void read_next_confs_xyz(FILE* file) override;
-    void get_parameters(YAML::Node& parameter_file, Kokkos::View<atom_type*>& atom_type_list);
 
 
     // initialization related stuff
     struct check_in_volume {};
 
-    void InitX(params_class params) override;
+    void InitX() override;
     double get_beta() { return beta; };
-    void assign_ids();
     void assign_algorithm(YAML::Node& doc);
-    void mix_parameters(YAML::Node& doc);
     void compute_coeff_position();
     void compute_coeff_momenta();
 

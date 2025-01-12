@@ -16,261 +16,12 @@
 
 // constructor
 particles_instance::particles_instance(YAML::Node doc, params_class params) :
-    particles_type(doc, params) {
-
-    // get interaction parameters from parameter file
-    get_parameters(doc, atom_type_list);
-
-    // generate mixed pair parameters
-    mix_parameters(doc);
-
-    T = check_and_assign_value<double>(doc["particles"], "temperature");
-    beta = 1/(kB*T);
-    sbeta = sqrt(beta);
-    cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
-    cutoff_squared = cutoff * cutoff;
-    start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
-
-    // get inverse halved box size (needed for MIC algorithm)
-    inverse_L[0] = 1.0/L[0];
-    inverse_L[1] = 1.0/L[1];
-    inverse_L[2] = 1.0/L[2];
-    
-    inverse_halved_L[0] = 2.0*inverse_L[0];
-    inverse_halved_L[1] = 2.0*inverse_L[1];
-    inverse_halved_L[2] = 2.0*inverse_L[2];
-
-    
-
-    assign_algorithm(doc);
-
-    std::cout << "temperature: " << T << std::endl;
-    
-    compute_coeff_momenta();
-    compute_coeff_position();
-    
-}
-
-void particles_instance::read_xyz(params_class params) {
-    // Open the input file using ifstream
-    std::ifstream infile(params.start_configuration_file);
-    if (!infile.is_open()) {
-        std::cerr << "Error opening file " << params.start_configuration_file << std::endl;
-        Kokkos::abort("abort");
-    }
-
-    // Count the number of lines in the file
-    int lines = 0;
-    std::string temp_line;
-    while (std::getline(infile, temp_line)) {
-        lines++;
-    }
-
-    // Check if the number of lines is a multiple of N + 2
-    if (lines % (N + 2) != 0) {
-        std::cerr << "Error: input file " << params.start_configuration_file << " contains " << lines << " lines" << std::endl;
-        std::cerr << "       the number of lines must be a multiple of N+2 = " << N + 2 << std::endl;
-        Kokkos::abort("abort");
-    }
-
-    // Calculate the number of configurations in the file
-    int confs = lines / (N + 2);
-    std::cout << "Number of configurations in input file: " << confs << std::endl;
-
-    // Reset the file stream to the beginning
-    infile.clear();
-    infile.seekg(0, std::ios::beg);
-
-    // Skip lines to reach the last configuration
-    int lines_to_skip = (confs - 1) * (N + 2);
-    for (int i = 0; i < lines_to_skip; ++i) {
-        if (!std::getline(infile, temp_line)) {
-            std::cerr << "Error: unexpected end of file while skipping to last configuration" << std::endl;
-            Kokkos::abort("abort");
-        }
-    }
-
-    // Read the number of atoms from the first line of the last configuration
-    if (!std::getline(infile, temp_line)) {
-        std::cerr << "Error: unexpected end of file while reading number of atoms" << std::endl;
-        Kokkos::abort("abort");
-    }
-    int num_atoms_in_file = std::stoi(temp_line);
-    if (num_atoms_in_file != N) {
-        std::cerr << "Error: number of atoms in file (" << num_atoms_in_file << ") does not match expected N (" << N << ")" << std::endl;
-        Kokkos::abort("abort");
-    }
-
-    // Read the comment line (we can skip or store it if needed)
-    if (!std::getline(infile, temp_line)) {
-        std::cerr << "Error: unexpected end of file while reading comment line" << std::endl;
-        Kokkos::abort("abort");
-    }
-    // Optionally, store or skip the comment line
-    std::string comment_line = temp_line;
-
-    std::cout << "Reading last configuration from input file " << params.start_configuration_file << std::endl;
-
-    // Read the atom data
-    label_xyz.clear(); // Ensure label_xyz is empty before filling
-    for (int i = 0; i < N; ++i) {
-        if (!std::getline(infile, temp_line)) {
-            std::cerr << "Error: unexpected end of file while reading atom data" << std::endl;
-            Kokkos::abort("abort");
-        }
-        std::istringstream iss(temp_line);
-        std::string id;
-        double x_val, y_val, z_val;
-        if (!(iss >> id >> x_val >> y_val >> z_val)) {
-            std::cerr << "Error parsing atom data on line " << i + 1 << std::endl;
-            Kokkos::abort("Error parsing xyz file");
-        }
-        label_xyz.push_back(id);
-        h_x(i, 0) = x_val;
-        h_x(i, 1) = y_val;
-        h_x(i, 2) = z_val;
-    }
-
-    infile.close();
-    Kokkos::deep_copy(x, h_x);
-}
-
-int particles_instance::how_many_confs_xyz(FILE* file) {
-
-    int lines = 0;
-    char c;
-
-    /* count the newline characters */
-    while ((c = fgetc(file)) != EOF) {
-        if (c == '\n')
-            lines++;
-    }
-    if (lines % (N + 2) != 0) {
-        printf("error: xyz file contains %d lines\n", lines);
-        printf("       the number of lines mus be a multiple of N+2=%d\n", N + 2);
-        Kokkos::abort("abort");
-    }
-    int confs = lines / (N + 2);
-    printf("confs in input configuration file %d\n", confs);
-    rewind(file);
-    return confs;
-}
-
-void particles_instance::read_next_confs_xyz(FILE* file) {
-    int count = 0;
-    char id[1000];
-    char c;
-    while ((c = fgetc(file)) != EOF) {
-        if (c == '\n') {
-            for (int i = 0;i < 11;i++) c = fgetc(file);
-            int tmp;
-            count += fscanf(file, " %d", &tmp);
-            break;
-        }
-    }
-    while ((c = fgetc(file)) != EOF) { if (c == '\n') break; }
-    for (int i = 0; i < N;i++) {
-        count += fscanf(file, "%s   %lf   %lf  %lf\n", id, &h_x(i, 0), &h_x(i, 1), &h_x(i, 2));
-        // printf("%s   %lf   %lf  %lf\n", id, h_x(i, 0), h_x(i, 1), h_x(i, 2));
-    }
-    if (name_xyz.compare(id) != 0) {
-        printf("name in the xyz file: %s  do not mach the name in the input file: %s\n", id, name_xyz.c_str());
-        Kokkos::abort("abort");
-    }
-    // printf("%d  %d\n", count, N);
-    if (count != N * 4 + 1) { Kokkos::abort("error in reading the file"); }
-    Kokkos::deep_copy(x, h_x);
-    // printx();
-}
-
-void particles_instance::get_parameters(YAML::Node& doc, Kokkos::View<atom_type*>& atom_type_list) {
-    parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");
-
-    std::ifstream infile(parameter_file);
-    std::string line;
-    std::getline(infile, line); // Skip the first line
-    std::vector<atom_type> temp_atom_type_list;
-    while (std::getline(infile, line)) {
-        std::istringstream iss(line);
-        std::string label;
-        double mass, charge, epsilon, sigma;
-        int index;
-
-        iss >> index >> label >> mass >> charge >> epsilon >> sigma;
-
-        // Create an atom_type instance and add it to the vector
-        atom_type atom(label.c_str(), mass, charge, index, epsilon*kcaltointernal, sigma);
-        temp_atom_type_list.push_back(atom);
-    }
-    h_atom_type_list = Kokkos::create_mirror_view(Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size()));
-    for (size_t i = 0; i < temp_atom_type_list.size(); ++i) {
-        h_atom_type_list(i) = temp_atom_type_list[i];
-    }
-    atom_type_list = Kokkos::View<atom_type*>("atom_type_list", temp_atom_type_list.size());
-
-    Kokkos::deep_copy(atom_type_list, h_atom_type_list);
-}
-
-void particles_instance::mix_parameters(YAML::Node& doc) {
-
-    // assign correct size to parameter matrices
-    int num_atom_types = atom_type_list.extent(0);
-    sigma_mat = Kokkos::View<double**>("sigma_mat", num_atom_types, num_atom_types);
-    epsilon_mat = Kokkos::View<double**>("epsilon_mat", num_atom_types, num_atom_types);
-
-    // Initialize host mirrors
-    h_sigma_mat = Kokkos::create_mirror_view(sigma_mat);
-    h_epsilon_mat = Kokkos::create_mirror_view(epsilon_mat);
-
-
-    // Fill known diagonal elements
-    for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
-        h_epsilon_mat(i, i) = h_atom_type_list(i).LJ_epsilon;
-        h_sigma_mat(i, i) = h_atom_type_list(i).LJ_sigma;
-    }
-
-    // Apply Lorentz-Berthelot mixing rules
-    for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
-        for(int j = i + 1; j < h_atom_type_list.extent(0); ++j) {
-            double epsilon = sqrt(h_epsilon_mat(i, i) * h_epsilon_mat(j, j)); // Berthelots rule
-            double sigma = 0.5 * (h_sigma_mat(i, i) + h_sigma_mat(j, j)); // Lorentz rule
-            h_epsilon_mat(i, j) = epsilon;
-            h_epsilon_mat(j, i) = epsilon;
-            h_sigma_mat(i, j) = sigma;
-            h_sigma_mat(j, i) = sigma;
-            //printf("i: %d j: %d eps: %f sig: %f",i,j,epsilon,sigma);
-        }
-
-    }
-
-    // Copy the updated data to device memory
-    Kokkos::deep_copy(sigma_mat, h_sigma_mat);
-    Kokkos::deep_copy(epsilon_mat, h_epsilon_mat);
-}
+    particles_type(doc, params) {}
 
 void particles_instance::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
     printf("ALGORITHM: %s \n", algorithm.c_str());
-    if (algorithm.compare("all_neighbour") == 0) {
-        printf("selected algorithm: %s is not implemented for non identical particles\n", algorithm.c_str());
-        Kokkos::abort("aborting");
-    }
-    else if (algorithm.compare("all_neighbour_inner_parallel") == 0) {
-        potential_strategy = std::bind(&particles_instance::potential_all_neighbour_inner_parallel, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_all_neighbour_inner_parallel, this);
-        force_strategy = std::bind(&particles_instance::compute_force_all_inner_parallel, this);
-    }
-    else if (algorithm.compare("MICAIP") == 0) {
-        potential_strategy = std::bind(&particles_instance::potential_MICAIP, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_MICAIP, this);
-        force_strategy = std::bind(&particles_instance::compute_force_MICAIP, this);
-    }
-    else if (algorithm.compare("AMIC") == 0) {
-        potential_strategy = std::bind(&particles_instance::potential_AMICAIP, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_AMICAIP, this);
-        force_strategy = std::bind(&particles_instance::compute_force_AMICAIP, this);
-    }
-    else if (algorithm.compare("cell_list") == 0) {
+    if (algorithm.compare("cell_list") == 0) {
         particles_instance::init_cell_list(doc);
         potential_strategy = std::bind(&particles_instance::potential_cell_list, this);
         potential_without_binning_strategy = std::bind(&particles_instance::potential_cell_list, this);
@@ -377,60 +128,19 @@ void particles_instance::init_cell_list(YAML::Node& doc) {
     Kokkos::deep_copy(cell_list, 0);
 }
 
-void particles_instance::assign_ids() {
-    // this function reads in the atom types from the start_configuration_file
-    // and assigns each an atom_type_id defined in the atom_type_list.
-
-    std::ifstream infile(start_configuration_file);
-    if (!infile) {
-        throw std::runtime_error("Unable to open parameter file: " + start_configuration_file);
-    }
-
-    std::string line;
-    // get number of particles from first line
-    std::getline(infile, line);
-    std::istringstream iss(line);
-    int N_particles;
-    iss >> N_particles;
-
-    // skip comment line 
-    std::getline(infile, line);
-    // assign all ids
-    for (int i = 0; i < N_particles; i++) {
-        // get type from current line
-        std::getline(infile, line);
-        std::istringstream iss(line);
-        std::string type;
-        iss >> type;
-        
-        // find matching id and assign it
-        for (int j = 0; j < h_atom_type_list.extent(0); j++) {
-            if(type == h_atom_type_list[j].label) {
-                h_id[i] = h_atom_type_list[j].type_index;
-                break;
-            }
-        }
-    }
-}
-
-void particles_instance::InitX(params_class params) {
+void particles_instance::InitX() {
     x = type_x("x", N);
     // create_mirror() will always allocate a new view,
     // create_mirror_view() will only create a new view if the original one is not in HostSpace
     h_x = Kokkos::create_mirror(x);
     p = type_p("p", N);
     f = type_f("f", N);
-
     // save atom_type id for each particle
     id = type_id("id", N);
     h_id = Kokkos::create_mirror(id);
-    assign_ids();
-    Kokkos::deep_copy(id, h_id);
-    read_xyz(params);
-    Kokkos::deep_copy(h_x, x);
-    Kokkos::parallel_for("volume_check", Kokkos::RangePolicy<check_in_volume>(0, N), *this);
+    //assign_ids();
+    //Kokkos::deep_copy(id, h_id);
     Kokkos::fence();
-    printf("particle initialized\n");
 }
 
 void particles_instance::compute_coeff_momenta() {

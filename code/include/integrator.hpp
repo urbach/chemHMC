@@ -16,7 +16,7 @@
 class integrator_type {
 
 public:
-    particles_type* particles;
+    particles_instance* particles;
     Calc_Manager* calc_manager = nullptr;
     atom_type* atoms;
     int average_steps;

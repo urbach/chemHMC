@@ -22,6 +22,7 @@ public:
     std::mt19937_64 gen64;
     params_class params_o;
     params_class* params;
+    particles_instance* particles;
 
     HMC_class() {};
     void init(int argc, char** argv, bool check_overwrite = true);

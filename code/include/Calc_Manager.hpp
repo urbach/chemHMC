@@ -8,9 +8,10 @@
 class Calc_Manager {
 private:
     std::vector<std::shared_ptr<Calc>> calc_list;
-    std::shared_ptr<particles_instance> particles;
+    
 
 public:
+    std::shared_ptr<particles_instance> particles;
     // Add a Calc object to the list
     void addCalc(std::shared_ptr<Calc> calc);
 
