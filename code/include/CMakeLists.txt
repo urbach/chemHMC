@@ -3,6 +3,8 @@ set(chemHMC_header
     HMC.hpp
     read_infile.hpp
     integrator.hpp
+    Input_reader.hpp
+    Parameters.hpp
     particles_type.hpp
     particles.hpp
     atom.hpp
@@ -18,6 +20,7 @@ set(chemHMC_scr
     ../modules/HMC.cpp
     ../modules/LJ.cpp
     ../modules/Calc_Manager.cpp
+    ../modules/Input_reader.cpp
     ../modules/read_infile.cpp
     ../modules/integrator.cpp
     ../modules/particles/particles_type.cpp

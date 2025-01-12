@@ -6,6 +6,7 @@
 #include <Kokkos_Core.hpp>
 #include "global.hpp"
 #include "read_infile.hpp"
+#include "Parameters.hpp"
 #include "particles.hpp"
 #include "particles_type.hpp"
 #include <random>
@@ -27,9 +28,7 @@ public:
     void set_binomial_steps(std::mt19937_64 &gen64);
     virtual void integrate() = 0;
 
-    void set_calc_manager(Calc_Manager& calc_manager_ref) {
-        calc_manager = &calc_manager_ref;
-    }
+    void set_calc_manager(Calc_Manager& calc_manager_ref);
 };
 
 

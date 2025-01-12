@@ -1,5 +1,6 @@
 #include <iostream> 
 #include "integrator.hpp"
+#include "Parameters.hpp"
 #include "read_infile.hpp"
 #include "particles.hpp"
 
@@ -21,6 +22,12 @@ integrator_type::integrator_type(YAML::Node doc, params_class params) {
 
 }
 
+void integrator_type::set_calc_manager(Calc_Manager& calc_manager_ref) {
+    // The integrator needs to save a reference to the calc_manager to be able
+    // to trigger force calculations
+    calc_manager = &calc_manager_ref;
+}
+
 LEAP::LEAP(YAML::Node doc, params_class params) : integrator_type(doc, params) {}
 
 // binomial distribution with average n*p= average_steps
@@ -38,7 +45,6 @@ void integrator_type::set_binomial_steps(std::mt19937_64 &gen64) {
     }
 }
 
-
 void LEAP::integrate() {
     // initial half-step for the  momenta
     calc_manager->compute_force();
@@ -49,10 +55,8 @@ void LEAP::integrate() {
     particles->update_positions(dt);
     // nsteps-1 full steps
     for (size_t i = 0; i < steps - 1; i++) {
-
         calc_manager->compute_force();
         Kokkos::fence();
-        //printf("FOOOOOORCE: %f\n", host_f(0,0));
         particles->update_momenta(dt);
         particles->update_positions(dt);
     }
@@ -61,7 +65,6 @@ void LEAP::integrate() {
     Kokkos::fence();
     particles->update_momenta(dt / 2.);
 }
-
 
 //////////////////////////////////////////////////////////////////////////////
 // OMF2

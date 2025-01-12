@@ -4,34 +4,22 @@
 #include "global.hpp"
 #include "yaml-cpp/yaml.h"
 
-struct params_class { // Just the thing that holds all variables
-  
+struct params_class {
   double L[dim_space];
   double inverse_L[dim_space];
   double inverse_halved_L[dim_space];
+  int Ntrajectories;
+  int thermalization_steps;
+  int save_every;
+  int print_info_every;
   // run parameter
-  bool append;
   int seed;
-  int replica;
-  int start_measure;
-  int total_measure;
-  int measure_every_X_updates;
-  int istart;
   int N;
 
   FILE* fileout;
-  std::string StartCondition;
   std::string start_configuration_file;
   std::string nameout;
   std::string parameter_file;
-
-  std::string name_RDF;
-  
-  // contructor;
-  params_class(){};
-  params_class(YAML::Node doc, bool check_overwrite=true);
- 
-
 };
 
 

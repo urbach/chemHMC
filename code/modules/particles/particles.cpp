@@ -426,14 +426,7 @@ void particles_instance::InitX(params_class params) {
     h_id = Kokkos::create_mirror(id);
     assign_ids();
     Kokkos::deep_copy(id, h_id);
-
-    if (params.StartCondition == "read") {
-        read_xyz(params);
-    }
-    else {
-        Kokkos::abort("StartCondition for particles must be 'read'");
-    }
-    
+    read_xyz(params);
     Kokkos::deep_copy(h_x, x);
     Kokkos::parallel_for("volume_check", Kokkos::RangePolicy<check_in_volume>(0, N), *this);
     Kokkos::fence();

@@ -20,7 +20,8 @@ public:
     YAML::Node doc;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
-    params_class params;
+    params_class params_o;
+    params_class* params;
 
     HMC_class() {};
     void init(int argc, char** argv, bool check_overwrite = true);

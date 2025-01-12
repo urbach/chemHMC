@@ -85,6 +85,74 @@ void error_if_can_not_open_file_to_write(const std::string& name) {
     fclose(f);
 }
 
+params_class::params_class(YAML::Node doc, bool check_overwrite) {
+
+    // get box dimensions
+    L[0] = check_and_assign_value<double>(doc["geometry"], "Lx");
+    L[1] = check_and_assign_value<double>(doc["geometry"], "Ly");
+    L[2] = check_and_assign_value<double>(doc["geometry"], "Lz");
+    seed = check_and_assign_value<int>(doc, "seed");
+    StartCondition = check_and_assign_value<std::string>(doc, "StartCondition");
+
+    std::cout << "geometry: " << L[0] << std::endl;
+    std::cout << "   Lx: " << L[0] << std::endl;
+    std::cout << "   Ly: " << L[1] << std::endl;
+    std::cout << "   Lz: " << L[2] << std::endl;
+    std::cout << "seed: " << seed << std::endl;
+    std::cout << "StartCondition: " << StartCondition << std::endl;
+    if (StartCondition == "read") {
+        start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
+    }
+    fileout = NULL;
+    nameout = check_and_assign_value<std::string>(doc, "output_file");
+
+    parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");  
+
+    printf("parameter_file:");
+    printf("parameter_file: %s\n", parameter_file.c_str());
+
+    append = check_and_assign_value<bool>(doc, "append");
+    
+    // Sanity check
+    if (append == true) {
+        if (StartCondition != "read") {
+            printf("error: append=true so the start condition must be read, while in the inputfile StartCondition=%s\n", StartCondition.c_str());
+            Kokkos::abort("aborting");
+        }
+        if (start_configuration_file != nameout) {
+            printf("error: append=true is only supported if the start_configuration_file is the same of the output_file\n");
+            printf("start_configuration_file= %s\n", start_configuration_file.c_str());
+            printf("output_file             = %s\n", nameout.c_str());
+            Kokkos::abort("aborting");
+        }
+        error_if_can_not_open_file_to_read(parameter_file);
+    }
+    else {
+        if (check_overwrite) {
+            error_if_file_exist(nameout);
+        }
+    }
+
+    // read N from first line of input file
+    std::ifstream xyz_file(nameout);
+    std::string line;
+    if (std::getline(xyz_file, line)) {
+        N = std::atoi(line.c_str());
+        std::cout << "Number of particles (N) read from .xyz file: " << N << std::endl;
+    } else {
+        std::cerr << "Error: Could not read the first line of file " << nameout << std::endl;
+        throw std::runtime_error("File read error");
+    }
+
+    xyz_file.close();
+
+    fileout = fopen(nameout.c_str(), "ab");
+    if (fileout == NULL || nameout.length() <= 0 || nameout.compare("null") == 0) {
+        printf("unable to open file %s\n", nameout.c_str());
+        Kokkos::abort("abort");
+    }
+}
+
 YAML::Node read_params(int argc, char** argv) {
     int opt = -1;
     YAML::Node doc;
