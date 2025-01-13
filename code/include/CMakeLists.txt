@@ -5,12 +5,12 @@ set(chemHMC_header
     integrator.hpp
     Input_reader.hpp
     Parameters.hpp
-    particles_type.hpp
     particles.hpp
     atom.hpp
     LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
+    #particles_type.hpp
     # binning.hpp
     # identical_particles.hpp
     # quick_sort.hpp

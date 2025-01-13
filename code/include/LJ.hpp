@@ -11,7 +11,6 @@
 #include <iomanip>
 #include "yaml-cpp/yaml.h"
 #include "particles.hpp"
-#include "particles_type.hpp"
 class LJ : public Calc {
 public:
     LJ() = default;

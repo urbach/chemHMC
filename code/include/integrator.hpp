@@ -8,7 +8,6 @@
 #include "read_infile.hpp"
 #include "Parameters.hpp"
 #include "particles.hpp"
-#include "particles_type.hpp"
 #include <random>
 #include "atom.hpp"
 #include "Calc_Manager.hpp"

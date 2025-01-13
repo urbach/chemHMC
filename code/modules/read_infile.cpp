@@ -12,9 +12,6 @@
 
 #include "global.hpp"
 #include "yaml-cpp/yaml.h"
-#include "particles_type.hpp"
-
-
 
 template<class T>
 T check_and_assign_value(YAML::Node doc, const char* tag) {

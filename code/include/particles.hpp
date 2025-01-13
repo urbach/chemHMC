@@ -8,8 +8,8 @@
 #include <iomanip>
 #include "yaml-cpp/yaml.h"
 #include "global.hpp"
+#include "read_infile.hpp"
 #include <Kokkos_Core.hpp>
-#include "particles_type.hpp"
 
 struct BondType {
     int type;
@@ -55,11 +55,17 @@ struct Dihedral {
     int atom4;
 };
 
-class particles_instance : public particles_type {
+class particles_instance {
 
 public:
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
-
+    
+    int N;
+    int seed;
+    double coeff_p;
+    double L[dim_space];
+    double inverse_L[dim_space];
+    double inverse_halved_L[dim_space];
     double mass;
     double beta;
     double sbeta;// sqrt(beta)
@@ -68,6 +74,20 @@ public:
     double cutoff;
     double cutoff_squared;
     std::string name_xyz;
+
+    type_x  x;      ///< Kokkos view containing the positions
+    type_p  p;      ///< Kokkos view containing the momenta
+    type_f  f;      ///< Kokkos view containing the forces
+    type_id id;     ///< Kokkos view containing the type_ids 
+    // the host mirror of x is used to restore the position before the MD in case of a rejection
+    type_x::HostMirror h_x;     ///< Host mirror of x (positions).
+    type_p::HostMirror h_p;     ///< Host_mirror of p (momenta)
+
+    std::string algorithm;
+    std::vector<std::string> label_xyz;
+
+    // rng
+    RandPoolType rand_pool;
 
     const std::string name = "particles";
     Kokkos::View<atom_type*> atom_type_list; ///< view containing mass/charge/index of atom types
@@ -108,13 +128,13 @@ public:
     Kokkos::View<double*[2]>::HostMirror h_bond_parameters;
 
     // file interaction
-    void print_xyz(params_class params, int traj, double K, double V) override;
+    void print_xyz(params_class params, int traj, double K, double V);
 
 
     // initialization related stuff
     struct check_in_volume {};
 
-    void InitX() override;
+    void InitX();
     double get_beta() { return beta; };
     void assign_algorithm(YAML::Node& doc);
     void compute_coeff_position();
@@ -126,16 +146,16 @@ public:
     // integrator related stuff
     struct hbTag {};
 
-    void hb() override;
-    void update_positions(const double dt_) override;
-    void update_momenta(const double dt_) override;
+    void hb();
+    void update_positions(const double dt_);
+    void update_momenta(const double dt_);
 
     KOKKOS_FUNCTION void operator() (hbTag, const int i) const;
     
     // kinetic energy calculation
     struct kinetic {};
 
-    double compute_kinetic_E() override;
+    double compute_kinetic_E();
 
     KOKKOS_FUNCTION void operator() (kinetic, const int& i, double& sum) const;
 
@@ -153,11 +173,11 @@ public:
     double potential_AMICAIP();
     double potential_cell_list();
     double potential_verlet_list();
-    double compute_potential() override {
+    double compute_potential() {
         return potential_strategy();
     };
     std::function<double()>  potential_without_binning_strategy;
-    double evaluate_potential() override {
+    double evaluate_potential() {
         return potential_without_binning_strategy();
     };
 
@@ -168,7 +188,7 @@ public:
     KOKKOS_FUNCTION void operator() (Tag_potential_verlet, const member_type& teamMember, double& V) const;
 
     // pot E minimization
-    void minimize_energy(YAML::Node& doc) override;
+    void minimize_energy(YAML::Node& doc);
     double gradient_descent_minimzation(YAML::Node& doc);
     double conjugate_gradient_minimzation(YAML::Node& doc);
     void save_optimized_geometry(double V) const;
@@ -187,7 +207,7 @@ public:
     void compute_force_AMICAIP();
     void compute_force_cell_list();
     void compute_force_verlet_list();
-    void compute_force() override {
+    void compute_force() {
         force_strategy();
     };
 
@@ -210,7 +230,7 @@ public:
 
     // Verlet list
     void init_verlet_list(YAML::Node& doc);
-    void build_verlet_list() override;
+    void build_verlet_list();
 
     struct Tag_build_verlet_list {};
 
@@ -268,7 +288,7 @@ public:
 
     double potential_bonds_angles();
 
-    void build_bondless_verlet_list() override;
+    void build_bondless_verlet_list();
     struct Tag_verlet_remove_bonds {};
     KOKKOS_FUNCTION void operator() (Tag_verlet_remove_bonds, const member_type& teamMember) const;
 

@@ -6,7 +6,6 @@
 #include "Input_reader.hpp"
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
-#include "particles_type.hpp"
 #include "particles.hpp"
 #include "LJ.hpp"
 #include <memory>

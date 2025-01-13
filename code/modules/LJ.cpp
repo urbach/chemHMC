@@ -7,7 +7,6 @@
 #include <atom.hpp>
 #include <iostream>
 #include <iomanip>
-#include "particles_type.hpp"
 #include "particles.hpp"
 #include <cmath> // For potential calculations
 

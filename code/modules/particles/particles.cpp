@@ -1,5 +1,3 @@
-#include "particles_type.hpp"
-
 #include <array>
 #include <cstdlib>
 #include <cstring>

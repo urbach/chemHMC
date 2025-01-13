@@ -2,7 +2,6 @@
 #define HMC_H
 #include "read_infile.hpp"
 #include "yaml-cpp/yaml.h"
-#include "particles_type.hpp"
 #include "particles.hpp"
 #include "global.hpp"
 #include "integrator.hpp"
