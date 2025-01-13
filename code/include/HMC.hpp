@@ -5,6 +5,7 @@
 #include "particles.hpp"
 #include "global.hpp"
 #include "integrator.hpp"
+#include "Calc_Manager.hpp"
 #include <random>
 
 class HMC_class {
@@ -21,12 +22,12 @@ public:
     std::mt19937_64 gen64;
     params_class* params;
     particles_instance* particles;
+    Calc_Manager* calc_manager;
 
     HMC_class() {};
     void init(int argc, char** argv, bool check_overwrite = true);
 
     void run();
-    void run2();
     void optimize_stepsize();
     double gen_random();
 };

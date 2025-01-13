@@ -20,7 +20,7 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     particles = new particles_instance();
     integrator = nullptr; // Specific integrator gets initialized by input reader
     Input_reader input_reader = Input_reader(params, integrator, particles);
-    
+    calc_manager = new Calc_Manager();
     
     
     input_reader.parse_input(argc, argv);
@@ -150,122 +150,27 @@ void HMC_class::optimize_stepsize() {
 void HMC_class::run() {
 
     Kokkos::Timer timer;
-    std::vector<double> acceptance_vec;
     double tokcal = 1.0/kcaltointernal;
-    // perform a loose energy minimization to remove energy hotspots
-    if (doc["minimization"]) {
-        printf("STARTING MINIMIZATION \n");
-        integrator->particles->minimize_energy(doc);
-    }
-    
-    if (integrator->particles->algorithm == "verlet_list") integrator->particles->build_verlet_list();
-    if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
-    if (integrator->particles->algorithm == "opls") integrator->particles->build_bondless_verlet_list();
-    
-    if (doc["optimize_stepsize"]) {
-        optimize_stepsize();
-        printf("USED DT: %f \n", integrator->dt);
-    }
-    
-    double Vi = integrator->particles->compute_potential();
-    printf("INITIAL V: %f \n", Vi*tokcal);
-
-    double beta = integrator->particles->get_beta();
-
-    Kokkos::fence();
-    // copy the configuration before the MD
-    Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-    for (int i = 0; i < params->Ntrajectories; i++) {
-        Kokkos::Timer timer_traj;
-        // hb momenta
-        integrator->particles->hb();
-        double Ki = integrator->particles->compute_kinetic_E();
-        // molecular dynamics
-        if (integrator->particles->algorithm == "verlet_list") {
-            integrator->particles->build_verlet_list();
-        }
-        if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
-        if (integrator->particles->algorithm == "opls") integrator->particles->build_bondless_verlet_list();
-        integrator->integrate();
-
-        // accept/reject
-        double Vf = integrator->particles->compute_potential();
-        double Kf = integrator->particles->compute_kinetic_E();
-
-        double dh = beta * (Kf + Vf - Ki - Vi);
-        double exp_mdh = exp(-dh);
-        if ((i % params->print_info_every == 0)) {
-            printf("step %d: K = %.12g  V = %.12g \n", i, Kf*tokcal, Vf*tokcal);
-        }
-        Kokkos::fence();
-
-
-        if (i < params->thermalization_steps) {
-            Vi = Vf;
-            Ki = Kf;
-            Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-        }
-        else {
-            double r = gen_random();// random number from 0 to 1
-            //acceptance_vec.push_back(exp_mdh);
-            if (r < exp_mdh) {
-                acceptance++;
-                Vi = Vf;
-                Ki = Kf;
-                Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-            }
-            else {
-                Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
-            }
-            // save
-            if ((i % params->save_every == 0)) {
-                integrator->particles->print_xyz(*params, i, Ki, Vi);
-            }
-            // adjust the stepsize based the current average acceptance
-            if (doc["adjust_step_size"]) {
-                if ((acceptance / ((double)(i - params->thermalization_steps))) > 0.66) {
-                    integrator->dt *= 1.01;
-                } else if ((acceptance / ((double)(i - params->thermalization_steps))) < 0.64) {
-                    integrator->dt *= 0.99;
-                }
-            }
-        }
-#ifdef DEBUG
-        integrator->particles->printx();
-#endif
-    }
-    printf("Acceptance: %g\n", acceptance / ((double)(Ntrajectories - thermalization_steps)));
-    printf("final step size: %f\n", integrator->dt);
-    printf("time for HMC: %g  s\n", timer.seconds());
-}
-
-void HMC_class::run2() {
-
-    Kokkos::Timer timer;
-    double tokcal = 1.0/kcaltointernal;
-
-    // Create a Calc_Manager instance
-    Calc_Manager calc_manager;
     
     // Create a std::shared_ptr from the raw pointer and pass it to manager.set_particles
-    calc_manager.set_particles(std::shared_ptr<particles_instance>(particles));
+    calc_manager->set_particles(std::shared_ptr<particles_instance>(particles));
 
     // Create an LJ object and add it to the manager
     std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
-    calc_manager.addCalc(ljCalc);
+    calc_manager->addCalc(ljCalc);
 
     // Initialize all Calc objects
-    calc_manager.initialize();
+    calc_manager->initialize();
 
-    integrator->set_calc_manager(calc_manager);
+    integrator->set_calc_manager(*calc_manager);
 
-    double Vi = calc_manager.compute_potential();
+    double Vi = calc_manager->compute_potential();
     printf("INITIAL V: %f \n", Vi*tokcal);
 
     double beta = integrator->particles->get_beta();
-    calc_manager.compute_force();
+    calc_manager->compute_force();
     //std::cout << "Lennard-Jones Force: " << force << std::endl;
-    integrator->set_calc_manager(calc_manager);
+    integrator->set_calc_manager(*calc_manager);
 
     Kokkos::fence();
     // copy the configuration before the MD
@@ -279,7 +184,7 @@ void HMC_class::run2() {
         integrator->integrate();
 
         // accept/reject
-        double Vf = calc_manager.compute_potential();
+        double Vf = calc_manager->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
 
         double dh = beta * (Kf + Vf - Ki - Vi);

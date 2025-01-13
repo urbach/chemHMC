@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
         HMC_class HMC;
         HMC.init(argc, argv);
         
-        HMC.run2();
+        HMC.run();
 
         printf("total kokkos time = %f s\n", timer.seconds());
     }
