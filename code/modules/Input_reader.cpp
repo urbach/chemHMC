@@ -60,7 +60,7 @@ void Input_reader::parse_input(int argc, char** argv) {
 
     parse_simulation_parameters(doc);
     parse_integrator_options(doc);
-    particles_ptr = integrator_ptr->particles;
+    //particles_ptr = integrator_ptr->particles;
     get_number_of_particles();
     parse_particles_options(doc);
     particles_ptr->InitX();
@@ -126,7 +126,7 @@ void Input_reader::parse_integrator_options(YAML::Node& doc) {
     }
     integrator_ptr->dt = check_and_assign_value<double>(doc["integrator"], "dt");
     integrator_ptr->steps = check_and_assign_value<int>(doc["integrator"], "steps");
-
+    integrator_ptr->particles = particles_ptr;
 }
 
 void get_atom_types_from_file(YAML::Node& doc, particles_instance*& particles) {

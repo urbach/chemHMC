@@ -12,11 +12,18 @@
 #include <memory>
 
 void HMC_class::init(int argc, char** argv, bool check_overwrite) {
+    
     doc = read_params(argc, argv);
-    params_o = params_class();
-    params = &params_o;
     acceptance = 0;
+    
+    // Init main submodules
+    params = new params_class();
+    particles = new particles_instance();
+    integrator = nullptr; // Specific integrator gets initialized by input reader
     Input_reader input_reader = Input_reader(params, integrator, particles);
+    
+    
+    
     input_reader.parse_input(argc, argv);
     gen64.seed(params->seed);
 }

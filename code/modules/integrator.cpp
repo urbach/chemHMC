@@ -5,7 +5,6 @@
 #include "particles.hpp"
 
 integrator_type::integrator_type(YAML::Node doc, params_class params) {
-    particles = new particles_instance(doc, params);
 }
 
 void integrator_type::set_calc_manager(Calc_Manager& calc_manager_ref) {

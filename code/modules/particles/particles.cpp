@@ -14,9 +14,6 @@
 #include "read_infile.hpp"
 #include "particles.hpp"
 
-// constructor
-particles_instance::particles_instance(YAML::Node doc, params_class params) {}
-
 void particles_instance::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
     printf("ALGORITHM: %s \n", algorithm.c_str());

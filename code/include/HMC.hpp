@@ -20,7 +20,6 @@ public:
     YAML::Node doc;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
-    params_class params_o;
     params_class* params;
     particles_instance* particles;
 

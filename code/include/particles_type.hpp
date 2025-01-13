@@ -7,12 +7,6 @@
 #include "global.hpp"
 #include "read_infile.hpp"
 
-typedef Kokkos::View<int*> t_bincount;
-typedef Kokkos::View<int*> t_binoffsets;
-typedef Kokkos::View<int*> t_permute_vector;
-typedef Kokkos::View<bool*> t_bool;
-typedef Kokkos::View<int*> t_prefix;
-
 class particles_type {
 
 public:
@@ -39,23 +33,8 @@ public:
     std::string algorithm;
     std::vector<std::string> label_xyz;
 
-    t_bincount bincount;
-    t_binoffsets binoffsets;
-    t_permute_vector permute_vector;
-    t_permute_vector permute_vector_temp;
-
-    t_bincount::HostMirror h_bincount;
-    t_binoffsets::HostMirror h_binoffsets;
-    t_permute_vector::HostMirror h_permute_vector;
-
-    t_bool before;
-    t_bool after;
-
     // rng
     RandPoolType rand_pool;
-
-    // constructor
-    particles_type();
 
     virtual double get_beta() = 0;
     virtual void InitX() = 0;
@@ -74,20 +53,6 @@ public:
     virtual void build_verlet_list() = 0;
     virtual void build_bondless_verlet_list() = 0;
     virtual void minimize_energy(YAML::Node& doc) = 0;
-    KOKKOS_INLINE_FUNCTION void lextoc(int ib, int& bx, int& by, int& bz) const {
-        bz = ib / (nbin[0] * nbin[1]);
-        by = (ib - bz * nbin[0] * nbin[1]) / (nbin[0]);
-        bx = ib - nbin[0] * (by + bz * nbin[1]);
-    };
-    KOKKOS_INLINE_FUNCTION int ctolex(int& bx, int& by, int& bz)  const {
-        return bx + nbin[0] * (by + bz * nbin[1]);
-    };
-    KOKKOS_INLINE_FUNCTION int which_bin(type_x  x, int i) const {
-        int bx = floor(x(i, 0) / sizebin[0]);
-        int by = floor(x(i, 1) / sizebin[1]);
-        int bz = floor(x(i, 2) / sizebin[2]);
-        return ctolex(bx, by, bz);
-    };
 };
 
 #endif

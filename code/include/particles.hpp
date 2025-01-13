@@ -107,11 +107,6 @@ public:
     Kokkos::View<double*[2]> bond_parameters;
     Kokkos::View<double*[2]>::HostMirror h_bond_parameters;
 
-
-    // constructor
-    particles_instance(YAML::Node doc, params_class params);
-
-
     // file interaction
     void print_xyz(params_class params, int traj, double K, double V) override;
 
