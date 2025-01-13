@@ -61,7 +61,9 @@ void Input_reader::parse_input(int argc, char** argv) {
     parse_simulation_parameters(doc);
     parse_integrator_options(doc);
     particles_ptr = integrator_ptr->particles;
+    get_number_of_particles();
     parse_particles_options(doc);
+    particles_ptr->InitX();
     assign_ids();
     read_xyz();
 }
@@ -206,6 +208,10 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
     particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
     particles_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
 
+    particles_ptr->L[0] = params_ptr->L[0];
+    particles_ptr->L[1] = params_ptr->L[1];
+    particles_ptr->L[2] = params_ptr->L[2];
+
     particles_ptr->inverse_L[0] = 1.0/params_ptr->L[0];
     particles_ptr->inverse_L[1] = 1.0/params_ptr->L[1];
     particles_ptr->inverse_L[2] = 1.0/params_ptr->L[2];
@@ -218,8 +224,21 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
     
     particles_ptr->compute_coeff_momenta();
     particles_ptr->compute_coeff_position();
-
+    printf("NUMBEROFP: %d\n", particles_ptr->N);
     particles_ptr->rand_pool.init(params_ptr->seed, particles_ptr->N);
+}
+
+void Input_reader::get_number_of_particles() {
+    std::ifstream infile(params_ptr->start_configuration_file);
+    if (!infile) {
+        throw std::runtime_error("Unable to open parameter file: " + params_ptr->start_configuration_file);
+    }
+
+    std::string line;
+    // get number of particles from first line
+    std::getline(infile, line);
+    std::istringstream iss(line);
+    iss >> particles_ptr->N;
 }
 
 void Input_reader::assign_ids() {

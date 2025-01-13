@@ -15,8 +15,7 @@
 #include "particles.hpp"
 
 // constructor
-particles_instance::particles_instance(YAML::Node doc, params_class params) :
-    particles_type(doc, params) {}
+particles_instance::particles_instance(YAML::Node doc, params_class params) {}
 
 void particles_instance::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
@@ -26,6 +25,8 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         potential_strategy = std::bind(&particles_instance::potential_cell_list, this);
         potential_without_binning_strategy = std::bind(&particles_instance::potential_cell_list, this);
         force_strategy = std::bind(&particles_instance::compute_force_cell_list, this);
+    }
+    else if (algorithm.compare("AMIC") == 0) {
     }
     else if (algorithm.compare("verlet_list") == 0) {
         particles_instance::init_verlet_list(doc);

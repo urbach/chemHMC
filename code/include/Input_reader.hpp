@@ -26,6 +26,7 @@ private:
     void parse_particles_options(YAML::Node& doc);
     void read_xyz();
     void assign_ids();
+    void get_number_of_particles();
 
     // Helper method to validate file existence
     void validate_file(const std::string& file_path) const;

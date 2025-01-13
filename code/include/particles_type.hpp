@@ -55,7 +55,7 @@ public:
     RandPoolType rand_pool;
 
     // constructor
-    particles_type(YAML::Node doc, params_class params);
+    particles_type();
 
     virtual double get_beta() = 0;
     virtual void InitX() = 0;

@@ -5,26 +5,12 @@
 #include "particles.hpp"
 
 integrator_type::integrator_type(YAML::Node doc, params_class params) {
-
-    if (doc["particles"]) {
-        particles = new particles_instance(doc, params);
-        particles->InitX();
-    }
-    else {
-        Kokkos::abort("no particles in input file");
-    }
-
-    steps = check_and_assign_value<int>(doc["integrator"], "steps");
-    average_steps = steps;
-    dt = check_and_assign_value<double>(doc["integrator"], "dt");
-    std::cout << "steps: " << steps << std::endl;
-    std::cout << "dt: " << dt << std::endl;
-
+    particles = new particles_instance(doc, params);
 }
 
 void integrator_type::set_calc_manager(Calc_Manager& calc_manager_ref) {
     // The integrator needs to save a reference to the calc_manager to be able
-    // to trigger force calculations
+    // to trigger force calculations and neighbour-list builds
     calc_manager = &calc_manager_ref;
 }
 
