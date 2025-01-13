@@ -9,7 +9,8 @@
 #include <vector>
 
 #include "global.hpp"
-#include "read_infile.hpp"
+#include "Input_reader.hpp"
+#include "Parameters.hpp"
 #include "particles.hpp"
 
 void particles_instance::assign_algorithm(YAML::Node& doc) {
@@ -125,18 +126,13 @@ void particles_instance::init_cell_list(YAML::Node& doc) {
 }
 
 void particles_instance::InitX() {
-    x = type_x("x", N);
-    // create_mirror() will always allocate a new view,
-    // create_mirror_view() will only create a new view if the original one is not in HostSpace
+    // Create all general kokkos views that are needed
+    x = type_x("x", N); // particle positions
     h_x = Kokkos::create_mirror(x);
-    p = type_p("p", N);
-    f = type_f("f", N);
-    // save atom_type id for each particle
-    id = type_id("id", N);
+    p = type_p("p", N); // particle momenta
+    f = type_f("f", N); // forces
+    id = type_id("id", N); // particle type id
     h_id = Kokkos::create_mirror(id);
-    //assign_ids();
-    //Kokkos::deep_copy(id, h_id);
-    Kokkos::fence();
 }
 
 void particles_instance::compute_coeff_momenta() {

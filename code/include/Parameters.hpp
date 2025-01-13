@@ -3,18 +3,19 @@
 
 #include "global.hpp"
 
-struct Parameters { 
+struct params_class {
   double L[dim_space];
   double inverse_L[dim_space];
   double inverse_halved_L[dim_space];
+  int Ntrajectories;
+  int thermalization_steps;
+  int save_every;
+  int print_info_every;
   // run parameter
-  bool append;
   int seed;
-  int istart;
   int N;
 
   FILE* fileout;
-  std::string StartCondition;
   std::string start_configuration_file;
   std::string nameout;
   std::string parameter_file;

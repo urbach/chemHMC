@@ -8,7 +8,7 @@
 #include <iomanip>
 #include "yaml-cpp/yaml.h"
 #include "global.hpp"
-#include "read_infile.hpp"
+#include "Parameters.hpp"
 #include <Kokkos_Core.hpp>
 
 struct BondType {

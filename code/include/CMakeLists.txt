@@ -1,7 +1,6 @@
 
 set(chemHMC_header
     HMC.hpp
-    read_infile.hpp
     integrator.hpp
     Input_reader.hpp
     Parameters.hpp
@@ -10,7 +9,8 @@ set(chemHMC_header
     LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
-    #particles_type.hpp
+    # read_infile.hpp
+    # particles_type.hpp
     # binning.hpp
     # identical_particles.hpp
     # quick_sort.hpp
@@ -21,13 +21,13 @@ set(chemHMC_scr
     ../modules/LJ.cpp
     ../modules/Calc_Manager.cpp
     ../modules/Input_reader.cpp
-    ../modules/read_infile.cpp
     ../modules/integrator.cpp
     ../modules/particles/particles.cpp
     ../modules/particles/non_bonded_interactions/lennard_jones.cpp
     ../modules/particles/non_bonded_interactions/coulomb.cpp
     ../modules/particles/bonds/bonds.cpp
     ../modules/particles/bonds/opls.cpp
+    #../modules/read_infile.cpp
     #../modules/particles/particles_type.cpp
     #../modules/identical_particles_binning.cpp
     # ../modules/binning.cpp

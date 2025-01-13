@@ -1,11 +1,10 @@
 #include "Input_reader.hpp"
-#include "read_infile.hpp"
+#include "Parameters.hpp"
 #include "atom.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 
-// Constructor: Accepts a pointer to Parameters
 Input_reader::Input_reader(params_class* params, integrator_type*& integrator, particles_instance*& particles) 
                         : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles) {
     if (!params) {
@@ -13,7 +12,6 @@ Input_reader::Input_reader(params_class* params, integrator_type*& integrator, p
     }
 }
 
-// Validates the existence of the file
 void Input_reader::validate_file(const std::string& file_path) const {
     std::ifstream file(file_path);
     if (!file.good()) {
@@ -21,9 +19,8 @@ void Input_reader::validate_file(const std::string& file_path) const {
     }
 }
 
-// Template for safely extracting and converting YAML values
 template <typename T>
-T Input_reader::check_and_assign_value(const YAML::Node& node, const char* tag) const {
+T check_and_assign_value(const YAML::Node& node, const char* tag) {
     if (!node[tag]) {
         throw std::runtime_error(std::string("Error: Missing tag in YAML: ") + tag);
     }
@@ -34,7 +31,6 @@ T Input_reader::check_and_assign_value(const YAML::Node& node, const char* tag) 
     }
 }
 
-// Parse the input file and populate the Parameters struct
 void Input_reader::parse_input(int argc, char** argv) {
     int opt = -1;
     YAML::Node doc;
@@ -220,11 +216,10 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
     particles_ptr->inverse_halved_L[1] = 2.0*params_ptr->inverse_L[1];
     particles_ptr->inverse_halved_L[2] = 2.0*params_ptr->inverse_L[2];
 
-    particles_ptr->assign_algorithm(doc);
+    //particles_ptr->assign_algorithm(doc);
     
     particles_ptr->compute_coeff_momenta();
     particles_ptr->compute_coeff_position();
-    printf("NUMBEROFP: %d\n", particles_ptr->N);
     particles_ptr->rand_pool.init(params_ptr->seed, particles_ptr->N);
 }
 
@@ -363,3 +358,7 @@ void Input_reader::read_xyz() {
     infile.close();
     Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
 }
+
+/*void Input_reader::populate_calc_list() {
+
+}*/

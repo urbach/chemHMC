@@ -5,7 +5,6 @@
 #include "yaml-cpp/yaml.h"
 #include <Kokkos_Core.hpp>
 #include "global.hpp"
-#include "read_infile.hpp"
 #include "Parameters.hpp"
 #include "particles.hpp"
 #include <random>

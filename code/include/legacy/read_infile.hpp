@@ -24,6 +24,5 @@ struct params_class {
 
 
 template<class T> T check_and_assign_value(YAML::Node doc, const char *tag);
-YAML::Node read_params(int argc, char** argv);
 
 #endif

@@ -1,7 +1,7 @@
 #include <iostream> 
 #include "integrator.hpp"
 #include "Parameters.hpp"
-#include "read_infile.hpp"
+#include "Input_reader.hpp"
 #include "particles.hpp"
 
 integrator_type::integrator_type(YAML::Node doc, params_class params) {

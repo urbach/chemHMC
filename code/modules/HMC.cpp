@@ -2,7 +2,6 @@
 #include "global.hpp"
 #include <iostream>
 #include <fstream>
-#include "read_infile.hpp"
 #include "Input_reader.hpp"
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
@@ -11,18 +10,15 @@
 #include <memory>
 
 void HMC_class::init(int argc, char** argv, bool check_overwrite) {
-    
-    doc = read_params(argc, argv);
-    acceptance = 0;
-    
     // Init main submodules
     params = new params_class();
     particles = new particles_instance();
     integrator = nullptr; // Specific integrator gets initialized by input reader
     Input_reader input_reader = Input_reader(params, integrator, particles);
     calc_manager = new Calc_Manager();
-    
-    
+    // Create a std::shared_ptr from the raw pointer and pass it to the calc manager
+    calc_manager->set_particles(std::shared_ptr<particles_instance>(particles));
+
     input_reader.parse_input(argc, argv);
     gen64.seed(params->seed);
 }
@@ -151,9 +147,6 @@ void HMC_class::run() {
 
     Kokkos::Timer timer;
     double tokcal = 1.0/kcaltointernal;
-    
-    // Create a std::shared_ptr from the raw pointer and pass it to manager.set_particles
-    calc_manager->set_particles(std::shared_ptr<particles_instance>(particles));
 
     // Create an LJ object and add it to the manager
     std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();

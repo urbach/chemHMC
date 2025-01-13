@@ -4,7 +4,6 @@
 #include "Parameters.hpp"
 #include "integrator.hpp"
 #include "particles.hpp"
-#include "read_infile.hpp"
 #include "yaml-cpp/yaml.h"
 #include <string>
 
@@ -30,10 +29,10 @@ private:
 
     // Helper method to validate file existence
     void validate_file(const std::string& file_path) const;
-
-    // Template method for safely extracting values from YAML
-    template <typename T>
-    T check_and_assign_value(const YAML::Node& node, const char* tag) const;
 };
+
+// Template method for safely extracting values from YAML
+template <typename T>
+T check_and_assign_value(const YAML::Node& node, const char* tag);
 
 #endif

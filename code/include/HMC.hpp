@@ -1,6 +1,6 @@
 #ifndef HMC_H
 #define HMC_H
-#include "read_infile.hpp"
+#include "Parameters.hpp"
 #include "yaml-cpp/yaml.h"
 #include "particles.hpp"
 #include "global.hpp"
@@ -15,7 +15,7 @@ public:
     int thermalization_steps;
     int save_every;
     int print_info_every;
-    int acceptance;
+    int acceptance = 0;
     bool randomize_traj = false;
     YAML::Node doc;
     // we need a random generator on the host for the accept/reject
