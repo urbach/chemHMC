@@ -14,12 +14,14 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     params = new params_class();
     particles = new particles_instance();
     integrator = nullptr; // Specific integrator gets initialized by input reader
-    Input_reader input_reader = Input_reader(params, integrator, particles);
     calc_manager = new Calc_Manager();
+    Input_reader input_reader = Input_reader(params, integrator, particles, calc_manager);
     // Create a std::shared_ptr from the raw pointer and pass it to the calc manager
     calc_manager->set_particles(std::shared_ptr<particles_instance>(particles));
-
     input_reader.parse_input(argc, argv);
+    integrator->set_calc_manager(*calc_manager);
+    // Initialize all Calc objects
+    calc_manager->initialize();
     gen64.seed(params->seed);
 }
 
@@ -148,22 +150,11 @@ void HMC_class::run() {
     Kokkos::Timer timer;
     double tokcal = 1.0/kcaltointernal;
 
-    // Create an LJ object and add it to the manager
-    std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
-    calc_manager->addCalc(ljCalc);
-
-    // Initialize all Calc objects
-    calc_manager->initialize();
-
-    integrator->set_calc_manager(*calc_manager);
-
     double Vi = calc_manager->compute_potential();
     printf("INITIAL V: %f \n", Vi*tokcal);
 
     double beta = integrator->particles->get_beta();
     calc_manager->compute_force();
-    //std::cout << "Lennard-Jones Force: " << force << std::endl;
-    integrator->set_calc_manager(*calc_manager);
 
     Kokkos::fence();
     // copy the configuration before the MD

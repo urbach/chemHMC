@@ -1,12 +1,15 @@
 #include "Input_reader.hpp"
 #include "Parameters.hpp"
+#include "Calc_Manager.hpp"
+#include "Calc.hpp"
+#include "LJ.hpp"
 #include "atom.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 
-Input_reader::Input_reader(params_class* params, integrator_type*& integrator, particles_instance*& particles) 
-                        : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles) {
+Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& calc_manager) 
+                : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), calc_manager_ptr(calc_manager) {
     if (!params) {
         throw std::runtime_error("Error: Null pointer passed as params to Input_reader constructor.");
     }
@@ -62,6 +65,7 @@ void Input_reader::parse_input(int argc, char** argv) {
     particles_ptr->InitX();
     assign_ids();
     read_xyz();
+    populate_calc_list(doc);
 }
 
 void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
@@ -200,8 +204,6 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
     particles_ptr->T = check_and_assign_value<double>(doc["particles"], "temperature");
     particles_ptr->beta = 1/(kB*particles_ptr->T);
     particles_ptr->sbeta = sqrt(particles_ptr->beta);
-    particles_ptr->cutoff = check_and_assign_value<double>(doc["particles"], "cutoff");
-    particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
     particles_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
 
     particles_ptr->L[0] = params_ptr->L[0];
@@ -215,8 +217,6 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
     particles_ptr->inverse_halved_L[0] = 2.0*params_ptr->inverse_L[0];
     particles_ptr->inverse_halved_L[1] = 2.0*params_ptr->inverse_L[1];
     particles_ptr->inverse_halved_L[2] = 2.0*params_ptr->inverse_L[2];
-
-    //particles_ptr->assign_algorithm(doc);
     
     particles_ptr->compute_coeff_momenta();
     particles_ptr->compute_coeff_position();
@@ -359,6 +359,12 @@ void Input_reader::read_xyz() {
     Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
 }
 
-/*void Input_reader::populate_calc_list() {
-
-}*/
+void Input_reader::populate_calc_list(YAML::Node& doc) {
+    if (doc["LJ"]) {
+        // Create an LJ object and add it to the manager
+        std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
+        particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+        particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+        calc_manager_ptr->addCalc(ljCalc);
+    }
+}
