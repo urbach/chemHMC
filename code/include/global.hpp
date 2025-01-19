@@ -28,6 +28,7 @@ typedef Kokkos::View<const double* [dim_space]> type_const_x;
 typedef Kokkos::View<const double* [dim_space]> type_const_p;
 typedef Kokkos::View<const double* [dim_space]> type_const_f;
 typedef Kokkos::View<const int*> type_const_id;
+typedef Kokkos::TeamPolicy<>::member_type  member_type;
 
 
 #endif

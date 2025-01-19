@@ -74,8 +74,20 @@ public:
     void init(const particles_instance& particles) override;
     double potential(const particles_instance& particles) override;
     struct Tag_potential_bonds {};
+    struct Tag_force_bonds {};
     double potential_bonds(const particles_instance& particles);
     void force(const particles_instance& particles, type_f& f) override;
+    void force_bonds(const particles_instance& particles, type_f& f);
+
+    double potential_angles(const particles_instance& particles);
+    struct Tag_potential_angles {};
+    void force_angles(const particles_instance& particles, type_f& f);
+    struct Tag_force_angles {};
+
+    double potential_dihedrals(const particles_instance& particles);
+    struct Tag_potential_dihedrals {};
+    void force_dihedrals(const particles_instance& particles, type_f& f);
+    struct Tag_force_dihedrals {};
 };
 
 #endif

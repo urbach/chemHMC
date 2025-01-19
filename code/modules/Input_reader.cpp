@@ -383,6 +383,7 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
 
     if (doc["opls"]) {
         auto bonds_ptr = std::make_shared<Bonds>();
+        particles_ptr->bonds_ptr = bonds_ptr;
         read_lammps(bonds_ptr, "data.lmp");
         calc_manager_ptr->addCalc(bonds_ptr);
     }

@@ -19,7 +19,7 @@ public:
     typedef Kokkos::TeamPolicy<>::member_type  member_type;
     
     Neighbor_list* neighbor_list = nullptr;
-    Bonds* bonds_ptr = nullptr;
+    std::shared_ptr<Bonds> bonds_ptr = nullptr;
 
     int N;
     int seed;
