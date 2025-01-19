@@ -56,7 +56,7 @@ void particles_instance::read_next_confs_xyz(FILE* file) {
     // printx();
 }
 
-/* void particles_type::save_device_rng() {
+ void particles_type::save_device_rng() {
     // rand_pool.return_rng_state(hs);
     // FILE* f;
     // f = fopen(params.rng_device_state.c_str(), "w+");
@@ -71,4 +71,4 @@ void particles_type::load_device_rng() {
     // if (i!=N*padding) Kokkos::abort("invalid rng_device_state file\n");
     // rand_pool.load_rng_state(hs);
     // fclose(f);
-} */
+} 

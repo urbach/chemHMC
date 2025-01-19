@@ -2,7 +2,9 @@
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
 #include "Calc.hpp"
-#include "LJ.hpp"
+#include "bonds.hpp"
+#include "Neighbor_list.hpp"
+#include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
 #include <fstream>
 #include <iostream>
@@ -361,10 +363,286 @@ void Input_reader::read_xyz() {
 
 void Input_reader::populate_calc_list(YAML::Node& doc) {
     if (doc["LJ"]) {
-        // Create an LJ object and add it to the manager
-        std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
-        particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
-        particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
-        calc_manager_ptr->addCalc(ljCalc);
+        std::string algorithm = check_and_assign_value<std::string>(doc["LJ"], "algorithm");
+        if (algorithm.compare("cutoff") == 0) {
+            particles_ptr->algorithm = "cutoff";
+            std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
+            particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+            particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+            calc_manager_ptr->addCalc(ljCalc);
+        }
+        else if (algorithm.compare("verlet_list") == 0) {
+            particles_ptr->algorithm = "verlet_list";
+            std::shared_ptr<Calc> ljCalc = std::make_shared<LJ_verlet>();
+            particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+            particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+            calc_manager_ptr->addCalc(ljCalc);
+            UseNeighborList = true;
+        }
     }
+
+    if (doc["opls"]) {
+        auto bonds_ptr = std::make_shared<Bonds>();
+        read_lammps(bonds_ptr, "data.lmp");
+        calc_manager_ptr->addCalc(bonds_ptr);
+    }
+
+    if (UseNeighborList) {
+        // If we have any pair potentials utilizing a neighbor list we initialize it here
+        // and do a first build
+        if (doc["opls"]) {
+            particles_ptr->neighbor_list = new Neighbor_list_bonds();
+        }
+        else {
+            particles_ptr->neighbor_list = new Neighbor_list();
+        }
+        particles_ptr->neighbor_list->init_verlet_list(doc,particles_ptr->N);
+        particles_ptr->neighbor_list->build_verlet_list(*particles_ptr);
+    }
+}
+
+void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::string& filename) {
+    std::ifstream infile(filename);
+    std::string line;
+
+    int numBonds = 0, numAngles = 0, numDihedrals = 0;
+    int numBondTypes = 0, numAngleTypes = 0, numDihedralTypes;
+
+    while (std::getline(infile, line)) {
+        std::istringstream iss(line);
+        std::string keyword;
+        int count;
+        
+        // Read the entire line and check for keywords
+        if (iss >> count) {
+            std::getline(iss, keyword);  // Get the rest of the line as the keyword
+
+            // Trim leading whitespace from keyword
+            keyword = keyword.substr(keyword.find_first_not_of(" \t"));
+
+            if (keyword == "bonds") {
+                numBonds = count;
+            } else if (keyword == "angles") {
+                numAngles = count;
+            } else if (keyword == "dihedrals") {
+                numDihedrals = count;
+            } else if (keyword == "atom types") {
+                // Just skipping atom types for now
+            } else if (keyword == "bond types") {
+                numBondTypes = count;
+            } else if (keyword == "angle types") {
+                numAngleTypes = count;
+            } else if (keyword == "dihedral types") {
+                numDihedralTypes = count;
+            }
+        }
+    }
+
+    bonds_ptr->bonds = Kokkos::View<Bond*>("bonds", numBonds);
+    bonds_ptr->angles = Kokkos::View<Angle*>("angles", numAngles);
+    bonds_ptr->dihedrals = Kokkos::View<Dihedral*>("dihedrals", numDihedrals);
+    bonds_ptr->bondTypes = Kokkos::View<BondType*>("bondTypes", numBondTypes);
+    bonds_ptr->angleTypes = Kokkos::View<AngleType*>("angleTypes", numAngleTypes);
+    bonds_ptr->dihedralTypes = Kokkos::View<DihedralType*>("dihedralTypes", numDihedralTypes);
+
+    bonds_ptr->h_bonds = Kokkos::create_mirror_view(bonds_ptr->bonds);
+    bonds_ptr->h_angles = Kokkos::create_mirror_view(bonds_ptr->angles);
+    bonds_ptr->h_dihedrals = Kokkos::create_mirror_view(bonds_ptr->dihedrals);
+    bonds_ptr->h_bondTypes = Kokkos::create_mirror_view(bonds_ptr->bondTypes);
+    bonds_ptr->h_angleTypes = Kokkos::create_mirror_view(bonds_ptr->angleTypes);
+    bonds_ptr->h_dihedralTypes = Kokkos::create_mirror_view(bonds_ptr->dihedralTypes);
+
+    bool inBondSection = false, inAngleSection = false, inDihedralSection = false;
+    bool inBondTypeSection = false, inAngleTypeSection = false, inDihedralTypeSection = false;
+
+    int bondIndex = 0, angleIndex = 0, dihedralIndex = 0;
+    int bondTypeIndex = 0, angleTypeIndex = 0, dihedralTypeIndex = 0;
+
+    infile.clear();  // Reset the stream to start reading again
+    infile.seekg(0); // Go back to the beginning of the file
+
+    while (std::getline(infile, line)) {
+        if (line.empty()) continue;
+        std::istringstream iss(line);
+
+        // Section identification
+        if (line.find("Bond Coeffs") != std::string::npos) {
+            inBondTypeSection = true;
+            inAngleTypeSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
+            inBondSection = false;
+            inAngleSection = false;
+            continue;
+        }
+        if (line.find("Angle Coeffs") != std::string::npos) {
+            inAngleTypeSection = true;
+            inBondTypeSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
+            inBondSection = false;
+            inAngleSection = false;
+            continue;
+        }
+        if (line.find("Dihedral Coeffs") != std::string::npos) {
+            inAngleTypeSection = false;
+            inBondTypeSection = false;
+            inDihedralTypeSection = true;
+            inDihedralSection = false;
+            inBondSection = false;
+            inAngleSection = false;
+            continue;
+        }
+        if (line.find("Bonds") != std::string::npos) {
+            inBondSection = true;
+            inAngleSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
+            inBondTypeSection = false;
+            inAngleTypeSection = false;
+            continue;
+        }
+        if (line.find("Angles") != std::string::npos) {
+            inAngleSection = true;
+            inBondSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
+            inBondTypeSection = false;
+            inAngleTypeSection = false;
+            continue;
+        }
+        if (line.find("Dihedrals") != std::string::npos) {
+            inBondSection = false;
+            inAngleSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = true;
+            inBondTypeSection = false;
+            inAngleTypeSection = false;
+            continue;
+        }
+
+
+        // Parse bond type data
+        if (inBondTypeSection && bondTypeIndex < numBondTypes) {
+            int type;
+            double k, r0;
+            if (iss >> type >> k >> r0) {
+                bonds_ptr->h_bondTypes(bondTypeIndex).type = type;
+                bonds_ptr->h_bondTypes(bondTypeIndex).k = k*kcaltointernal; // convert from kcal/mol to internal units
+                bonds_ptr->h_bondTypes(bondTypeIndex).r0 = r0;
+                bondTypeIndex++;
+            }
+        }
+
+        // Parse angle type data
+        if (inAngleTypeSection && angleTypeIndex < numAngleTypes) {
+            int type;
+            double k, theta0;
+            if (iss >> type >> k >> theta0) {
+                bonds_ptr->h_angleTypes(angleTypeIndex).type = type;
+                bonds_ptr->h_angleTypes(angleTypeIndex).k = k*kcaltointernal;// convert from kcal/mol to internal units
+                bonds_ptr->h_angleTypes(angleTypeIndex).theta0 = theta0 * M_PI/180.0;
+                angleTypeIndex++;
+            }
+        }
+
+        // Parse dihedral type data
+        if (inDihedralTypeSection && dihedralTypeIndex < numDihedralTypes) {
+            int type;
+            double k1, k2, k3, k4;
+            if (iss >> type >> k1 >> k2 >> k3 >> k4) {
+                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).type = type;
+                // for some reason lammps files include the usual factor of 0.5 into all k-values
+                // except for the dihedrals so we have to explicitly add it here
+                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).k1 = 0.5*k1*kcaltointernal;// convert from kcal/mol to internal units
+                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).k2 = 0.5*k2*kcaltointernal;// convert from kcal/mol to internal units
+                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).k3 = 0.5*k3*kcaltointernal;// convert from kcal/mol to internal units
+                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).k4 = 0.5*k4*kcaltointernal;// convert from kcal/mol to internal units
+                dihedralTypeIndex++;
+            }
+        }
+
+        // Parse bond data
+        if (inBondSection && bondIndex < numBonds) {
+            int id, type, atom1, atom2;
+            if (iss >> id >> type >> atom1 >> atom2) {
+                bonds_ptr->h_bonds(bondIndex).id = id;
+                bonds_ptr->h_bonds(bondIndex).type = type;
+                bonds_ptr->h_bonds(bondIndex).atom1 = atom1;
+                bonds_ptr->h_bonds(bondIndex).atom2 = atom2;
+                bondIndex++;
+            }
+        }
+
+        // Parse angle data
+        if (inAngleSection && angleIndex < numAngles) {
+            int id, type, atom1, atom2, atom3;
+            if (iss >> id >> type >> atom1 >> atom2 >> atom3) {
+                bonds_ptr->h_angles(angleIndex).id = id;
+                bonds_ptr->h_angles(angleIndex).type = type;
+                bonds_ptr->h_angles(angleIndex).atom1 = atom1;
+                bonds_ptr->h_angles(angleIndex).atom2 = atom2;
+                bonds_ptr->h_angles(angleIndex).atom3 = atom3;
+                angleIndex++;
+            }
+        }
+
+        // Parse dihedral data
+        if (inDihedralSection && dihedralIndex < numDihedrals) {
+            int id, type, atom1, atom2, atom3, atom4;
+            if (iss >> id >> type >> atom1 >> atom2 >> atom3 >> atom4) {
+                bonds_ptr->h_dihedrals(dihedralIndex).id = id;
+                bonds_ptr->h_dihedrals(dihedralIndex).type = type;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom1 = atom1;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom2 = atom2;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom3 = atom3;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom4 = atom4;
+                dihedralIndex++;
+            }
+        }
+    }
+
+    // Copy data to device
+    Kokkos::deep_copy(bonds_ptr->bonds, bonds_ptr->h_bonds);
+    Kokkos::deep_copy(bonds_ptr->angles, bonds_ptr->h_angles);
+    Kokkos::deep_copy(bonds_ptr->dihedrals, bonds_ptr->h_dihedrals);
+    Kokkos::deep_copy(bonds_ptr->bondTypes, bonds_ptr->h_bondTypes);
+    Kokkos::deep_copy(bonds_ptr->angleTypes, bonds_ptr->h_angleTypes);
+    Kokkos::deep_copy(bonds_ptr->dihedralTypes, bonds_ptr->h_dihedralTypes);
+
+    /*std::cout << "Number of Bonds: " << numBonds << std::endl;
+    std::cout << "Number of Angles: " << numAngles << std::endl;
+    std::cout << "Number of Dihedrals: " << numDihedrals << std::endl;
+    std::cout << "Actual Bonds Read: " << bondIndex << std::endl;
+    std::cout << "Actual Angles Read: " << angleIndex << std::endl;
+    std::cout << "Actual Dihedrals Read: " << dihedralIndex << std::endl;
+    std::cout << "Number of Bond Types: " << numBondTypes << std::endl;
+    std::cout << "Number of Angle Types: " << numAngleTypes << std::endl;
+    std::cout << "Number of Dihedral Types: " << numDihedralTypes << std::endl;
+
+    for (int i = 0; i < bonds_ptr->bonds.extent(0); i++) {
+        printf("bond number: %d \n", i);
+        printf("bond type: %d \n", bonds_ptr->h_bonds(i).type);
+        printf("atom1: %d atom2: %d k: %f r0: %f\n", bonds_ptr->h_bonds(i).atom1-1, bonds_ptr->h_bonds(i).atom2-1, bonds_ptr->h_bondTypes(bonds_ptr->h_bonds(i).type-1).k, bonds_ptr->h_bondTypes(bonds_ptr->h_bonds(i).type-1).r0);
+    }
+    
+    for (int i = 0; i < bonds_ptr->bondTypes.extent(0); i++) {
+        printf("bond type number: %d \n", i);
+        printf("type: %d k: %f r0: %f\n", bonds_ptr->h_bondTypes(i).type, bonds_ptr->h_bondTypes(i).k, bonds_ptr->h_bondTypes(i).r0);
+    }
+    
+    for (int i = 0; i < bonds_ptr->angles.extent(0); i++) {
+        printf("angle number: %d \n", i);
+        printf("atom1: %d atom2: %d atom3: %d k: %f theta0: %f\n", bonds_ptr->h_angles(i).atom1, bonds_ptr->h_angles(i).atom2, bonds_ptr->h_angles(i).atom3, bonds_ptr->h_angleTypes(bonds_ptr->h_angles(i).type-1).k, bonds_ptr->h_angleTypes(bonds_ptr->h_angles(i).type-1).theta0);
+    }
+    printf("EXTENT: %d", bonds_ptr->dihedrals.extent(0));
+    for (int i = 0; i < bonds_ptr->dihedrals.extent(0); i++) {
+        printf("dihedral number: %d \n", i);
+        printf("atom1: %d atom2: %d atom3: %d atom4: %d\n", bonds_ptr->h_dihedrals(i).atom1, bonds_ptr->h_dihedrals(i).atom2, bonds_ptr->h_dihedrals(i).atom3, bonds_ptr->h_dihedrals(i).atom4);
+    }
+
+    for (int i = 0; i < bonds_ptr->dihedralTypes.extent(0); i++) {
+        printf("dihedral number: %d \n", i);
+        printf("atom1: %f atom2: %f atom3: %f atom4: %f\n", bonds_ptr->h_dihedralTypes(i).k1, bonds_ptr->h_dihedralTypes(i).k2, bonds_ptr->h_dihedralTypes(i).k3, bonds_ptr->h_dihedralTypes(i).k4);
+    }*/
 }

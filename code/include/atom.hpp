@@ -48,12 +48,6 @@ public:
         : mass(0), charge(0), type_index(0), LJ_epsilon(0), LJ_sigma(0) {
         label[0] = '\0';  // Initialize the label to an empty string
     }
-
-    /*KOKKOS_FUNCTION atom_type(std::string label, double mass, double charge, int type_index, double LJ_epsilon, double LJ_sigma)
-        : label(label), mass(mass), charge(charge), type_index(type_index), LJ_epsilon(LJ_epsilon), LJ_sigma(LJ_sigma) {}
-
-    KOKKOS_FUNCTION atom_type() 
-        : label(""), mass(0), charge(0), type_index(0), LJ_epsilon(0), LJ_sigma(0) {}*/
 };
 
 #endif

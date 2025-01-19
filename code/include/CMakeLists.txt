@@ -6,33 +6,27 @@ set(chemHMC_header
     Parameters.hpp
     particles.hpp
     atom.hpp
-    LJ.hpp
+    bonds.hpp
+    ../modules/potentials/non_bonded_interactions/LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
-    # read_infile.hpp
-    # particles_type.hpp
-    # binning.hpp
-    # identical_particles.hpp
-    # quick_sort.hpp
+    Neighbor_list.hpp
 )
 
 set(chemHMC_scr 
     ../modules/HMC.cpp
-    ../modules/LJ.cpp
+    ../modules/potentials/non_bonded_interactions/LJ.cpp
     ../modules/Calc_Manager.cpp
     ../modules/Input_reader.cpp
     ../modules/integrator.cpp
     ../modules/particles/particles.cpp
-    ../modules/particles/non_bonded_interactions/lennard_jones.cpp
+    ../modules/Neighbor_list.cpp
+    ../modules/potentials/molecules/bonds.cpp
+    ../modules/Neighbor_list.cpp
+    ../modules/Neighbor_list_bonds.cpp
     ../modules/particles/non_bonded_interactions/coulomb.cpp
     ../modules/particles/bonds/bonds.cpp
     ../modules/particles/bonds/opls.cpp
-    #../modules/read_infile.cpp
-    #../modules/particles/particles_type.cpp
-    #../modules/identical_particles_binning.cpp
-    # ../modules/binning.cpp
-    #../modules/identical_particles.cpp
-    # ../modules/quick_sort.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
 target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)

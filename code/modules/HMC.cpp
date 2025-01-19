@@ -6,7 +6,6 @@
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
 #include "particles.hpp"
-#include "LJ.hpp"
 #include <memory>
 
 void HMC_class::init(int argc, char** argv, bool check_overwrite) {
@@ -79,7 +78,7 @@ void HMC_class::optimize_stepsize() {
             double Ki = integrator->particles->compute_kinetic_E();
 
             if (integrator->particles->algorithm == "verlet_list") {
-                integrator->particles->build_verlet_list();
+                //integrator->particles->build_verlet_list();
             }
             if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
             if (integrator->particles->algorithm == "opls") integrator->particles->build_bondless_verlet_list();
@@ -166,6 +165,7 @@ void HMC_class::run() {
         double Ki = integrator->particles->compute_kinetic_E();
         // molecular dynamics
         integrator->integrate();
+        if (particles->algorithm == "verlet_list") particles->neighbor_list->build_verlet_list(*particles);
 
         // accept/reject
         double Vf = calc_manager->compute_potential();

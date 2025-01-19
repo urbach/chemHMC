@@ -693,39 +693,12 @@ void particles_instance::operator() (Tag_potential_dihedrals, const member_type&
 }
 
 void particles_instance::build_bondless_verlet_list() {
-    build_verlet_list();
-    Kokkos::deep_copy(h_verlet_list,verlet_list);
-    Kokkos::deep_copy(h_neighbour_count,neighbour_count);
-    /*printf("NEIGHBORS: %d \n",h_neighbour_count(3));
-    printf("LIST: %d \n",h_verlet_list(3,0));
-    printf("LIST: %d \n",h_verlet_list(3,1));
-    printf("LIST: %d \n",h_verlet_list(3,2));
-    printf("LIST: %d \n",h_verlet_list(3,3));
-    printf("LIST: %d \n",h_verlet_list(3,4));
-    printf("LIST: %d \n",h_verlet_list(3,5));
-    printf("LIST: %d \n",h_verlet_list(3,6));
-    printf("LIST: %d \n",h_verlet_list(3,7));
-    printf("LIST: %d \n",h_verlet_list(3,8));
-    printf("LIST: %d \n",h_verlet_list(3,9));
-    printf("LIST: %d \n",h_verlet_list(3,10));*/
     // Remove bonded atoms from neighbour list
     Kokkos::parallel_for("verlet_remove_bonds",
         Kokkos::TeamPolicy<Tag_verlet_remove_bonds>(N, Kokkos::AUTO), *this);
     Kokkos::fence();
     Kokkos::deep_copy(h_verlet_list,verlet_list);
     Kokkos::deep_copy(h_neighbour_count,neighbour_count);
-    /*printf("NEIGHBORS: %d \n",h_neighbour_count(3));
-    printf("LIST: %d \n",h_verlet_list(3,0));
-    printf("LIST: %d \n",h_verlet_list(3,1));
-    printf("LIST: %d \n",h_verlet_list(3,2));
-    printf("LIST: %d \n",h_verlet_list(3,3));
-    printf("LIST: %d \n",h_verlet_list(3,4));
-    printf("LIST: %d \n",h_verlet_list(3,5));
-    printf("LIST: %d \n",h_verlet_list(3,6));
-    printf("LIST: %d \n",h_verlet_list(3,7));
-    printf("LIST: %d \n",h_verlet_list(3,8));
-    printf("LIST: %d \n",h_verlet_list(3,9));
-    printf("LIST: %d \n",h_verlet_list(3,10));*/
 }
 
 KOKKOS_FUNCTION
@@ -742,8 +715,8 @@ void particles_instance::operator()(Tag_verlet_remove_bonds, const member_type& 
         int n = neighbour_count(i);
         for (int k = 0; k < n; k++) {
             if (verlet_list(i, k) == atom2) {
-                // Found the bonded atom, remove it by setting it to 0
-                // we set it to 0 to first collect all atoms to be removed from the bond list, 
+                // Found the bonded atom, remove it by setting it to 0.
+                // We set it to 0 to first collect all atoms to be removed from the bond list, 
                 // this avoids racing conditions. Since the verlet_list is directional (each bonds occurs
                 // only once), atom "0" can never occur in the bond list and we can safely use the 0 as a placeholder
                 verlet_list(i,k) = 0;
@@ -813,7 +786,7 @@ void particles_instance::operator()(Tag_verlet_remove_bonds, const member_type& 
     });
 
     // Remove atoms connected via dihedrals (1-4 interactions)
-    /*Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, dihedrals.extent(0)), [=](const int d) {
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, dihedrals.extent(0)), [=](const int d) {
         int atom1 = dihedrals(d).atom1 - 1;
         int atom2 = dihedrals(d).atom2 - 1;
         int atom3 = dihedrals(d).atom3 - 1;
@@ -863,5 +836,5 @@ void particles_instance::operator()(Tag_verlet_remove_bonds, const member_type& 
                 ++write_idx;
             }
         }
-    });*/
+    });
 }

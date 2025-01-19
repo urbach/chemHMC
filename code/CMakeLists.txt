@@ -82,6 +82,8 @@ add_subdirectory(include  include)
 target_include_directories(chemHMC 
 PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/modules>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/Input>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 PRIVATE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>

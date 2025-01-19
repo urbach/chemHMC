@@ -12,117 +12,31 @@
 #include "Input_reader.hpp"
 #include "Parameters.hpp"
 #include "particles.hpp"
+#include "Neighbor_list.hpp"
+#include "bonds.hpp"
 
 void particles_instance::assign_algorithm(YAML::Node& doc) {
     algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
-    printf("ALGORITHM: %s \n", algorithm.c_str());
-    if (algorithm.compare("cell_list") == 0) {
-        particles_instance::init_cell_list(doc);
-        potential_strategy = std::bind(&particles_instance::potential_cell_list, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_cell_list, this);
-        force_strategy = std::bind(&particles_instance::compute_force_cell_list, this);
-    }
-    else if (algorithm.compare("AMIC") == 0) {
-    }
-    else if (algorithm.compare("verlet_list") == 0) {
-        particles_instance::init_verlet_list(doc);
-        potential_strategy = std::bind(&particles_instance::potential_verlet_list, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_verlet_list, this);
-        force_strategy = std::bind(&particles_instance::compute_force_verlet_list, this);
-    }
-    else if (algorithm.compare("ewald_sum") == 0) {
+    if (algorithm.compare("ewald_sum") == 0) {
         particles_instance::init_ewald_sum(doc);
         potential_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
         force_strategy = std::bind(&particles_instance::compute_force_ewald, this);
     }
     else if (algorithm.compare("bonds_angles") == 0) {
-        particles_instance::init_verlet_list(doc);
         particles_instance::read_bonds_angles("data.lmp");
         potential_strategy = std::bind(&particles_instance::potential_bonds_angles, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_bonds_angles, this);
         force_strategy = std::bind(&particles_instance::compute_force_bonds_angles, this);
     }
     else if (algorithm.compare("opls") == 0) {
-        particles_instance::init_verlet_list(doc);
         particles_instance::init_ewald_sum(doc);
         particles_instance::read_bonds_angles("data.lmp");
         potential_strategy = std::bind(&particles_instance::potential_opls, this);
-        potential_without_binning_strategy = std::bind(&particles_instance::potential_opls, this);
         force_strategy = std::bind(&particles_instance::compute_force_opls, this);
     }
     else {
         printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
         Kokkos::abort("aborting");
     }
-}
-
-void particles_instance::init_verlet_list(YAML::Node& doc) {
-    int max_neighbors;
-    if (doc["particles"]["MaxNeighbors"]) {
-        max_neighbors = check_and_assign_value<int>(doc["particles"], "MaxNeighbors");
-    } else {
-        max_neighbors = 50; // should be replaced by good estimate
-    }
-    
-    verlet_list = Kokkos::View<int**>("verlet_list", N, max_neighbors);
-    h_verlet_list = Kokkos::create_mirror_view(verlet_list);
-
-    Kokkos::deep_copy(h_verlet_list, 0);
-    Kokkos::deep_copy(verlet_list, h_verlet_list);
-
-    neighbour_count = Kokkos::View<int*>("neighbour_count", N);
-    h_neighbour_count = Kokkos::create_mirror_view(neighbour_count);
-}
-
-void particles_instance::init_cell_list(YAML::Node& doc) {
-    // calculate size of the cells and allocate the needed views
-    cell_size = Kokkos::View<double*>("cell_size", dim_space);
-    cells_per_dim = Kokkos::View<int*>("cells_per_dim", dim_space);
-
-    h_cell_size = Kokkos::create_mirror_view(cell_size);
-    h_cells_per_dim = Kokkos::create_mirror_view(cells_per_dim);
-
-    for (int dim = 0; dim < 3; ++dim) {
-        h_cells_per_dim(dim) = static_cast<int>(L[dim] / cutoff);
-    }
-    for (int dim = 0; dim < 3; ++dim) {
-        h_cell_size(dim) = L[dim] / h_cells_per_dim(dim);
-    }
-    int total_cells = h_cells_per_dim(0) * h_cells_per_dim(1) * h_cells_per_dim(2);
-    if (total_cells < 27) {
-        Kokkos::abort("ERROR: Lennard-Jones cutoff distance must be smaller than 1/3 of the smallest cell dimension! aborting...");
-    }
-    Kokkos::deep_copy(cell_size, h_cell_size);
-    Kokkos::deep_copy(cells_per_dim, h_cells_per_dim);
-    // Get max particles per cell
-    int max_particles_per_cell;
-    if (doc["particles"]["MaxParticlesPerCell"]) {
-        max_particles_per_cell = check_and_assign_value<int>(doc["particles"], "MaxParticlesPerCell");
-    } else {
-        // If no user value is supplied, we make a generous estimate
-        double cell_volume = h_cell_size(0) * h_cell_size(1) * h_cell_size(2);
-        double min_sigma = 10.0;
-        for(int i = 0; i < h_atom_type_list.extent(0); ++i) {
-            if (h_atom_type_list[i].LJ_sigma < min_sigma) {
-                min_sigma = h_atom_type_list[i].LJ_sigma;
-            }
-        }
-        double estimated_atomic_volume = min_sigma * min_sigma * min_sigma;
-        max_particles_per_cell = cell_volume / estimated_atomic_volume;
-    }
-    // Allocate the cell list and cell count views
-    cell_list = Kokkos::View<int**>("cell_list",h_cells_per_dim(0) * 
-                                    h_cells_per_dim(1) * h_cells_per_dim(2),max_particles_per_cell);
-    cell_count = Kokkos::View<int*>("cell_count", h_cells_per_dim(0) * 
-                                    h_cells_per_dim(1) * h_cells_per_dim(2));
-
-    h_cell_list = Kokkos::create_mirror_view(cell_list);
-    h_cell_count = Kokkos::create_mirror_view(cell_count);
-
-    Kokkos::deep_copy(h_cell_count, 0);
-    Kokkos::deep_copy(cell_count, h_cell_count);
-    Kokkos::deep_copy(cell_list, 0);
 }
 
 void particles_instance::InitX() {
@@ -160,7 +74,7 @@ double particles_instance::compute_kinetic_E() {
 
 KOKKOS_FUNCTION
 void particles_instance::operator() (kinetic, const int& i, double& sum) const {
-    sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * atom_type_list[id[i]-1].mass);
+    sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * atom_type_list[id[i]].mass);
 };
 
 class functor_update_pos {
@@ -178,7 +92,7 @@ public:
     KOKKOS_FUNCTION
         void operator() (const int i) const {
         for (int dir = 0; dir < 3; dir++) {
-            x(i, dir) += dt * c[id[i]-1] * p(i, dir);
+            x(i, dir) += dt * c[id[i]] * p(i, dir);
             // apply  periodic boundary condition
             x(i, dir) -= L[dir] * floor(x(i, dir) / L[dir]);
         }
@@ -234,9 +148,9 @@ void particles_instance::operator() (hbTag, const int i) const {
     gen_type rgen = rand_pool.get_state(i);
     // we need to divide by sqrt(2) in order to have exp(-p^2)
     // normal() produced distribution exp(-p^2/2)
-    p(i, 0) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]-1].mass / beta);
-    p(i, 1) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]-1].mass / beta);
-    p(i, 2) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]-1].mass / beta);
+    p(i, 0) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]].mass / beta);
+    p(i, 1) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]].mass / beta);
+    p(i, 2) = rgen.normal() * Kokkos::sqrt(atom_type_list[id[i]].mass / beta);
     rand_pool.free_state(rgen);
 }
 
@@ -274,7 +188,7 @@ double particles_instance::conjugate_gradient_minimzation(YAML::Node& doc) {
 
     // Precompute invariant data
     if (algorithm == "verlet_list") {
-        build_verlet_list();
+        //build_verlet_list();
     } else if (algorithm == "bonds_angles") {
         build_bondless_verlet_list();
     }
@@ -343,7 +257,7 @@ double particles_instance::gradient_descent_minimzation(YAML::Node& doc) {
     }
     double dt = check_and_assign_value<double>(doc["integrator"],"dt");
     // get initial potential energy
-    if (algorithm == "verlet_list") build_verlet_list();
+    //if (algorithm == "verlet_list") build_verlet_list();
     if (algorithm == "bonds_angles") build_bondless_verlet_list();
     double V = compute_potential();
     double V_new;
