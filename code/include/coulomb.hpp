@@ -1,3 +1,6 @@
+#ifndef COULOMB_HPP
+#define COULOMB_HPP
+
 #include "global.hpp"
 #include "particles.hpp"
 
@@ -14,7 +17,21 @@ public:
     Kokkos::View<double*> charge;
     Kokkos::View<double*>::HostMirror h_charge;
 
-    void init(particles_instance& particles) override;
-    double potential(particles_instance& particles) override;
-    void force(particles_instance& particles, type_f& f) override;
-}
+    void init(const particles_instance& particles) override;
+    double potential(const particles_instance& particles) override;
+    void force(const particles_instance& particles, type_f& f) override;
+
+    struct Tag_potential_ewald_real {};
+    struct Tag_potential_ewald_reciprocal {};
+    struct Tag_potential_ewald_self {};
+    double compute_ewald_real(const particles_instance& particles);
+    double compute_ewald_reciprocal(const particles_instance& particles);
+    double compute_ewald_self(const particles_instance& particles);
+
+    struct Tag_force_ewald_real {};
+    struct Tag_force_ewald_reciprocal {};
+    void compute_ewald_real_forces(const particles_instance& particles,type_f& f);
+    void compute_ewald_reciprocal_forces(const particles_instance& particles,type_f& f);
+};
+
+#endif

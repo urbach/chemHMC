@@ -6,6 +6,7 @@
 #include "Neighbor_list.hpp"
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
+#include "coulomb.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -386,6 +387,15 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         particles_ptr->bonds_ptr = bonds_ptr;
         read_lammps(bonds_ptr, "data.lmp");
         calc_manager_ptr->addCalc(bonds_ptr);
+    }
+
+    if (doc["coulomb"]) {
+        auto coulomb_ptr = std::make_shared<Coulomb>();
+        coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+        coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
+        coulomb_ptr->ewald_accuracy = check_and_assign_value<double>(doc["coulomb"], "accuracy");
+        coulomb_ptr->k_max = check_and_assign_value<int>(doc["coulomb"], "k_max");
+        calc_manager_ptr->addCalc(coulomb_ptr);
     }
 
     if (UseNeighborList) {

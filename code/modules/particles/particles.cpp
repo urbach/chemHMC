@@ -13,20 +13,6 @@
 #include "Parameters.hpp"
 #include "particles.hpp"
 #include "Neighbor_list.hpp"
-#include "bonds.hpp"
-
-void particles_instance::assign_algorithm(YAML::Node& doc) {
-    algorithm = check_and_assign_value<std::string>(doc["particles"], "algorithm");
-    if (algorithm.compare("ewald_sum") == 0) {
-        particles_instance::init_ewald_sum(doc);
-        potential_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
-        force_strategy = std::bind(&particles_instance::compute_force_ewald, this);
-    }
-    else {
-        printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
-        Kokkos::abort("aborting");
-    }
-}
 
 void particles_instance::InitX() {
     // Create all general kokkos views that are needed
@@ -56,15 +42,26 @@ void particles_instance::compute_coeff_position() {
 }
 
 double particles_instance::compute_kinetic_E() {
-    double K = 0;
-    Kokkos::parallel_reduce("identical-particles-LJ-kinetic-E", Kokkos::RangePolicy<kinetic>(0, N), *this, K);
+    double K = 0.0;
+
+    // Capture all needed members explicitly
+    auto& p = this->p;
+    auto& id = this->id;
+    auto& atom_type_list = this->atom_type_list;
+
+    // Use parallel_reduce with the tag
+    Kokkos::parallel_reduce(
+        "identical-particles-LJ-kinetic-E",
+        Kokkos::RangePolicy<kinetic>(0, N),
+        KOKKOS_LAMBDA(const kinetic&, const int i, double& sum) {
+            double mass = atom_type_list[id(i)].mass;
+            double kinetic_energy = (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * mass);
+            sum += kinetic_energy;
+        },
+        K);
+
     return K;
 }
-
-KOKKOS_FUNCTION
-void particles_instance::operator() (kinetic, const int& i, double& sum) const {
-    sum += (p(i, 0) * p(i, 0) + p(i, 1) * p(i, 1) + p(i, 2) * p(i, 2)) / (2 * atom_type_list[id[i]].mass);
-};
 
 class functor_update_pos {
 public:

@@ -25,7 +25,6 @@ set(chemHMC_scr
     ../modules/potentials/molecules/bonds.cpp
     ../modules/Neighbor_list.cpp
     ../modules/Neighbor_list_bonds.cpp
-    ../modules/particles/non_bonded_interactions/coulomb.cpp
     ../modules/potentials/non_bonded_interactions/coulomb.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})

@@ -112,55 +112,6 @@ public:
         force_strategy();
     };
 
-    // Ewald sum
-    double ewald_alpha; // width of the gaussians
-    double sqrt_ewald_alpha;
-    double r_c; // real-space cutoff for the ewald sum
-    double r_c2;
-    double ewald_accuracy; // rms accuracy of the ewald sum
-    int k_max;
-    double V_self = 0.0; // self interaction energy in the ewald sum is precomputed and stored.
-    Kokkos::View<double*> charge;
-    Kokkos::View<double*>::HostMirror h_charge;
-
-    void init_ewald_sum(YAML::Node& doc);
-    double potential_ewald_sum();
-    double compute_ewald_real();
-    double compute_ewald_reciprocal();
-    double compute_ewald_self();
-
-    struct Tag_potential_ewald_real {};
-    struct Tag_potential_ewald_reciprocal {};
-    struct Tag_potential_ewald_self {};
-    KOKKOS_FUNCTION void operator() (Tag_potential_ewald_real, const member_type& teamMember, double& V) const;
-    KOKKOS_FUNCTION void operator() (Tag_potential_ewald_reciprocal, const member_type& teamMember, double& V) const;
-    KOKKOS_FUNCTION void operator() (Tag_potential_ewald_self, const member_type& teamMember, double& V) const;
-
-    void compute_force_ewald();
-    void compute_ewald_real_forces();
-    void compute_ewald_reciprocal_forces();
-
-    struct Tag_force_ewald_real {};
-    struct Tag_force_ewald_reciprocal {};
-
-    KOKKOS_FUNCTION void operator()(Tag_force_ewald_real, const member_type& teamMember) const;
-    KOKKOS_FUNCTION void operator()(Tag_force_ewald_reciprocal, const member_type& teamMember) const;
-
-    // Bonds/angles
-    void read_bonds_angles(const std::string& filename);
-    Kokkos::View<Bond*> bonds;
-    Kokkos::View<Bond*>::HostMirror h_bonds;
-    Kokkos::View<BondType*> bondTypes;
-    Kokkos::View<BondType*>::HostMirror h_bondTypes;
-    Kokkos::View<AngleType*> angleTypes;
-    Kokkos::View<AngleType*>::HostMirror h_angleTypes;
-    Kokkos::View<Angle*> angles;
-    Kokkos::View<Angle*>::HostMirror h_angles;
-    Kokkos::View<DihedralType*> dihedralTypes;
-    Kokkos::View<DihedralType*>::HostMirror h_dihedralTypes;
-    Kokkos::View<Dihedral*> dihedrals;
-    Kokkos::View<Dihedral*>::HostMirror h_dihedrals;
-
     // Destructor
     ~particles_instance() {};
 };
