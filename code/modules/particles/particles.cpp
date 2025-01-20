@@ -22,17 +22,6 @@ void particles_instance::assign_algorithm(YAML::Node& doc) {
         potential_strategy = std::bind(&particles_instance::potential_ewald_sum, this);
         force_strategy = std::bind(&particles_instance::compute_force_ewald, this);
     }
-    else if (algorithm.compare("bonds_angles") == 0) {
-        particles_instance::read_bonds_angles("data.lmp");
-        potential_strategy = std::bind(&particles_instance::potential_bonds_angles, this);
-        force_strategy = std::bind(&particles_instance::compute_force_bonds_angles, this);
-    }
-    else if (algorithm.compare("opls") == 0) {
-        particles_instance::init_ewald_sum(doc);
-        particles_instance::read_bonds_angles("data.lmp");
-        potential_strategy = std::bind(&particles_instance::potential_opls, this);
-        force_strategy = std::bind(&particles_instance::compute_force_opls, this);
-    }
     else {
         printf("selected algorithm: %s is not a valid algorithm\n", algorithm.c_str());
         Kokkos::abort("aborting");
@@ -190,7 +179,7 @@ double particles_instance::conjugate_gradient_minimzation(YAML::Node& doc) {
     if (algorithm == "verlet_list") {
         //build_verlet_list();
     } else if (algorithm == "bonds_angles") {
-        build_bondless_verlet_list();
+        //build_bondless_verlet_list();
     }
 
     // Initialize variables
@@ -258,7 +247,7 @@ double particles_instance::gradient_descent_minimzation(YAML::Node& doc) {
     double dt = check_and_assign_value<double>(doc["integrator"],"dt");
     // get initial potential energy
     //if (algorithm == "verlet_list") build_verlet_list();
-    if (algorithm == "bonds_angles") build_bondless_verlet_list();
+    //if (algorithm == "bonds_angles") build_bondless_verlet_list();
     double V = compute_potential();
     double V_new;
     // Start energy minimization

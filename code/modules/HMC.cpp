@@ -80,8 +80,8 @@ void HMC_class::optimize_stepsize() {
             if (integrator->particles->algorithm == "verlet_list") {
                 //integrator->particles->build_verlet_list();
             }
-            if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
-            if (integrator->particles->algorithm == "opls") integrator->particles->build_bondless_verlet_list();
+            //if (integrator->particles->algorithm == "bonds_angles") integrator->particles->build_bondless_verlet_list();
+            //if (integrator->particles->algorithm == "opls") integrator->particles->build_bondless_verlet_list();
             integrator->integrate();
 
             // accept/reject

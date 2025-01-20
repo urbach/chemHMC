@@ -7,6 +7,7 @@ set(chemHMC_header
     particles.hpp
     atom.hpp
     bonds.hpp
+    coulomb.hpp
     ../modules/potentials/non_bonded_interactions/LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
@@ -25,8 +26,7 @@ set(chemHMC_scr
     ../modules/Neighbor_list.cpp
     ../modules/Neighbor_list_bonds.cpp
     ../modules/particles/non_bonded_interactions/coulomb.cpp
-    ../modules/particles/bonds/bonds.cpp
-    ../modules/particles/bonds/opls.cpp
+    ../modules/potentials/non_bonded_interactions/coulomb.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
 target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)

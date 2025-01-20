@@ -60,12 +60,6 @@ public:
     type_id::HostMirror h_id; ///< host mirror of id
     double T;   ///< temperature
 
-    // verlet_list related stuff
-    Kokkos::View<int*> neighbour_count;
-    Kokkos::View<int*>::HostMirror h_neighbour_count;
-    Kokkos::View<int**> verlet_list;
-    Kokkos::View<int**>::HostMirror h_verlet_list;
-
     // file interaction
     void print_xyz(params_class params, int traj, double K, double V);
 
@@ -166,43 +160,6 @@ public:
     Kokkos::View<DihedralType*>::HostMirror h_dihedralTypes;
     Kokkos::View<Dihedral*> dihedrals;
     Kokkos::View<Dihedral*>::HostMirror h_dihedrals;
-
-    double potential_bonds_angles();
-
-    void build_bondless_verlet_list();
-    struct Tag_verlet_remove_bonds {};
-    KOKKOS_FUNCTION void operator() (Tag_verlet_remove_bonds, const member_type& teamMember) const;
-
-    double potential_bonds();
-    struct Tag_potential_bonds {};
-    KOKKOS_FUNCTION void operator() (Tag_potential_bonds, const member_type& team_member, double& V) const;
-
-    double potential_angles();
-    struct Tag_potential_angles {};
-    KOKKOS_FUNCTION void operator() (Tag_potential_angles, const member_type& team_member, double& V) const;
-    
-    double potential_dihedrals();
-    struct Tag_potential_dihedrals {};
-    KOKKOS_FUNCTION void operator() (Tag_potential_dihedrals, const member_type& team_member, double& V) const;
-
-    void compute_force_bonds_angles();
-    void compute_force_bonds();
-    struct Tag_force_bonds {};
-    KOKKOS_FUNCTION void operator() (Tag_force_bonds, const member_type& team_member) const;
-
-    void compute_force_angles();
-    struct Tag_force_angles {};
-    KOKKOS_FUNCTION void operator() (const int i)const;
-
-    void compute_force_dihedrals();
-    struct Tag_force_dihedrals {};
-    KOKKOS_FUNCTION void operator() (Tag_force_dihedrals, const member_type& team_member) const;
-
-    
-
-    // OPLS
-    double potential_opls();
-    void compute_force_opls();
 
     // Destructor
     ~particles_instance() {};
