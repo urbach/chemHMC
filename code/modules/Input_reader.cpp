@@ -338,8 +338,7 @@ void Input_reader::read_xyz() {
     std::cout << "Reading last configuration from input file " << params_ptr->start_configuration_file << std::endl;
 
     // Read the atom data
-    std::vector<std::string> label_xyz;
-    label_xyz.clear(); // Ensure label_xyz is empty before filling
+    particles_ptr->label_xyz.clear(); // Ensure label_xyz is empty before filling
     for (int i = 0; i < particles_ptr->N; ++i) {
         if (!std::getline(infile, temp_line)) {
             std::cerr << "Error: unexpected end of file while reading atom data" << std::endl;
@@ -352,7 +351,7 @@ void Input_reader::read_xyz() {
             std::cerr << "Error parsing atom data on line " << i + 1 << std::endl;
             Kokkos::abort("Error parsing xyz file");
         }
-        label_xyz.push_back(id);
+        particles_ptr->label_xyz.push_back(id);
         particles_ptr->h_x(i, 0) = x_val;
         particles_ptr->h_x(i, 1) = y_val;
         particles_ptr->h_x(i, 2) = z_val;
