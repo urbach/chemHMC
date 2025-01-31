@@ -29,6 +29,13 @@ public:
     void set_calc_manager(Calc_Manager& calc_manager_ref);
 };
 
+class VELOCITY_VERLET : public integrator_type {
+
+public:
+    VELOCITY_VERLET() = delete;
+    VELOCITY_VERLET(YAML::Node doc, params_class params);
+    void integrate() override;
+};
 
 class LEAP : public integrator_type {
 
