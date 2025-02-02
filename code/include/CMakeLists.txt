@@ -1,7 +1,13 @@
 
 set(chemHMC_header
     HMC.hpp
-    integrator.hpp
+    ../modules/integrators/integrator_type.hpp
+    ../modules/integrators/leapfrog.hpp
+    ../modules/integrators/OMF2.hpp
+    ../modules/integrators/OMF4.hpp
+    ../modules/integrators/velocity_verlet.hpp
+    ../modules/integrators/integrator.hpp
+    ../modules/integrators/SHAKE.hpp
     Input_reader.hpp
     Parameters.hpp
     particles.hpp
@@ -19,7 +25,12 @@ set(chemHMC_scr
     ../modules/potentials/non_bonded_interactions/LJ.cpp
     ../modules/Calc_Manager.cpp
     ../modules/Input_reader.cpp
-    ../modules/integrator.cpp
+    ../modules/integrators/integrator_type.cpp
+    ../modules/integrators/leapfrog.cpp
+    ../modules/integrators/OMF2.cpp
+    ../modules/integrators/OMF4.cpp
+    ../modules/integrators/velocity_verlet.cpp
+    ../modules/integrators/SHAKE.cpp
     ../modules/particles/particles.cpp
     ../modules/Neighbor_list.cpp
     ../modules/potentials/molecules/bonds.cpp

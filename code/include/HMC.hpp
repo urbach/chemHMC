@@ -4,7 +4,7 @@
 #include "yaml-cpp/yaml.h"
 #include "particles.hpp"
 #include "global.hpp"
-#include "integrator.hpp"
+#include "../modules/integrators/integrator.hpp"
 #include "Calc_Manager.hpp"
 #include <random>
 

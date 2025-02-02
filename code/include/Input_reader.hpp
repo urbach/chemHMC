@@ -3,7 +3,7 @@
 
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
-#include "integrator.hpp"
+#include "../modules/integrators/integrator.hpp"
 #include "particles.hpp"
 #include "bonds.hpp"
 #include "yaml-cpp/yaml.h"
