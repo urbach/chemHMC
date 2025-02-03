@@ -45,17 +45,21 @@ void Bonds::build_constrained_bond_list(std::vector<int> constrained_bond_type_i
 }
 
 double Bonds::potential(const particles_instance& particles) {
+    Kokkos::Timer bonds_timer;
     double result = 0.0;
     result += potential_bonds(particles);
     result += potential_angles(particles);
     result += potential_dihedrals(particles);
+    time_potential += bonds_timer.seconds();
     return result;
 }
 
 void Bonds::force(const particles_instance& particles, type_f& f) {
+    Kokkos::Timer bonds_timer;
     force_bonds(particles,f);
     force_angles(particles,f);
     force_dihedrals(particles,f);
+    time_force += bonds_timer.seconds();
 }
 
 double Bonds::potential_bonds(const particles_instance& particles) {
@@ -71,9 +75,8 @@ double Bonds::potential_bonds(const particles_instance& particles) {
     // Outer parallel_reduce
     Kokkos::parallel_reduce(
         "bond-potential",
-        Kokkos::TeamPolicy<Tag_potential_bonds>(bonds.extent(0), Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_potential_bonds, const Kokkos::TeamPolicy<>::member_type& team_member, double& V) {
-            const int i = team_member.league_rank();
+        Kokkos::RangePolicy<>(0, bonds.extent(0)),
+        KOKKOS_LAMBDA(const int i, double& V) {
 
             int atom1 = bonds(i).atom1-1;
             int atom2 = bonds(i).atom2-1;
@@ -94,9 +97,7 @@ double Bonds::potential_bonds(const particles_instance& particles) {
             double dr = r-r0;
             double potential = k*dr*dr; // The usual factor of 0.5 is already part of k
 
-            Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
-                V += potential;
-            });
+            V += potential;
         },
     result);
 

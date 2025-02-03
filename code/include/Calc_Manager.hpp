@@ -20,5 +20,6 @@ public:
     void compute_force();
     double compute_potential();
     void set_particles(std::shared_ptr<particles_instance> particles_in);
+    void print_timings();
 };
 #endif

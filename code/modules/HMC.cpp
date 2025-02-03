@@ -202,6 +202,7 @@ void HMC_class::run() {
         }
     }
     printf("Acceptance: %g\n", acceptance / ((double)(params->Ntrajectories - params->thermalization_steps)));
-    printf("final step size: %f\n", integrator->dt);
+    //printf("final step size: %f\n", integrator->dt);
     printf("time for HMC: %g  s\n", timer.seconds());
+    calc_manager->print_timings();
 }

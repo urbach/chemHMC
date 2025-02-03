@@ -34,3 +34,9 @@ double Calc_Manager::compute_potential() {
 void Calc_Manager::set_particles(std::shared_ptr<particles_instance> particles_in) {
     particles = particles_in;
 }
+
+void Calc_Manager::print_timings() {
+    for (const auto& calc : calc_list) {
+        calc->print_timings();
+    }
+}

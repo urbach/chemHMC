@@ -18,6 +18,7 @@ void Coulomb::init(const particles_instance& particles) {
 }
 
 double Coulomb::potential(const particles_instance& particles) {
+    Kokkos::Timer coulomb_time;
     const double conversion_factor = 332.062934*kcaltointernal; //conversion to amu* A^2/fs^2
     double V_real = compute_ewald_real(particles);
     double V_reciprocal = compute_ewald_reciprocal(particles);
@@ -26,12 +27,15 @@ double Coulomb::potential(const particles_instance& particles) {
         V_self = compute_ewald_self(particles);
     }
 
+    time_potential += coulomb_time.seconds();
     return conversion_factor*(V_real + V_reciprocal + V_self);
 }
 
 void Coulomb::force(const particles_instance& particles,type_f& f) {
+    Kokkos::Timer coulomb_time;
     compute_ewald_real_forces(particles,f);
     compute_ewald_reciprocal_forces(particles,f);
+    time_force += coulomb_time.seconds();
 }
 
 double Coulomb::compute_ewald_real(const particles_instance& particles) {
