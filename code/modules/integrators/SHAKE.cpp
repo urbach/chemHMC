@@ -23,12 +23,12 @@ void VELOCITY_VERLET_SHAKE::integrate() {
 // SHAKE: Corrects bond constraints on positions
 void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
     const int max_iter = 100;  // Max iterations
-    const double tolerance = 1e-6;  // Convergence criterion
+    const double tolerance = 1e-4;  // Convergence criterion
 
     auto& x = particles->x;
     auto& L = particles->L;
     auto& inverse_halved_L = particles->inverse_halved_L;
-    auto& bonds = particles->bonds_ptr->bonds;
+    auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes = particles->bonds_ptr->bondTypes;
 
     for (int iter = 0; iter < max_iter; iter++) {
@@ -36,7 +36,7 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
 
         Kokkos::parallel_reduce(
         "SHAKE",
-        Kokkos::RangePolicy<>(0, bonds.extent(0)),  // Each bond gets its own thread
+        Kokkos::RangePolicy<>(0, bonds.extent(0)),
         KOKKOS_LAMBDA(const int i, double& local_max_error) {
 
             int atom1 = bonds(i).atom1 - 1;
@@ -84,7 +84,7 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
     auto& L = particles->L;
     auto& id = particles->id;
     auto& inverse_halved_L = particles->inverse_halved_L;
-    auto& bonds = particles->bonds_ptr->bonds;
+    auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& coeff_x = particles->coeff_x;  // 1/mass lookup table
 
     for (int iter = 0; iter < max_iter; iter++) {

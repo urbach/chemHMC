@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <iostream>
 
 Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& calc_manager) 
                 : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), calc_manager_ptr(calc_manager) {
@@ -62,7 +63,6 @@ void Input_reader::parse_input(int argc, char** argv) {
 
     parse_simulation_parameters(doc);
     parse_integrator_options(doc);
-    //particles_ptr = integrator_ptr->particles;
     get_number_of_particles();
     parse_particles_options(doc);
     particles_ptr->InitX();
@@ -390,6 +390,17 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         particles_ptr->bonds_ptr = bonds_ptr;
         read_lammps(bonds_ptr, "data.lmp");
         calc_manager_ptr->addCalc(bonds_ptr);
+        if (doc["integrator"]["constrained_bonds"]) {
+            std::string constrained_bonds = check_and_assign_value<std::string>(doc["integrator"], "constrained_bonds");
+            std::vector<int> constrained_bond_indices;
+            for(char& bondtype : constrained_bonds) {
+                if (bondtype == ',') continue;
+                constrained_bond_indices.push_back(bondtype);
+            }
+            bonds_ptr->build_constrained_bond_list(constrained_bond_indices);
+        } else {
+            bonds_ptr->unconstrained_bonds = bonds_ptr->bonds;
+        }
     }
 
     if (doc["coulomb"]) {

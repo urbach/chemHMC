@@ -4,6 +4,46 @@
 
 void Bonds::init(const particles_instance& particles) {}
 
+void Bonds::build_constrained_bond_list(std::vector<int> constrained_bond_type_indices) {
+    // Go through  the bonds list to count the number of bonds that need to be constrained
+    size_t number_of_constrained_bonds = 0;
+    for (size_t i = 0; i < h_bonds.extent(0); i++) {
+        for (size_t j = 0; j < constrained_bond_type_indices.size(); j++) {
+            if (h_bonds(i).type == constrained_bond_type_indices[j]) {
+                number_of_constrained_bonds++;
+                break;
+            }
+        }
+    }
+    // allocate views
+    constrained_bonds = Kokkos::View<Bond*>("contrained_bond_list", number_of_constrained_bonds);
+    h_constrained_bonds = Kokkos::create_mirror_view(constrained_bonds);
+    size_t number_of_unconstrained_bonds = h_bonds.extent(0)-number_of_constrained_bonds;
+    unconstrained_bonds = Kokkos::View<Bond*>("uncontrained_bond_list", number_of_unconstrained_bonds);
+    h_unconstrained_bonds = Kokkos::create_mirror_view(unconstrained_bonds);
+    // Now that we have allocated space we can populate the lists
+    size_t const_idx = 0;
+    size_t unconst_idx = 0;
+    for (size_t i = 0; i < h_bonds.extent(0); i++) {
+        bool is_constrained = false;
+        for (size_t j = 0; j < constrained_bond_type_indices.size(); j++) {
+            if (h_bonds(i).type == constrained_bond_type_indices[j]) {
+                is_constrained = true;
+                break;  // Avoid adding the same bond multiple times
+            }
+        }
+        if (is_constrained) {
+            h_constrained_bonds(const_idx) = h_bonds(i);
+            const_idx++;
+        } else {
+            h_unconstrained_bonds(unconst_idx) = h_bonds(i);
+            unconst_idx++;
+        }
+    }
+    Kokkos::deep_copy(constrained_bonds,h_constrained_bonds);
+    Kokkos::deep_copy(unconstrained_bonds,h_unconstrained_bonds);
+}
+
 double Bonds::potential(const particles_instance& particles) {
     double result = 0.0;
     result += potential_bonds(particles);
@@ -223,7 +263,7 @@ void Bonds::force_bonds(const particles_instance& particles, type_f& f) {
     auto& x = particles.x;
     auto& L = particles.L;
     auto& inverse_halved_L = particles.inverse_halved_L;
-    auto& bonds = this->bonds;
+    auto& bonds = this->unconstrained_bonds;
     auto& bondTypes = this->bondTypes;
 
     typedef Kokkos::TeamPolicy<Tag_force_bonds> team_policy;

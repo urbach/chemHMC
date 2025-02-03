@@ -58,6 +58,10 @@ public:
     Kokkos::View<double*[2]>::HostMirror h_bond_parameters;
 
     // these hold the data on types
+    Kokkos::View<Bond*> unconstrained_bonds;
+    Kokkos::View<Bond*>::HostMirror h_unconstrained_bonds;
+    Kokkos::View<Bond*> constrained_bonds;
+    Kokkos::View<Bond*>::HostMirror h_constrained_bonds;
     Kokkos::View<Bond*> bonds;
     Kokkos::View<Bond*>::HostMirror h_bonds;
     Kokkos::View<BondType*> bondTypes;
@@ -70,6 +74,8 @@ public:
     Kokkos::View<DihedralType*>::HostMirror h_dihedralTypes;
     Kokkos::View<Dihedral*> dihedrals;
     Kokkos::View<Dihedral*>::HostMirror h_dihedrals;
+
+    void build_constrained_bond_list(std::vector<int> constrained_bond_indices);
 
     void init(const particles_instance& particles) override;
     double potential(const particles_instance& particles) override;
