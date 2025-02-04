@@ -5,7 +5,7 @@
 void Coulomb::init(const particles_instance& particles) {
     // ratio of timing for real/imaginary parts, averaged over 100 runs
     double timer_ratio = 0.046304/0.018513; 
-    ewald_alpha = pow(timer_ratio*(M_PI*M_PI*M_PI*particles.N)/(pow(particles.L[0],6)),(1.0/3.0));
+    //ewald_alpha = pow(timer_ratio*(M_PI*M_PI*M_PI*particles.N)/(pow(particles.L[0],6)),(1.0/3.0));
     sqrt_ewald_alpha = sqrt(ewald_alpha);
     charge = Kokkos::View<double*>("charge", particles.h_atom_type_list.extent(0));
     h_charge = Kokkos::create_mirror_view(charge);
@@ -196,7 +196,7 @@ void Coulomb::compute_ewald_real_forces(const particles_instance& particles,type
             const int i = teamMember.league_rank();
             double alpha = ewald_alpha;
             double sqrt_alpha = sqrt_ewald_alpha;
-            double qi = charge(id(i)-1);
+            double qi = charge(id(i));
 
             // Temporary force accumulators for atom i
             double fx_i = 0.0;
@@ -205,7 +205,7 @@ void Coulomb::compute_ewald_real_forces(const particles_instance& particles,type
 
             Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& fx_tmp, double& fy_tmp, double& fz_tmp) {
                 if (i != j) {
-                    double qj = charge(id(j)-1);
+                    double qj = charge(id(j));
                     double rij[3];
 
                     // Calculate distance vector and apply minimum image convention
@@ -286,14 +286,14 @@ void Coulomb::compute_ewald_reciprocal_forces(const particles_instance& particle
 
             Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& inner_re, double& inner_im) {
                 double kr = kx_real * x(j, 0) + ky_real * x(j, 1) + kz_real * x(j, 2);
-                double charge_j = charge(id(j)-1);
+                double charge_j = charge(id(j));
                 inner_re += charge_j * cos(kr);
                 inner_im += charge_j * sin(kr);
             }, Kokkos::Sum<double>(S_re), Kokkos::Sum<double>(S_im));
 
             // Compute the forces
             Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, N), [=](const int i) {
-                double qi = charge(id(i)-1);
+                double qi = charge(id(i));
                 double kr_i = kx_real * x(i, 0) + ky_real * x(i, 1) + kz_real * x(i, 2);
 
                 double sin_kr_i = sin(kr_i);

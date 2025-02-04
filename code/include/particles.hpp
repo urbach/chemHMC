@@ -40,6 +40,7 @@ public:
     // the host mirror of x is used to restore the position before the MD in case of a rejection
     type_x::HostMirror h_x;     ///< Host mirror of x (positions).
     type_p::HostMirror h_p;     ///< Host_mirror of p (momenta)
+    type_id::HostMirror h_id; ///< host mirror of id
 
     std::string algorithm;
     std::vector<std::string> label_xyz;
@@ -57,7 +58,6 @@ public:
     Kokkos::View<double**>::HostMirror h_sigma_mat; ///< host mirror of sigma_mat
     Kokkos::View<double*> coeff_x;    ///< list of coefficients for the position calculation
     Kokkos::View<double*>::HostMirror h_coeff_x;    ///< host mirror of coeff_x
-    type_id::HostMirror h_id; ///< host mirror of id
     double T;   ///< temperature
 
     // file interaction

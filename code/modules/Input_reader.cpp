@@ -407,6 +407,7 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         auto coulomb_ptr = std::make_shared<Coulomb>();
         coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
         coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
+        coulomb_ptr->ewald_alpha = check_and_assign_value<double>(doc["coulomb"], "alpha");
         coulomb_ptr->ewald_accuracy = check_and_assign_value<double>(doc["coulomb"], "accuracy");
         coulomb_ptr->k_max = check_and_assign_value<int>(doc["coulomb"], "k_max");
         calc_manager_ptr->addCalc(coulomb_ptr);
@@ -552,7 +553,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int type;
             double k, r0;
             if (iss >> type >> k >> r0) {
-                bonds_ptr->h_bondTypes(bondTypeIndex).type = type;
+                bonds_ptr->h_bondTypes(bondTypeIndex).type = type - 1; // lammps indices start at 1
                 bonds_ptr->h_bondTypes(bondTypeIndex).k = k*kcaltointernal; // convert from kcal/mol to internal units
                 bonds_ptr->h_bondTypes(bondTypeIndex).r0 = r0;
                 bondTypeIndex++;
@@ -564,7 +565,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int type;
             double k, theta0;
             if (iss >> type >> k >> theta0) {
-                bonds_ptr->h_angleTypes(angleTypeIndex).type = type;
+                bonds_ptr->h_angleTypes(angleTypeIndex).type = type - 1; // lammps indices start at 1
                 bonds_ptr->h_angleTypes(angleTypeIndex).k = k*kcaltointernal;// convert from kcal/mol to internal units
                 bonds_ptr->h_angleTypes(angleTypeIndex).theta0 = theta0 * M_PI/180.0;
                 angleTypeIndex++;
@@ -576,7 +577,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int type;
             double k1, k2, k3, k4;
             if (iss >> type >> k1 >> k2 >> k3 >> k4) {
-                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).type = type;
+                bonds_ptr->h_dihedralTypes(dihedralTypeIndex).type = type - 1; // lammps indices start at 1
                 // for some reason lammps files include the usual factor of 0.5 into all k-values
                 // except for the dihedrals so we have to explicitly add it here
                 bonds_ptr->h_dihedralTypes(dihedralTypeIndex).k1 = 0.5*k1*kcaltointernal;// convert from kcal/mol to internal units
@@ -592,9 +593,9 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int id, type, atom1, atom2;
             if (iss >> id >> type >> atom1 >> atom2) {
                 bonds_ptr->h_bonds(bondIndex).id = id;
-                bonds_ptr->h_bonds(bondIndex).type = type;
-                bonds_ptr->h_bonds(bondIndex).atom1 = atom1;
-                bonds_ptr->h_bonds(bondIndex).atom2 = atom2;
+                bonds_ptr->h_bonds(bondIndex).type = type - 1; // lammps indices start at 1
+                bonds_ptr->h_bonds(bondIndex).atom1 = atom1 - 1; // lammps indices start at 1
+                bonds_ptr->h_bonds(bondIndex).atom2 = atom2 - 1; // lammps indices start at 1
                 bondIndex++;
             }
         }
@@ -604,10 +605,10 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int id, type, atom1, atom2, atom3;
             if (iss >> id >> type >> atom1 >> atom2 >> atom3) {
                 bonds_ptr->h_angles(angleIndex).id = id;
-                bonds_ptr->h_angles(angleIndex).type = type;
-                bonds_ptr->h_angles(angleIndex).atom1 = atom1;
-                bonds_ptr->h_angles(angleIndex).atom2 = atom2;
-                bonds_ptr->h_angles(angleIndex).atom3 = atom3;
+                bonds_ptr->h_angles(angleIndex).type = type - 1; // lammps indices start at 1
+                bonds_ptr->h_angles(angleIndex).atom1 = atom1 - 1; // lammps indices start at 1
+                bonds_ptr->h_angles(angleIndex).atom2 = atom2 - 1; // lammps indices start at 1
+                bonds_ptr->h_angles(angleIndex).atom3 = atom3 - 1; // lammps indices start at 1
                 angleIndex++;
             }
         }
@@ -617,11 +618,11 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int id, type, atom1, atom2, atom3, atom4;
             if (iss >> id >> type >> atom1 >> atom2 >> atom3 >> atom4) {
                 bonds_ptr->h_dihedrals(dihedralIndex).id = id;
-                bonds_ptr->h_dihedrals(dihedralIndex).type = type;
-                bonds_ptr->h_dihedrals(dihedralIndex).atom1 = atom1;
-                bonds_ptr->h_dihedrals(dihedralIndex).atom2 = atom2;
-                bonds_ptr->h_dihedrals(dihedralIndex).atom3 = atom3;
-                bonds_ptr->h_dihedrals(dihedralIndex).atom4 = atom4;
+                bonds_ptr->h_dihedrals(dihedralIndex).type = type - 1; // lammps indices start at 1
+                bonds_ptr->h_dihedrals(dihedralIndex).atom1 = atom1 - 1; // lammps indices start at 1
+                bonds_ptr->h_dihedrals(dihedralIndex).atom2 = atom2 - 1; // lammps indices start at 1
+                bonds_ptr->h_dihedrals(dihedralIndex).atom3 = atom3 - 1; // lammps indices start at 1
+                bonds_ptr->h_dihedrals(dihedralIndex).atom4 = atom4 - 1; // lammps indices start at 1
                 dihedralIndex++;
             }
         }

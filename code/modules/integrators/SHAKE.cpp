@@ -41,7 +41,7 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
 
             int atom1 = bonds(i).atom1 - 1;
             int atom2 = bonds(i).atom2 - 1;
-            int type = bonds(i).type - 1;
+            int type = bonds(i).type;
             double r0 = bondTypes(type).r0;
 
             double r[3];
