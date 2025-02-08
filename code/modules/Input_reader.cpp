@@ -393,10 +393,22 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         if (doc["integrator"]["constrained_bonds"]) {
             std::string constrained_bonds = check_and_assign_value<std::string>(doc["integrator"], "constrained_bonds");
             std::vector<int> constrained_bond_indices;
-            for(char& bondtype : constrained_bonds) {
-                if (bondtype == ',') continue;
-                constrained_bond_indices.push_back(bondtype);
+
+            // Use a stringstream to parse the comma-separated values
+            std::stringstream ss(constrained_bonds);
+            std::string token;
+
+            while (std::getline(ss, token, ',')) {
+                try {
+                    int bond_index = std::stoi(token);  // Convert to integer
+                    constrained_bond_indices.push_back(bond_index);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid number in constrained_bonds: " << token << std::endl;
+                } catch (const std::out_of_range& e) {
+                    std::cerr << "Number out of range in constrained_bonds: " << token << std::endl;
+                }
             }
+
             bonds_ptr->build_constrained_bond_list(constrained_bond_indices);
         } else {
             bonds_ptr->unconstrained_bonds = bonds_ptr->bonds;

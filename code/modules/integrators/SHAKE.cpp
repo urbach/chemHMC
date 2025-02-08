@@ -22,28 +22,35 @@ void VELOCITY_VERLET_SHAKE::integrate() {
 
 // SHAKE: Corrects bond constraints on positions
 void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
-    const int max_iter = 100;  // Max iterations
+    const int max_iter = 20;  // Max iterations
     const double tolerance = 1e-4;  // Convergence criterion
 
-    auto& x = particles->x;
+    Kokkos::deep_copy(particles->h_x,particles->x);
+
+    auto& x = particles->h_x;
     auto& L = particles->L;
+    auto& id = particles->h_id;
     auto& inverse_halved_L = particles->inverse_halved_L;
-    auto& bonds = particles->bonds_ptr->constrained_bonds;
-    auto& bondTypes = particles->bonds_ptr->bondTypes;
-    auto& coeff_x = particles->coeff_x;
+    auto& bonds = particles->bonds_ptr->h_constrained_bonds;
+    auto& bondTypes = particles->bonds_ptr->h_bondTypes;
+    auto& coeff_x = particles->h_coeff_x; // 1/mass lookup table
+
+
 
     for (int iter = 0; iter < max_iter; iter++) {
         double max_error = 0.0;
-
+        //printf("\n SHAKE ITERATION %d \n\n", iter+1);
         Kokkos::parallel_reduce(
         "SHAKE",
-        Kokkos::RangePolicy<>(0, bonds.extent(0)),
+        Kokkos::RangePolicy<Kokkos::Serial>(0, bonds.extent(0)),
         KOKKOS_LAMBDA(const int i, double& local_max_error) {
 
-            int atom1 = bonds(i).atom1 - 1;
-            int atom2 = bonds(i).atom2 - 1;
-            int type = bonds(i).type;
-            double r0 = bondTypes(type).r0;
+            int atom1 = bonds(i).atom1;
+            int atom2 = bonds(i).atom2;
+            int type1 = id(atom1);
+            int type2 = id(atom2);
+            int bondtype = bonds(i).type;
+            double r0 = bondTypes(bondtype).r0;
 
             double r[3];
             double r2 = 0.0;
@@ -63,12 +70,13 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
             // If deviation exceeds tolerance, apply shake correction
             if (fabs(error) > tolerance) {
                 // Compute lagrange multiplier
-                double correction_factor = 0.5 * (error / r_norm);
+                double sum_inv_mass = coeff_x(type1) + coeff_x(type2);
+                double lambda = (0.5 * (error / r_norm)) / sum_inv_mass;
 
                 for (int dim = 0; dim < 3; dim++) {
-                    double correction = correction_factor * r[dim];
-                    Kokkos::atomic_add(&x(atom1, dim), -correction);
-                    Kokkos::atomic_add(&x(atom2, dim), correction);
+                    // Scale correction factor by mass and apply it
+                    Kokkos::atomic_add(&x(atom1, dim), -(coeff_x(atom1)*lambda) * r[dim]);
+                    Kokkos::atomic_add(&x(atom2, dim), (coeff_x(atom2)*lambda) * r[dim]);
                 }
             }
         },
@@ -77,12 +85,13 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
         // If constraints are satisfied, exit early
         if (max_error < tolerance) break;
     }
+    Kokkos::deep_copy(particles->x,x);
 }
 
 // RATTLE: Corrects velocities to satisfy constraints
 void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
-    const int max_iter = 100;
-    const double tolerance = 1e-6;
+    const int max_iter = 20;
+    const double tolerance = 1e-4;
 
     auto& p = particles->p;  // Momenta
     auto& x = particles->x;  // Positions
@@ -107,8 +116,6 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
 
             double m1_inv = coeff_x(type1);
             double m2_inv = coeff_x(type2);
-            double m1 = 1.0 / m1_inv;
-            double m2 = 1.0 / m2_inv;
 
             // Compute relative position vector with periodic boundary conditions
             double r[3], r2 = 0.0;
@@ -131,18 +138,17 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
             local_max_error = fmax(local_max_error, fabs(error));
 
             if (fabs(error) > tolerance) {
-                double lambda = error / (m1 + m2);
-                double correction_factor = lambda / r_norm;
+                double sum_inv_mass = m1_inv + m2_inv;
+                double correction_factor = error / (r_norm * sum_inv_mass);
 
                 for (int dim = 0; dim < 3; dim++) {
                     double correction = correction_factor * r[dim];
-                    Kokkos::atomic_add(&p(atom1, dim), -correction * m1);
-                    Kokkos::atomic_add(&p(atom2, dim), correction * m2);
+                    Kokkos::atomic_add(&p(atom1, dim), -correction);
+                    Kokkos::atomic_add(&p(atom2, dim), correction);
                 }
             }
         },
         max_error);
-
 
         if (max_error < tolerance) break;
     }

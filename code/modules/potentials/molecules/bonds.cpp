@@ -9,7 +9,7 @@ void Bonds::build_constrained_bond_list(std::vector<int> constrained_bond_type_i
     size_t number_of_constrained_bonds = 0;
     for (size_t i = 0; i < h_bonds.extent(0); i++) {
         for (size_t j = 0; j < constrained_bond_type_indices.size(); j++) {
-            if (h_bonds(i).type == constrained_bond_type_indices[j]) {
+            if (h_bonds(i).type == constrained_bond_type_indices[j]-1) {
                 number_of_constrained_bonds++;
                 break;
             }
@@ -27,7 +27,7 @@ void Bonds::build_constrained_bond_list(std::vector<int> constrained_bond_type_i
     for (size_t i = 0; i < h_bonds.extent(0); i++) {
         bool is_constrained = false;
         for (size_t j = 0; j < constrained_bond_type_indices.size(); j++) {
-            if (h_bonds(i).type == constrained_bond_type_indices[j]) {
+            if (h_bonds(i).type == constrained_bond_type_indices[j]-1) {
                 is_constrained = true;
                 break;  // Avoid adding the same bond multiple times
             }
