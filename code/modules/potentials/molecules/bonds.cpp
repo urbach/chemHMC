@@ -274,8 +274,8 @@ void Bonds::force_bonds(const particles_instance& particles, type_f& f) {
         KOKKOS_LAMBDA(const Tag_force_bonds, const Kokkos::TeamPolicy<>::member_type& teamMember) {
             const int i = teamMember.league_rank();
 
-            int atom1 = bonds(i).atom1 - 1;
-            int atom2 = bonds(i).atom2 - 1;
+            int atom1 = bonds(i).atom1;
+            int atom2 = bonds(i).atom2;
             int type = bonds(i).type;
             double k = bondTypes(type).k;
             double r0 = bondTypes(type).r0;
@@ -323,9 +323,9 @@ void Bonds::force_angles(const particles_instance& particles, type_f& f) {
         KOKKOS_LAMBDA(const Tag_force_angles, const Kokkos::TeamPolicy<>::member_type& teamMember) {
                 const int i = teamMember.league_rank();
 
-                int atom1 = angles(i).atom1 - 1;
-                int atom2 = angles(i).atom2 - 1;
-                int atom3 = angles(i).atom3 - 1;
+                int atom1 = angles(i).atom1;
+                int atom2 = angles(i).atom2;
+                int atom3 = angles(i).atom3;
                 int type = angles(i).type;
                 double k = angleTypes(type).k;
                 double theta0 = angleTypes(type).theta0;
@@ -409,10 +409,10 @@ void Bonds::force_dihedrals(const particles_instance& particles, type_f& f) {
         KOKKOS_LAMBDA(const Tag_force_dihedrals, const Kokkos::TeamPolicy<>::member_type& teamMember) {
                 const int i = teamMember.league_rank();
 
-                int atom1 = dihedrals(i).atom1 - 1;
-                int atom2 = dihedrals(i).atom2 - 1;
-                int atom3 = dihedrals(i).atom3 - 1;
-                int atom4 = dihedrals(i).atom4 - 1;
+                int atom1 = dihedrals(i).atom1;
+                int atom2 = dihedrals(i).atom2;
+                int atom3 = dihedrals(i).atom3;
+                int atom4 = dihedrals(i).atom4;
                 int type = dihedrals(i).type;
 
                 double k1 = dihedralTypes(type).k1;

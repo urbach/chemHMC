@@ -89,8 +89,8 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(teamMember, bonds.extent(0)),
                 [&](const int b) {
-                    int atom1 = bonds(b).atom1 - 1;
-                    int atom2 = bonds(b).atom2 - 1;
+                    int atom1 = bonds(b).atom1;
+                    int atom2 = bonds(b).atom2;
                     if (atom1 != i) return;
 
                     // Search for atom2 in the Verlet list of atom i and mark for removal
@@ -108,9 +108,9 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(teamMember, angles.extent(0)),
                 [&](const int a) {
-                    int atom1 = angles(a).atom1 - 1;
-                    int atom2 = angles(a).atom2 - 1;
-                    int atom3 = angles(a).atom3 - 1;
+                    int atom1 = angles(a).atom1;
+                    int atom2 = angles(a).atom2;
+                    int atom3 = angles(a).atom3;
 
                     if (atom1 != i) return;
 
@@ -128,10 +128,10 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(teamMember, dihedrals.extent(0)),
                 [&](const int d) {
-                    int atom1 = dihedrals(d).atom1 - 1;
-                    int atom2 = dihedrals(d).atom2 - 1;
-                    int atom3 = dihedrals(d).atom3 - 1;
-                    int atom4 = dihedrals(d).atom4 - 1;
+                    int atom1 = dihedrals(d).atom1;
+                    int atom2 = dihedrals(d).atom2;
+                    int atom3 = dihedrals(d).atom3;
+                    int atom4 = dihedrals(d).atom4;
 
                     if (atom1 != i) return;
 

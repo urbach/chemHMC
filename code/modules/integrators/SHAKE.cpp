@@ -30,6 +30,7 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
     auto& inverse_halved_L = particles->inverse_halved_L;
     auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes = particles->bonds_ptr->bondTypes;
+    auto& coeff_x = particles->coeff_x;
 
     for (int iter = 0; iter < max_iter; iter++) {
         double max_error = 0.0;
@@ -47,17 +48,21 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
             double r[3];
             double r2 = 0.0;
 
+            // Calculate displacement vector between atoms
             for (int dim = 0; dim < 3; dim++) {
                 r[dim] = x(atom1, dim) - x(atom2, dim);
                 r[dim] -= round(r[dim] * inverse_halved_L[dim]) * L[dim];
                 r2 += r[dim] * r[dim];
             }
 
+            // Calculate deviation from equilibrium bond length
             double r_norm = sqrt(r2 + 1e-12);
             double error = r_norm - r0;
             local_max_error = fmax(local_max_error, fabs(error));
 
+            // If deviation exceeds tolerance, apply shake correction
             if (fabs(error) > tolerance) {
+                // Compute lagrange multiplier
                 double correction_factor = 0.5 * (error / r_norm);
 
                 for (int dim = 0; dim < 3; dim++) {
@@ -95,8 +100,8 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
         Kokkos::RangePolicy<>(0, bonds.extent(0)),
         KOKKOS_LAMBDA(const int i, double& local_max_error) {
 
-            int atom1 = bonds(i).atom1 - 1;
-            int atom2 = bonds(i).atom2 - 1;
+            int atom1 = bonds(i).atom1;
+            int atom2 = bonds(i).atom2;
             int type1 = id(atom1);
             int type2 = id(atom2);
 
