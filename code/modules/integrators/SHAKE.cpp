@@ -22,18 +22,16 @@ void VELOCITY_VERLET_SHAKE::integrate() {
 
 // SHAKE: Corrects bond constraints on positions
 void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
-    const int max_iter = 20;  // Max iterations
+    const int max_iter = 100;  // Max iterations
     const double tolerance = 1e-4;  // Convergence criterion
 
-    Kokkos::deep_copy(particles->h_x,particles->x);
-
-    auto& x = particles->h_x;
+    auto& x = particles->x;
     auto& L = particles->L;
-    auto& id = particles->h_id;
+    auto& id = particles->id;
     auto& inverse_halved_L = particles->inverse_halved_L;
-    auto& bonds = particles->bonds_ptr->h_constrained_bonds;
-    auto& bondTypes = particles->bonds_ptr->h_bondTypes;
-    auto& coeff_x = particles->h_coeff_x; // 1/mass lookup table
+    auto& bonds = particles->bonds_ptr->constrained_bonds;
+    auto& bondTypes = particles->bonds_ptr->bondTypes;
+    auto& coeff_x = particles->coeff_x; // 1/mass lookup table
 
 
 
@@ -42,7 +40,7 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
         //printf("\n SHAKE ITERATION %d \n\n", iter+1);
         Kokkos::parallel_reduce(
         "SHAKE",
-        Kokkos::RangePolicy<Kokkos::Serial>(0, bonds.extent(0)),
+        Kokkos::RangePolicy<>(0, bonds.extent(0)),
         KOKKOS_LAMBDA(const int i, double& local_max_error) {
 
             int atom1 = bonds(i).atom1;
@@ -85,12 +83,11 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
         // If constraints are satisfied, exit early
         if (max_error < tolerance) break;
     }
-    Kokkos::deep_copy(particles->x,x);
 }
 
 // RATTLE: Corrects velocities to satisfy constraints
 void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
-    const int max_iter = 20;
+    const int max_iter = 100;
     const double tolerance = 1e-4;
 
     auto& p = particles->p;  // Momenta
