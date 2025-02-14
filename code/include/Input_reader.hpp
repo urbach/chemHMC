@@ -17,6 +17,8 @@ public:
     // Method to parse and populate data from a file
     void parse_input(int argc, char** argv);
 
+    bool MD = false;
+
 private:
     params_class* params_ptr;
     particles_instance*& particles_ptr;

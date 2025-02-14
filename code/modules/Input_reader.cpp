@@ -92,6 +92,9 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     params_ptr->print_info_every = check_and_assign_value<int>(doc, "print_info_every");
     params_ptr->seed = check_and_assign_value<int>(doc, "seed");
     
+    std::string simulation_type = check_and_assign_value<std::string>(doc, "simulation_type");
+    if (simulation_type == "MD") MD = true;
+
     // Read number of particles from the starting configuration
     std::ifstream xyz_file(params_ptr->nameout);
     std::string line;

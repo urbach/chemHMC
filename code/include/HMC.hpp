@@ -18,6 +18,7 @@ public:
     int acceptance = 0;
     bool randomize_traj = false;
     YAML::Node doc;
+    bool MD = false;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
     params_class* params;
@@ -28,7 +29,7 @@ public:
     void init(int argc, char** argv, bool check_overwrite = true);
 
     void run();
-    void optimize_stepsize();
+    void run_MD();
     double gen_random();
 };
 #endif // !HMC_H

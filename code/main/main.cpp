@@ -15,8 +15,13 @@ int main(int argc, char** argv) {
         HMC_class HMC;
         HMC.init(argc, argv);
         
-        HMC.run();
-
+        if (!HMC.MD) {
+            printf("Starting HMC run.\n");
+            HMC.run();
+        } else {
+            printf("Starting MD run.\n");
+            HMC.run_MD();
+        }
         printf("total kokkos time = %f s\n", timer.seconds());
     }
     Kokkos::finalize();
