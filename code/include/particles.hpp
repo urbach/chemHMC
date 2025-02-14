@@ -40,7 +40,8 @@ public:
     // the host mirror of x is used to restore the position before the MD in case of a rejection
     type_x::HostMirror h_x;     ///< Host mirror of x (positions).
     type_p::HostMirror h_p;     ///< Host_mirror of p (momenta)
-    type_id::HostMirror h_id; ///< host mirror of id
+    type_f::HostMirror h_f;     ///< Host_mirror of f (forces)
+    type_id::HostMirror h_id;   ///< host mirror of id
 
     std::string algorithm;
     std::vector<std::string> label_xyz;
@@ -96,12 +97,6 @@ public:
     double compute_potential() {
         return potential_strategy();
     };
-
-    // pot E minimization
-    void minimize_energy(YAML::Node& doc);
-    double gradient_descent_minimzation(YAML::Node& doc);
-    double conjugate_gradient_minimzation(YAML::Node& doc);
-    void save_optimized_geometry(double V) const;
 
     // force calculation
     struct force {};

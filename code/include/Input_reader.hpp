@@ -17,6 +17,7 @@ public:
     // Method to parse and populate data from a file
     void parse_input(int argc, char** argv);
 
+    YAML::Node doc;
     bool MD = false;
 
 private:

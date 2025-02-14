@@ -40,7 +40,6 @@ T check_and_assign_value(const YAML::Node& node, const char* tag) {
 
 void Input_reader::parse_input(int argc, char** argv) {
     int opt = -1;
-    YAML::Node doc;
     // search for command line option and put filename in "infilename"
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "-i") == 0) {
@@ -91,7 +90,7 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     params_ptr->save_every = check_and_assign_value<int>(doc, "save_every");
     params_ptr->print_info_every = check_and_assign_value<int>(doc, "print_info_every");
     params_ptr->seed = check_and_assign_value<int>(doc, "seed");
-    
+
     std::string simulation_type = check_and_assign_value<std::string>(doc, "simulation_type");
     if (simulation_type == "MD") MD = true;
 

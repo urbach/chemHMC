@@ -21,5 +21,11 @@ public:
     double compute_potential();
     void set_particles(std::shared_ptr<particles_instance> particles_in);
     void print_timings();
+
+    // pot E minimization
+    void minimize_energy(YAML::Node& doc);
+    double gradient_descent_minimzation(YAML::Node& doc);
+    double conjugate_gradient_minimzation(YAML::Node& doc);
+    void save_optimized_geometry(double V) const;
 };
 #endif

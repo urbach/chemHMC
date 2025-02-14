@@ -23,6 +23,9 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     calc_manager->initialize();
     gen64.seed(params->seed);
     MD = input_reader.MD;
+    // Optional minimization
+    doc = input_reader.doc;
+    if (doc["minimization"]) calc_manager->minimize_energy(doc);
 }
 
 double HMC_class::gen_random() {
@@ -107,7 +110,6 @@ void HMC_class::run_MD() {
 
     // hb momenta
     integrator->particles->hb();
-
     for (int i = 1; i <= params->Ntrajectories; i++) {
         Kokkos::Timer timer_traj;
 
