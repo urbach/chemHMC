@@ -2,16 +2,28 @@
 #define SHAKE_HPP
 
 #include "integrator_type.hpp"
+#include <Kokkos_Core.hpp>
 
 class VELOCITY_VERLET_SHAKE : public integrator_type {
 
 public:
+    int max_iter;
+    double tolerance;
+    Kokkos::View<int*> size_1_clusters;
+    Kokkos::View<int* [2]> size_2_clusters;
+    Kokkos::View<int* [3]> size_3_clusters;
+    type_x trial_positions;
+
     struct Tag_SHAKE {};
     struct Tag_RATTLE {};
     VELOCITY_VERLET_SHAKE() = delete;
     VELOCITY_VERLET_SHAKE(YAML::Node doc, params_class params);
     void integrate() override;
+    void find_shake_clusters();
+    void generate_trial_positions();
     void apply_SHAKE();  // Position correction
+    void SHAKE_size_1_cluster();
+    void SHAKE_size_2_cluster();
     void apply_RATTLE(); // Velocity correction
 };
 
