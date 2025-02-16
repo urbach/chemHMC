@@ -150,14 +150,12 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
         "SHAKE_unconstrained_update",
         Kokkos::RangePolicy<>(0, trial_positions.extent(0)),
         KOKKOS_LAMBDA(const int i) {
-            //Kokkos::printf("trial %d: %f %f %f\n",i, trial_positions(i,0),trial_positions(i,1),trial_positions(i,2));
             for (int dir = 0; dir < 3; dir++) {
                 
                 trial_positions(i, dir) += this->dt * c[id[i]] * p(i, dir);
                 // apply  periodic boundary condition
                 trial_positions(i, dir) -= L[dir] * floor(trial_positions(i, dir) / L[dir]);
             }
-            //Kokkos::printf("after trial %d: %f %f %f\n",i, trial_positions(i,0),trial_positions(i,1),trial_positions(i,2));
         }
     );
 }
@@ -165,7 +163,7 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
 void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
     generate_trial_positions();
     SHAKE_size_1_cluster();
-    //SHAKE_size_2_cluster();
+    SHAKE_size_2_cluster();
 }
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
@@ -180,7 +178,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
     auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes = particles->bonds_ptr->bondTypes;
     auto& coeff_x = particles->coeff_x;    // Inverse mass lookup table
-    double dt_2 = this->dt*this->dt;
+    double dt = this->dt;
 
     Kokkos::parallel_for(
     "SHAKE_force_update",
@@ -198,7 +196,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
         double m1_inv = coeff_x[type1];
         double m2_inv = coeff_x[type2];
 
-        // unconstrained distance
+        // distance
         double rvec[3];
         rvec[0] = x(atom1, 0) - x(atom2, 0);
         rvec[0] -= int(rvec[0] * inverse_halved_L[0]) * L[0];
@@ -208,7 +206,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
         rvec[2] -= int(rvec[2] * inverse_halved_L[2]) * L[2];
         double r2 = rvec[0]*rvec[0]+rvec[1]*rvec[1]+rvec[2]*rvec[2];
 
-        // constrained distance
+        // unconstrained update distance
         double svec[3];
         svec[0] = trial_x(atom1, 0) - trial_x(atom2, 0);
         svec[0] -= int(svec[0] * inverse_halved_L[0]) * L[0];
@@ -240,7 +238,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
         else lambda = lambda2;
 
         // scale lambda so the forces have the proper magnitude when applied
-        lambda /= 0.5*sqrt(dt_2);
+        lambda /= dt*dt;
 
         // apply update to forces
         f(atom1,0) -= lambda*rvec[0];
@@ -260,6 +258,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
     auto& size_2_clusters       = this->size_2_clusters;
     auto& f                     = particles->f;
     auto& x                     = particles->x;
+    auto& trial_x               = this->trial_positions;
     auto& L                     = particles->L;
     auto& id                    = particles->id;
     auto& inverse_halved_L      = particles->inverse_halved_L;
@@ -268,112 +267,156 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
     auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
     double dt_2 = this->dt * this->dt;
   
-    // Outer iteration loop until all cluster constraints are satisfied within tolerance.
-    for (int iter = 0; iter < max_iter; iter++) {
+    Kokkos::parallel_for(
+    "SHAKE_size_2_cluster_update",
+    Kokkos::RangePolicy<>(0, size_2_clusters.extent(0)),
+    KOKKOS_LAMBDA(const int i) {
+        // Get the two bond indices for this cluster.
+        const int bond0_idx = size_2_clusters(i, 0);
+        const int bond1_idx = size_2_clusters(i, 1);
+
+        // Retrieve atoms for each bond.
+        int a = bonds(bond0_idx).atom1;
+        int b = bonds(bond0_idx).atom2;
+        int c = bonds(bond1_idx).atom1;
+        int d = bonds(bond1_idx).atom2;
+
+        int bondtype0 = bonds(bond0_idx).type;
+        int bondtype1 = bonds(bond1_idx).type;
+
+        int bond0_r0 = bondTypes(bondtype0).r0;
+        int bond1_r0 = bondTypes(bondtype1).r0;
+
+        // Identify the common atom. We check among the four atoms.
+        int atom0 = -1, atom1 = -1, atom2 = -1;
+        if (a == c || a == d) {
+            atom0 = a;
+            atom1 = b;
+            atom2 = (a == c) ? d : c;
+        } else if (b == c || b == d) {
+            atom0 = b;
+            atom1 = a;
+            atom2 = (b == c) ? d : c;
+        }
+        // If for some reason no common atom is found, skip this cluster.
+        if (atom0 < 0) {
+            Kokkos::printf("WARNING: size 2 shake cluster without common atom loaded!");
+            return;
+        }
+
+        int type0 = id(atom0);
+        int type1 = id(atom1);
+        int type2 = id(atom2);
+
+        double m0_inv = coeff_x[type0];
+        double m1_inv = coeff_x[type1];
+        double m2_inv = coeff_x[type2];
+
+        // atom distances
+        double r01[3];
+        r01[0] = x(atom0, 0) - x(atom1, 0);
+        r01[0] -= int(r01[0] * inverse_halved_L[0]) * L[0];
+        r01[1] = x(atom0, 1) - x(atom1, 1);
+        r01[1] -= int(r01[1] * inverse_halved_L[1]) * L[1];
+        r01[2] = x(atom0, 2) - x(atom1, 2);
+        r01[2] -= int(r01[2] * inverse_halved_L[2]) * L[2];
+        double r01_sq = r01[0]*r01[0]+r01[1]*r01[1]+r01[2]*r01[2];
+        double r02[3];
+        r02[0] = x(atom0, 0) - x(atom2, 0);
+        r02[0] -= int(r02[0] * inverse_halved_L[0]) * L[0];
+        r02[1] = x(atom0, 1) - x(atom2, 1);
+        r02[1] -= int(r02[1] * inverse_halved_L[1]) * L[1];
+        r02[2] = x(atom0, 2) - x(atom2, 2);
+        r02[2] -= int(r02[2] * inverse_halved_L[2]) * L[2];
+        double r02_sq = r02[0]*r02[0]+r02[1]*r02[1]+r02[2]*r02[2];
+
+        // distances after unconstrained update
+        double s01[3];
+        s01[0] = trial_x(atom0, 0) - trial_x(atom1, 0);
+        s01[0] -= int(s01[0] * inverse_halved_L[0]) * L[0];
+        s01[1] = trial_x(atom0, 1) - trial_x(atom1, 1);
+        s01[1] -= int(s01[1] * inverse_halved_L[1]) * L[1];
+        s01[2] = trial_x(atom0, 2) - trial_x(atom1, 2);
+        s01[2] -= int(s01[2] * inverse_halved_L[2]) * L[2];
+        double s01_sq = s01[0]*s01[0]+s01[1]*s01[1]+s01[2]*s01[2];
+        double s02[3];
+        s02[0] = trial_x(atom0, 0) - trial_x(atom2, 0);
+        s02[0] -= int(s02[0] * inverse_halved_L[0]) * L[0];
+        s02[1] = trial_x(atom0, 1) - trial_x(atom2, 1);
+        s02[1] -= int(s02[1] * inverse_halved_L[1]) * L[1];
+        s02[2] = trial_x(atom0, 2) - trial_x(atom2, 2);
+        s02[2] -= int(s02[2] * inverse_halved_L[2]) * L[2];
+        double s02_sq = s02[0]*s02[0]+s02[1]*s02[1]+s02[2]*s02[2];
+    
+        double a11 = 2.0*(m0_inv+m1_inv)*(s01[0]*r01[0]+s01[1]*r01[1]+s01[2]*r01[2]);
+        double a12 = 2.0*m0_inv*(s01[0]*r02[0] + s01[1]*r02[1] + s01[2]*r02[2]);
+        double a21 = 2.0*m0_inv*(s02[0]*r01[0] + s02[1]*r01[1] + s02[2]*r01[2]);
+        double a22 = 2.0*(m0_inv+m2_inv)*(s02[0]*r02[0] + s02[1]*r02[1] + s02[2]*r02[2]);
+
+        double D = a11*a22 - a12*a21;
+        if (D == 0.0) Kokkos::abort("Warning:Constraint determinant = 0.0\n");
+        double D_inv = 1.0/D;
+
+        double a11inv = a22*D_inv;
+        double a12inv = -a12*D_inv;
+        double a21inv = -a21*D_inv;
+        double a22inv = a11*D_inv;
+
+        double r0102 = (r01[0]*r02[0] + r01[1]*r02[1] + r01[2]*r02[2]);
+
+        double quad1_0101 = (m0_inv+m1_inv)*(m0_inv+m1_inv) * r01_sq;
+        double quad1_0202 = m0_inv*m0_inv * r02_sq;
+        double quad1_0102 = 2.0 * (m0_inv+m1_inv)*m0_inv * r0102;
+
+        double quad2_0202 = (m0_inv+m2_inv)*(m0_inv+m2_inv) * r02_sq;
+        double quad2_0101 = m0_inv*m0_inv * r01_sq;
+        double quad2_0102 = 2.0 * (m0_inv+m2_inv)*m0_inv * r0102;
+
+        double lambda01 = 0.0;
+        double lambda02 = 0.0;
+        int niter = 0;
+        int done = 0;
+
+        double quad1,quad2,b1,b2,lambda01_new,lambda02_new;
+
+        while (!done && niter < max_iter) {
+            quad1 = quad1_0101 * lambda01*lambda01 + quad1_0202 * lambda02*lambda02 +
+                quad1_0102 * lambda01*lambda02;
+            quad2 = quad2_0101 * lambda01*lambda01 + quad2_0202 * lambda02*lambda02 +
+                quad2_0102 * lambda01*lambda02;
         
-        double max_error = 0.0;
-        Kokkos::parallel_reduce(
-        "SHAKE_size_2_cluster_update",
-        Kokkos::RangePolicy<>(0, size_2_clusters.extent(0)),
-        KOKKOS_LAMBDA(const int i, double &local_max_error) {
-            // Get the two bond indices for this cluster.
-            const int bond0_idx = size_2_clusters(i, 0);
-            const int bond1_idx = size_2_clusters(i, 1);
-    
-            // Retrieve atoms for each bond.
-            int a = bonds(bond0_idx).atom1;
-            int b = bonds(bond0_idx).atom2;
-            int c = bonds(bond1_idx).atom1;
-            int d = bonds(bond1_idx).atom2;
-    
-            // Identify the common atom. We check among the four atoms.
-            int common = -1, unique0 = -1, unique1 = -1;
-            if (a == c || a == d) {
-                common  = a;
-                unique0 = b; // for bond0, the atom that is not common
-                unique1 = (a == c) ? d : c;
-            } else if (b == c || b == d) {
-                common  = b;
-                unique0 = a;
-                unique1 = (b == c) ? d : c;
-            }
-            // If for some reason no common atom is found, skip this cluster.
-            if (common < 0) return;
-    
-            // Reorder bond0 as (unique0, common) and bond1 as (common, unique1).
-            // --- Compute bond0 vector: from unique0 to common.
-            double r0[3], r0_sq = 0.0;
-            for (int dim = 0; dim < 3; dim++) {
-                r0[dim] = x(unique0, dim) - x(common, dim);
-                r0[dim] -= round(r0[dim] * inverse_halved_L[dim]) * L[dim];
-                r0_sq += r0[dim] * r0[dim];
-            }
-            double r0_norm = sqrt(r0_sq + 1e-12);
-            double r0_target = bondTypes(bonds(bond0_idx).type).r0;
-            double error0 = r0_norm - r0_target;
-    
-            // --- Compute bond1 vector: from common to unique1.
-            double r1[3], r1_sq = 0.0;
-            for (int dim = 0; dim < 3; dim++) {
-                r1[dim] = x(common, dim) - x(unique1, dim);
-                r1[dim] -= round(r1[dim] * inverse_halved_L[dim]) * L[dim];
-                r1_sq += r1[dim] * r1[dim];
-            }
-            double r1_norm = sqrt(r1_sq + 1e-12);
-            double r1_target = bondTypes(bonds(bond1_idx).type).r0;
-            double error1 = r1_norm - r1_target;
-    
-            // Update local maximum error with the worst error in this cluster.
-            double cluster_max = fabs(error0) > fabs(error1) ? fabs(error0) : fabs(error1);
-            local_max_error = fmax(local_max_error, cluster_max);
-    
-            // Retrieve the inverse masses for the involved atoms.
-            double invMass_unique0 = coeff_x(id(unique0));
-            double invMass_common    = coeff_x(id(common));
-            double invMass_unique1 = coeff_x(id(unique1));
-    
-            // Effective coefficients: these are the denominators in the single-bond case.
-            double A0 = invMass_unique0 + invMass_common;
-            double A1 = invMass_common + invMass_unique1;
-    
-            // Compute the coupling coefficient B from the common atom.
-            double dot_r0_r1 = 0.0;
-            for (int dim = 0; dim < 3; dim++) {
-                dot_r0_r1 += r0[dim] * r1[dim];
-            }
-            double cos_theta = dot_r0_r1 / (r0_norm * r1_norm);
-            double B = invMass_common * cos_theta;
-    
-            // Form the right-hand side terms.
-            double L0_term = 0.5 * (error0 / r0_norm) / dt_2;
-            double L1_term = 0.5 * (error1 / r1_norm) / dt_2;
-    
-            // Solve the 2x2 system:
-            //   A0*lambda0 - B*lambda1 = L0_term
-            //  -B*lambda0 + A1*lambda1 = L1_term
-            double D = A0 * A1 - B * B;
-            if (fabs(D) < 1e-12) return;  // Avoid division by zero
-            double lambda0 = (A1 * L0_term + B * L1_term) / D;
-            double lambda1 = (A0 * L1_term + B * L0_term) / D;
-    
-            // --- Apply corrections.
-            // For bond0: unique0 gets +lambda0*r0, common gets -lambda0*r0.
-            for (int dim = 0; dim < 3; dim++) {
-                double corr0 = lambda0 * r0[dim];
-                Kokkos::atomic_add(&f(unique0, dim), corr0);
-                Kokkos::atomic_add(&f(common,    dim), -corr0);
-            }
-            // For bond1: common gets +lambda1*r1, unique1 gets -lambda1*r1.
-            for (int dim = 0; dim < 3; dim++) {
-                double corr1 = lambda1 * r1[dim];
-                Kokkos::atomic_add(&f(common,    dim), corr1);
-                Kokkos::atomic_add(&f(unique1, dim), -corr1);
-            }
-            },
-            max_error);
-        // If all clusters are within tolerance, we can break out of the iteration loop.
-        if (max_error < tolerance) break;
-    }
+            b1 = bond0_r0*bond0_r0 - s01_sq - quad1;
+            b2 = bond1_r0*bond1_r0 - s02_sq - quad2;
+        
+            lambda01_new = a11inv*b1 + a12inv*b2;
+            lambda02_new = a21inv*b1 + a22inv*b2;
+        
+            done = 1;
+            if (fabs(lambda01_new-lambda01) > tolerance) done = 0;
+            if (fabs(lambda02_new-lambda02) > tolerance) done = 0;
+        
+            lambda01 = lambda01_new;
+            lambda02 = lambda02_new;
+        
+            niter++;
+        }
+
+        lambda01 /= dt_2;
+        lambda02 /= dt_2;
+
+        f(atom0,0) -= lambda01*r01[0] + lambda02*r02[0];
+        f(atom0,1) -= lambda01*r01[1] + lambda02*r02[1];
+        f(atom0,2) -= lambda01*r01[2] + lambda02*r02[2];
+
+        f(atom1,0) += lambda01*r01[0];
+        f(atom1,1) += lambda01*r01[1];
+        f(atom1,2) += lambda01*r01[2];
+
+        f(atom2,0) += lambda02*r02[0];
+        f(atom2,1) += lambda02*r02[1];
+        f(atom2,2) += lambda02*r02[2];
+        }
+    );
 }
 
 // RATTLE: Corrects velocities to satisfy constraints
