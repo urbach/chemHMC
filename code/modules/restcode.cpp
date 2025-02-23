@@ -188,3 +188,69 @@ void HMC_class::optimize_stepsize() {
         file.close(); // Close the file
     }
 }
+
+// RATTLE: Corrects velocities to satisfy constraints
+void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
+    auto& max_iter = this->max_iter;  // Max iterations  
+    auto& tolerance = this->tolerance; // Convergence criterion
+
+    auto& p = particles->p;  // Momenta
+    auto& x = particles->x;  // Positions
+    auto& L = particles->L;
+    auto& id = particles->id;
+    auto& inverse_halved_L = particles->inverse_halved_L;
+    auto& bonds = particles->bonds_ptr->constrained_bonds;
+    auto& coeff_x = particles->coeff_x;  // 1/mass lookup table
+
+    for (int iter = 0; iter < max_iter; iter++) {
+        double max_error = 0.0;
+
+        Kokkos::parallel_reduce(
+        "RATTLE",
+        Kokkos::RangePolicy<>(0, bonds.extent(0)),
+        KOKKOS_LAMBDA(const int i, double& local_max_error) {
+
+            int atom1 = bonds(i).atom1;
+            int atom2 = bonds(i).atom2;
+            int type1 = id(atom1);
+            int type2 = id(atom2);
+
+            double m1_inv = coeff_x(type1);
+            double m2_inv = coeff_x(type2);
+
+            // Compute relative position vector with periodic boundary conditions
+            double r[3], r2 = 0.0;
+            for (int dim = 0; dim < 3; dim++) {
+                r[dim] = x(atom1, dim) - x(atom2, dim);
+                r[dim] -= round(r[dim] * inverse_halved_L[dim]) * L[dim]; 
+                r2 += r[dim] * r[dim];
+            }
+            double r_norm = sqrt(r2 + 1e-12);  // Avoid divide-by-zero
+
+            // Compute relative momentum
+            double pij[3], dot_product = 0.0;
+            for (int dim = 0; dim < 3; dim++) {
+                pij[dim] = p(atom1, dim) * m1_inv - p(atom2, dim) * m2_inv;
+                dot_product += pij[dim] * r[dim];
+            }
+
+            // Compute velocity constraint error
+            double error = dot_product / r_norm;
+            local_max_error = fmax(local_max_error, fabs(error));
+
+            if (fabs(error) > tolerance) {
+                double sum_inv_mass = m1_inv + m2_inv;
+                double correction_factor = error / (r_norm * sum_inv_mass);
+
+                for (int dim = 0; dim < 3; dim++) {
+                    double correction = correction_factor * r[dim];
+                    Kokkos::atomic_add(&p(atom1, dim), -correction);
+                    Kokkos::atomic_add(&p(atom2, dim), correction);
+                }
+            }
+        },
+        max_error);
+
+        if (max_error < tolerance) break;
+    }
+}

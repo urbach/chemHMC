@@ -26,6 +26,8 @@ public:
     void SHAKE_size_2_cluster();
     void SHAKE_size_3_cluster();
     void apply_RATTLE(); // Velocity correction
+    void RATTLE_size_1_cluster();
+    void RATTLE_size_2_cluster();
 };
 
 #endif
