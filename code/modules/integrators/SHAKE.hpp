@@ -24,6 +24,7 @@ public:
     void apply_SHAKE();  // Position correction
     void SHAKE_size_1_cluster();
     void SHAKE_size_2_cluster();
+    void SHAKE_size_3_cluster();
     void apply_RATTLE(); // Velocity correction
 };
 

@@ -24,7 +24,7 @@ void VELOCITY_VERLET_SHAKE::integrate() {
         particles->update_momenta(dt / 2.);
 
         // Apply RATTLE to correct velocities
-        //apply_RATTLE();
+        apply_RATTLE();
     }
 }
 
@@ -164,6 +164,7 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
     generate_trial_positions();
     SHAKE_size_1_cluster();
     SHAKE_size_2_cluster();
+    SHAKE_size_3_cluster();
 }
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
@@ -415,6 +416,261 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
         f(atom2,0) += lambda02*r02[0];
         f(atom2,1) += lambda02*r02[1];
         f(atom2,2) += lambda02*r02[2];
+        }
+    );
+}
+
+void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
+    auto& max_iter              = this->max_iter;
+    auto& tolerance             = this->tolerance;
+    auto& size_3_clusters       = this->size_3_clusters;
+    auto& f                     = particles->f;
+    auto& x                     = particles->x;
+    auto& trial_x               = this->trial_positions;
+    auto& L                     = particles->L;
+    auto& id                    = particles->id;
+    auto& inverse_halved_L      = particles->inverse_halved_L;
+    auto& bonds                 = particles->bonds_ptr->constrained_bonds;
+    auto& bondTypes             = particles->bonds_ptr->bondTypes;
+    auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
+    double dt_2 = this->dt * this->dt;
+  
+    Kokkos::parallel_for(
+    "SHAKE_size_2_cluster_update",
+    Kokkos::RangePolicy<>(0, size_3_clusters.extent(0)),
+    KOKKOS_LAMBDA(const int i) {
+        // Get the three bond indices for this size_3 cluster.
+        const int bond0_idx = size_3_clusters(i, 0);
+        const int bond1_idx = size_3_clusters(i, 1);
+        const int bond2_idx = size_3_clusters(i, 2);
+
+        // Retrieve atoms for each bond.
+        int a = bonds(bond0_idx).atom1;
+        int b = bonds(bond0_idx).atom2;
+        int c = bonds(bond1_idx).atom1;
+        int d = bonds(bond1_idx).atom2;
+        int e = bonds(bond2_idx).atom1;
+        int g = bonds(bond2_idx).atom2; // f is already the force
+
+        // Optionally retrieve bond types if needed.
+        int bondtype0 = bonds(bond0_idx).type;
+        int bondtype1 = bonds(bond1_idx).type;
+        int bondtype2 = bonds(bond2_idx).type;
+        int bond0_r0 = bondTypes(bondtype0).r0;
+        int bond1_r0 = bondTypes(bondtype1).r0;
+        int bond2_r0 = bondTypes(bondtype2).r0;
+
+        // Identify the common atom among the three bonds.
+        // We check the two atoms in bond 0 to see if one of them is common in bonds 1 and 2.
+        int atom0 = -1;
+        int atom1 = -1, atom2 = -1, atom3 = -1;
+
+        if ((a == c || a == d) && (a == e || a == g)) {
+            atom0 = a;
+            // For bond0, the peripheral atom is the one that is not the common atom.
+            atom1 = b;
+            // For bond1: choose the atom that is not common.
+            atom2 = (c == a) ? d : c;
+            // For bond2: choose the atom that is not common.
+            atom3 = (e == a) ? g : e;
+        } else if ((b == c || b == d) && (b == e || b == g)) {
+            atom0 = b;
+            atom1 = a;
+            atom2 = (c == b) ? d : c;
+            atom3 = (e == b) ? g : e;
+        } else {
+            Kokkos::printf("WARNING: size 3 shake cluster without a common atom loaded!");
+            return;
+        }
+
+        int type0 = id(atom0);
+        int type1 = id(atom1);
+        int type2 = id(atom2);
+        int type3 = id(atom3);
+
+        double m0_inv = coeff_x[type0];
+        double m1_inv = coeff_x[type1];
+        double m2_inv = coeff_x[type2];
+        double m3_inv = coeff_x[type3];
+
+        // current distances
+        double r01[3];
+        r01[0] = x(atom0, 0) - x(atom1, 0);
+        r01[0] -= int(r01[0] * inverse_halved_L[0]) * L[0];
+        r01[1] = x(atom0, 1) - x(atom1, 1);
+        r01[1] -= int(r01[1] * inverse_halved_L[1]) * L[1];
+        r01[2] = x(atom0, 2) - x(atom1, 2);
+        r01[2] -= int(r01[2] * inverse_halved_L[2]) * L[2];
+        double r01_sq = r01[0]*r01[0]+r01[1]*r01[1]+r01[2]*r01[2];
+
+        double r02[3];
+        r02[0] = x(atom0, 0) - x(atom2, 0);
+        r02[0] -= int(r02[0] * inverse_halved_L[0]) * L[0];
+        r02[1] = x(atom0, 1) - x(atom2, 1);
+        r02[1] -= int(r02[1] * inverse_halved_L[1]) * L[1];
+        r02[2] = x(atom0, 2) - x(atom2, 2);
+        r02[2] -= int(r02[2] * inverse_halved_L[2]) * L[2];
+        double r02_sq = r02[0]*r02[0]+r02[1]*r02[1]+r02[2]*r02[2];
+
+        double r03[3];
+        r03[0] = x(atom0, 0) - x(atom3, 0);
+        r03[0] -= int(r03[0] * inverse_halved_L[0]) * L[0];
+        r03[1] = x(atom0, 1) - x(atom3, 1);
+        r03[1] -= int(r03[1] * inverse_halved_L[1]) * L[1];
+        r03[2] = x(atom0, 2) - x(atom3, 2);
+        r03[2] -= int(r03[2] * inverse_halved_L[2]) * L[2];
+        double r03_sq = r03[0]*r03[0]+r03[1]*r03[1]+r03[2]*r03[2];
+
+        // distances after unconstrained update
+        double s01[3];
+        s01[0] = trial_x(atom0, 0) - trial_x(atom1, 0);
+        s01[0] -= int(s01[0] * inverse_halved_L[0]) * L[0];
+        s01[1] = trial_x(atom0, 1) - trial_x(atom1, 1);
+        s01[1] -= int(s01[1] * inverse_halved_L[1]) * L[1];
+        s01[2] = trial_x(atom0, 2) - trial_x(atom1, 2);
+        s01[2] -= int(s01[2] * inverse_halved_L[2]) * L[2];
+        double s01_sq = s01[0]*s01[0]+s01[1]*s01[1]+s01[2]*s01[2];
+
+        double s02[3];
+        s02[0] = trial_x(atom0, 0) - trial_x(atom2, 0);
+        s02[0] -= int(s02[0] * inverse_halved_L[0]) * L[0];
+        s02[1] = trial_x(atom0, 1) - trial_x(atom2, 1);
+        s02[1] -= int(s02[1] * inverse_halved_L[1]) * L[1];
+        s02[2] = trial_x(atom0, 2) - trial_x(atom2, 2);
+        s02[2] -= int(s02[2] * inverse_halved_L[2]) * L[2];
+        double s02_sq = s02[0]*s02[0]+s02[1]*s02[1]+s02[2]*s02[2];
+
+        double s03[3];
+        s03[0] = trial_x(atom0, 0) - trial_x(atom3, 0);
+        s03[0] -= int(s03[0] * inverse_halved_L[0]) * L[0];
+        s03[1] = trial_x(atom0, 1) - trial_x(atom3, 1);
+        s03[1] -= int(s03[1] * inverse_halved_L[1]) * L[1];
+        s03[2] = trial_x(atom0, 2) - trial_x(atom3, 2);
+        s03[2] -= int(s03[2] * inverse_halved_L[2]) * L[2];
+        double s03_sq = s03[0]*s03[0]+s03[1]*s03[1]+s03[2]*s03[2];
+    
+        double a11 = 2.0 * (m0_inv+m1_inv)*(s01[0]*r01[0]+s01[1]*r01[1]+s01[2]*r01[2]);
+        double a12 = 2.0 * m0_inv*(s01[0]*r02[0]+s01[1]*r02[1]+s01[2]*r02[2]);
+        double a13 = 2.0 * m0_inv*(s01[0]*r03[0]+s01[1]*r03[1]+s01[2]*r03[2]);
+        double a21 = 2.0 * m0_inv*(s02[0]*r01[0]+s02[1]*r01[1]+s02[2]*r01[2]);
+        double a22 = 2.0 * (m0_inv+m2_inv)*(s02[0]*r02[0]+s02[1]*r02[1]+s02[2]*r02[2]);
+        double a23 = 2.0 * m0_inv*(s02[0]*r03[0]+s02[1]*r03[1]+s02[2]*r03[2]);
+        double a31 = 2.0 * m0_inv*(s03[0]*r01[0]+s03[1]*r01[1]+s03[2]*r01[2]);
+        double a32 = 2.0 * m0_inv*(s03[0]*r02[0]+s03[1]*r02[1]+s03[2]*r02[2]);
+        double a33 = 2.0 * (m0_inv+m3_inv)*(s03[0]*r03[0]+s03[1]*r03[1]+s03[2]*r03[2]);
+
+        double determ = a11*a22*a33 + a12*a23*a31 + a13*a21*a32-a11*a23*a32 - a12*a21*a33 - a13*a22*a31;
+        if (determ == 0.0) Kokkos::abort("Contraint determinant = 0.0");
+        double determinv = 1.0/determ;
+
+        double a11inv = determinv * (a22*a33 - a23*a32);
+        double a12inv = -determinv * (a12*a33 - a13*a32);
+        double a13inv = determinv * (a12*a23 - a13*a22);
+        double a21inv = -determinv * (a21*a33 - a23*a31);
+        double a22inv = determinv * (a11*a33 - a13*a31);
+        double a23inv = -determinv * (a11*a23 - a13*a21);
+        double a31inv = determinv * (a21*a32 - a22*a31);
+        double a32inv = -determinv * (a11*a32 - a12*a31);
+        double a33inv = determinv * (a11*a22 - a12*a21);
+
+        // compute coeffs
+
+        double r0102 = (r01[0]*r02[0] + r01[1]*r02[1] + r01[2]*r02[2]);
+        double r0103 = (r01[0]*r03[0] + r01[1]*r03[1] + r01[2]*r03[2]);
+        double r0203 = (r02[0]*r03[0] + r02[1]*r03[1] + r02[2]*r03[2]);
+
+        double quad1_0101 = (m0_inv+m1_inv)*(m0_inv+m1_inv) * r01_sq;
+        double quad1_0202 = m0_inv*m0_inv * r02_sq;
+        double quad1_0303 = m0_inv*m0_inv * r03_sq;
+        double quad1_0102 = 2.0 * (m0_inv+m1_inv)*m0_inv * r0102;
+        double quad1_0103 = 2.0 * (m0_inv+m1_inv)*m0_inv * r0103;
+        double quad1_0203 = 2.0 * m0_inv*m0_inv * r0203;
+
+        double quad2_0101 = m0_inv*m0_inv * r01_sq;
+        double quad2_0202 = (m0_inv+m2_inv)*(m0_inv+m2_inv) * r02_sq;
+        double quad2_0303 = m0_inv*m0_inv * r03_sq;
+        double quad2_0102 = 2.0 * (m0_inv+m2_inv)*m0_inv * r0102;
+        double quad2_0103 = 2.0 * m0_inv*m0_inv * r0103;
+        double quad2_0203 = 2.0 * (m0_inv+m2_inv)*m0_inv * r0203;
+
+        double quad3_0101 = m0_inv*m0_inv * r01_sq;
+        double quad3_0202 = m0_inv*m0_inv * r02_sq;
+        double quad3_0303 = (m0_inv+m3_inv)*(m0_inv+m3_inv) * r03_sq;
+        double quad3_0102 = 2.0 * m0_inv*m0_inv * r0102;
+        double quad3_0103 = 2.0 * (m0_inv+m3_inv)*m0_inv * r0103;
+        double quad3_0203 = 2.0 * (m0_inv+m3_inv)*m0_inv * r0203;
+
+        double lambda01 = 0.0;
+        double lambda02 = 0.0;
+        double lambda03 = 0.0;
+        int niter = 0;
+        int done = 0;
+
+        double quad1,quad2,quad3,b1,b2,b3,lambda01_new,lambda02_new,lambda03_new;
+
+        while (!done && niter < max_iter) {
+            quad1 = quad1_0101 * lambda01*lambda01 +
+            quad1_0202 * lambda02*lambda02 +
+            quad1_0303 * lambda03*lambda03 +
+            quad1_0102 * lambda01*lambda02 +
+            quad1_0103 * lambda01*lambda03 +
+            quad1_0203 * lambda02*lambda03;
+
+            quad2 = quad2_0101 * lambda01*lambda01 +
+            quad2_0202 * lambda02*lambda02 +
+            quad2_0303 * lambda03*lambda03 +
+            quad2_0102 * lambda01*lambda02 +
+            quad2_0103 * lambda01*lambda03 +
+            quad2_0203 * lambda02*lambda03;
+
+            quad3 = quad3_0101 * lambda01*lambda01 +
+            quad3_0202 * lambda02*lambda02 +
+            quad3_0303 * lambda03*lambda03 +
+            quad3_0102 * lambda01*lambda02 +
+            quad3_0103 * lambda01*lambda03 +
+            quad3_0203 * lambda02*lambda03;
+
+            b1 = bond0_r0*bond0_r0 - s01_sq - quad1;
+            b2 = bond1_r0*bond1_r0 - s02_sq - quad2;
+            b3 = bond2_r0*bond2_r0 - s03_sq - quad3;
+
+            lambda01_new = a11inv*b1 + a12inv*b2 + a13inv*b3;
+            lambda02_new = a21inv*b1 + a22inv*b2 + a23inv*b3;
+            lambda03_new = a31inv*b1 + a32inv*b2 + a33inv*b3;
+
+            done = 1;
+            if (fabs(lambda01_new-lambda01) > tolerance) done = 0;
+            if (fabs(lambda02_new-lambda02) > tolerance) done = 0;
+            if (fabs(lambda03_new-lambda03) > tolerance) done = 0;
+
+            lambda01 = lambda01_new;
+            lambda02 = lambda02_new;
+            lambda03 = lambda03_new;
+
+            niter++;
+        }
+        
+        // Scale lambda appropriately
+        lambda01 /= dt_2;
+        lambda02 /= dt_2;
+        lambda03 /= dt_2;
+
+        // apply constraint forces
+        f(atom0,0) -= lambda01*r01[0] + lambda02*r02[0] + lambda03*r03[0];
+        f(atom0,1) -= lambda01*r01[1] + lambda02*r02[1] + lambda03*r03[1];
+        f(atom0,2) -= lambda01*r01[2] + lambda02*r02[2] + lambda03*r03[2];
+
+        f(atom1,0) += lambda01*r01[0];
+        f(atom1,1) += lambda01*r01[1];
+        f(atom1,2) += lambda01*r01[2];
+
+        f(atom2,0) += lambda02*r02[0];
+        f(atom2,1) += lambda02*r02[1];
+        f(atom2,2) += lambda02*r02[2];
+
+        f(atom3,0) += lambda03*r03[0];
+        f(atom3,1) += lambda03*r03[1];
+        f(atom3,2) += lambda03*r03[2];
         }
     );
 }

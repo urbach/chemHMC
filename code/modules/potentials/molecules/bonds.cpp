@@ -69,7 +69,7 @@ double Bonds::potential_bonds(const particles_instance& particles) {
     auto& x = particles.x;
     auto& L = particles.L;
     auto& inverse_halved_L = particles.inverse_halved_L;
-    auto& bonds = this->bonds;
+    auto& bonds = this->unconstrained_bonds;
     auto& bondTypes = this->bondTypes;
 
     // Outer parallel_reduce
