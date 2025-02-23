@@ -28,6 +28,7 @@ public:
     void apply_RATTLE(); // Velocity correction
     void RATTLE_size_1_cluster();
     void RATTLE_size_2_cluster();
+    void RATTLE_size_3_cluster();
 };
 
 #endif
