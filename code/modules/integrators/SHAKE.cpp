@@ -139,12 +139,11 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
     auto& L = particles->L;
     auto& id = particles->id;
     auto& x = particles->x;
-    auto& inverse_halved_L = particles->inverse_halved_L;
-    auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& c = particles->coeff_x;    // Inverse mass lookup table
-    trial_positions = Kokkos::create_mirror(x);
+    auto& dt = this->dt;
+    this->trial_positions = Kokkos::create_mirror(x);
     Kokkos::deep_copy(trial_positions,x);
-
+    auto& trial_positions = this->trial_positions;
     // do an unconstrained update on all positions
     Kokkos::parallel_for(
         "SHAKE_unconstrained_update",
@@ -152,7 +151,7 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
         KOKKOS_LAMBDA(const int i) {
             for (int dir = 0; dir < 3; dir++) {
                 
-                trial_positions(i, dir) += this->dt * c[id[i]] * p(i, dir);
+                trial_positions(i, dir) += dt * c[id[i]] * p(i, dir);
                 // apply  periodic boundary condition
                 trial_positions(i, dir) -= L[dir] * floor(trial_positions(i, dir) / L[dir]);
             }
@@ -168,7 +167,6 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
 }
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
-    auto& tolerance = this->tolerance;
     auto& size_1_clusters = this->size_1_clusters;
     auto& f = particles->f;
     auto& x = particles->x;
@@ -683,7 +681,6 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
 }
 
 void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
-    auto& tolerance = this->tolerance;
     auto& size_1_clusters = this->size_1_clusters;
     auto& p = particles->p;
     auto& x = particles->x;
@@ -693,7 +690,6 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
     auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes = particles->bonds_ptr->bondTypes;
     auto& coeff_x = particles->coeff_x;    // Inverse mass lookup table
-    double dt = this->dt;
 
     Kokkos::parallel_for(
     "SHAKE_force_update",
@@ -726,8 +722,8 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
         pvec[0] = p(atom1, 0)*m1_inv - p(atom2, 0)*m2_inv;
         pvec[1] = p(atom1, 1)*m1_inv - p(atom2, 1)*m2_inv;
         pvec[2] = p(atom1, 2)*m1_inv - p(atom2, 2)*m2_inv;
-        double p2 = pvec[0]*pvec[0]+pvec[1]*pvec[1]+pvec[2]*pvec[2];
-        //Kokkos::printf("r2: %f \t s2: %f\n",r2,s2);
+
+
         // compute factors for lagrange multiplier
         double A = (rvec[0]*pvec[0]+rvec[1]*pvec[1]+rvec[2]*pvec[2]);
         double B = r2 * (m1_inv+m2_inv);
@@ -747,12 +743,9 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
 }
 
 void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
-    auto& max_iter              = this->max_iter;
-    auto& tolerance             = this->tolerance;
     auto& size_2_clusters       = this->size_2_clusters;
     auto& p                    = particles->p;
     auto& x                     = particles->x;
-    auto& trial_x               = this->trial_positions;
     auto& L                     = particles->L;
     auto& id                    = particles->id;
     auto& inverse_halved_L      = particles->inverse_halved_L;
@@ -828,12 +821,11 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
         p01[0] = p(atom0, 0)*m0_inv - p(atom1, 0)*m1_inv;
         p01[1] = p(atom0, 1)*m0_inv - p(atom1, 1)*m1_inv;
         p01[2] = p(atom0, 2)*m0_inv - p(atom1, 2)*m1_inv;
-        double p01_sq = p01[0]*p01[0]+p01[1]*p01[1]+p01[2]*p01[2];
+
         double p02[3];
         p02[0] = p(atom0, 0)*m0_inv - p(atom2, 0)*m2_inv;
         p02[1] = p(atom0, 1)*m0_inv - p(atom2, 1)*m2_inv;
         p02[2] = p(atom0, 2)*m0_inv - p(atom2, 2)*m2_inv;
-        double p02_sq = p02[0]*p02[0]+p02[1]*p02[1]+p02[2]*p02[2];
 
         double A[2][2];
 
@@ -972,19 +964,16 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
         p01[0] = p(atom0, 0)*m0_inv - p(atom1, 0)*m1_inv;
         p01[1] = p(atom0, 1)*m0_inv - p(atom1, 1)*m1_inv;
         p01[2] = p(atom0, 2)*m0_inv - p(atom1, 2)*m1_inv;
-        double p01_sq = p01[0]*p01[0]+p01[1]*p01[1]+p01[2]*p01[2];
 
         double p02[3];
         p02[0] = p(atom0, 0)*m0_inv - p(atom2, 0)*m2_inv;
         p02[1] = p(atom0, 1)*m0_inv - p(atom2, 1)*m2_inv;
         p02[2] = p(atom0, 2)*m0_inv - p(atom2, 2)*m2_inv;
-        double p02_sq = p02[0]*p02[0]+p02[1]*p02[1]+p02[2]*p02[2];
 
         double p03[3];
         p03[0] = p(atom0, 0)*m0_inv - p(atom3, 0)*m3_inv;
         p03[1] = p(atom0, 1)*m0_inv - p(atom3, 1)*m3_inv;
         p03[2] = p(atom0, 2)*m0_inv - p(atom3, 2)*m3_inv;
-        double p03_sq = p03[0]*p03[0]+p03[1]*p03[1]+p03[2]*p03[2];
 
         double A[3][3];
 
