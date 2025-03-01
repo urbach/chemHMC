@@ -141,7 +141,7 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
     auto& x = particles->x;
     auto& c = particles->coeff_x;    // Inverse mass lookup table
     auto& dt = this->dt;
-    this->trial_positions = Kokkos::create_mirror(x);
+    this->trial_positions = Kokkos::View<double*[3]>("trial_positions",particles->N);
     Kokkos::deep_copy(trial_positions,x);
     auto& trial_positions = this->trial_positions;
     // do an unconstrained update on all positions
