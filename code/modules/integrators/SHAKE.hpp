@@ -13,6 +13,7 @@ public:
     Kokkos::View<int* [2]> size_2_clusters;
     Kokkos::View<int* [3]> size_3_clusters;
     type_x trial_positions;
+    type_p trial_momenta;
 
     struct Tag_SHAKE {};
     struct Tag_RATTLE {};
@@ -26,6 +27,7 @@ public:
     void SHAKE_size_2_cluster();
     void SHAKE_size_3_cluster();
     void apply_RATTLE(); // Velocity correction
+    void generate_trial_momenta();
     void RATTLE_size_1_cluster();
     void RATTLE_size_2_cluster();
     void RATTLE_size_3_cluster();

@@ -234,26 +234,6 @@ double LJ_verlet::potential(const particles_instance& particles) {
                         double sr2 = sigma * sigma / r2;
                         double sr6 = sr2 * sr2 * sr2;
                         innerV += epsilon * sr6 * (sr6 - 1.0);
-                        if (i==0) {
-                            if (j==4) {
-                                /*Kokkos::printf("j:%d r2:%f innerV:%f rx:%f ry:%f rz:%f \n",j,r2,innerV,rx,ry,rz);
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,0));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,1));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,2));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,3));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,4));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,5));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,6));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,7));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,8));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,9));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,10));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,11));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,12));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,13));
-                                Kokkos::printf("particle_j: %d\n", verlet_list(0,14));*/
-                                }
-                        }
                     }
                 },
                 tmpV);

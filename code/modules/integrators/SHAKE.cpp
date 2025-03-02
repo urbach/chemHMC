@@ -21,10 +21,8 @@ void VELOCITY_VERLET_SHAKE::integrate() {
         calc_manager->compute_force();
         Kokkos::fence();
         apply_SHAKE();
-        particles->update_momenta(dt / 2.);
-
-        // Apply RATTLE to correct velocities
         apply_RATTLE();
+        particles->update_momenta(dt / 2.);
     }
 }
 
@@ -675,9 +673,33 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
 
 // RATTLE: Corrects velocities to satisfy constraints
 void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
+    generate_trial_momenta();
     RATTLE_size_1_cluster();
     RATTLE_size_2_cluster();
     RATTLE_size_3_cluster();
+}
+
+void VELOCITY_VERLET_SHAKE::generate_trial_momenta() {
+    auto& p = particles->p;
+    auto& L = particles->L;
+    auto& id = particles->id;
+    auto& x = particles->x;
+    auto& f = particles->f;
+    auto& c = particles->coeff_p;    // Inverse mass lookup table
+    auto& dt = this->dt;
+    this->trial_momenta = Kokkos::View<double*[3]>("trial_momenta",particles->N);
+    Kokkos::deep_copy(trial_momenta,p);
+    auto& trial_momenta = this->trial_momenta;
+    // do an unconstrained update on all positions
+    Kokkos::parallel_for(
+        "RATTLE_unconstrained_update",
+        Kokkos::RangePolicy<>(0, trial_momenta.extent(0)),
+        KOKKOS_LAMBDA(const int i) {
+            trial_momenta(i, 0) -= 0.5*dt * c * f(i, 0);
+            trial_momenta(i, 1) -= 0.5*dt * c * f(i, 1);
+            trial_momenta(i, 2) -= 0.5*dt * c * f(i, 2);
+        }
+    );
 }
 
 void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
@@ -686,6 +708,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
     auto& x = particles->x;
     auto& L = particles->L;
     auto& id = particles->id;
+    auto& trial_p = this->trial_momenta;
     auto& inverse_halved_L = particles->inverse_halved_L;
     auto& bonds = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes = particles->bonds_ptr->bondTypes;
@@ -719,9 +742,10 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
 
         // unconstrained update distance
         double pvec[3];
-        pvec[0] = p(atom1, 0)*m1_inv - p(atom2, 0)*m2_inv;
-        pvec[1] = p(atom1, 1)*m1_inv - p(atom2, 1)*m2_inv;
-        pvec[2] = p(atom1, 2)*m1_inv - p(atom2, 2)*m2_inv;
+        //Kokkos::printf("atom1: %f %f %f\n",trial_p(atom1, 0),trial_p(atom1, 1),trial_p(atom1, 2));
+        pvec[0] = trial_p(atom1, 0)*m1_inv - trial_p(atom2, 0)*m2_inv;
+        pvec[1] = trial_p(atom1, 1)*m1_inv - trial_p(atom2, 1)*m2_inv;
+        pvec[2] = trial_p(atom1, 2)*m1_inv - trial_p(atom2, 2)*m2_inv;
 
 
         // compute factors for lagrange multiplier
@@ -748,6 +772,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
     auto& x                     = particles->x;
     auto& L                     = particles->L;
     auto& id                    = particles->id;
+    auto& trial_p               = this->trial_momenta;
     auto& inverse_halved_L      = particles->inverse_halved_L;
     auto& bonds                 = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes             = particles->bonds_ptr->bondTypes;
@@ -818,19 +843,19 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
         double r02_sq = r02[0]*r02[0]+r02[1]*r02[1]+r02[2]*r02[2];
 
         double p01[3];
-        p01[0] = p(atom0, 0)*m0_inv - p(atom1, 0)*m1_inv;
-        p01[1] = p(atom0, 1)*m0_inv - p(atom1, 1)*m1_inv;
-        p01[2] = p(atom0, 2)*m0_inv - p(atom1, 2)*m1_inv;
+        p01[0] = trial_p(atom0, 0)*m0_inv - trial_p(atom1, 0)*m1_inv;
+        p01[1] = trial_p(atom0, 1)*m0_inv - trial_p(atom1, 1)*m1_inv;
+        p01[2] = trial_p(atom0, 2)*m0_inv - trial_p(atom1, 2)*m1_inv;
 
         double p02[3];
-        p02[0] = p(atom0, 0)*m0_inv - p(atom2, 0)*m2_inv;
-        p02[1] = p(atom0, 1)*m0_inv - p(atom2, 1)*m2_inv;
-        p02[2] = p(atom0, 2)*m0_inv - p(atom2, 2)*m2_inv;
+        p02[0] = trial_p(atom0, 0)*m0_inv - trial_p(atom2, 0)*m2_inv;
+        p02[1] = trial_p(atom0, 1)*m0_inv - trial_p(atom2, 1)*m2_inv;
+        p02[2] = trial_p(atom0, 2)*m0_inv - trial_p(atom2, 2)*m2_inv;
 
         double A[2][2];
 
         A[0][0] = (m0_inv+m1_inv) * r01_sq;
-        A[1][0] = (m0_inv) * r01[0]*r02[0]+r01[1]*r02[1]+r01[2]*r02[2];
+        A[1][0] = (m0_inv) * (r01[0]*r02[0]+r01[1]*r02[1]+r01[2]*r02[2]);
         A[0][1] = A[1][0];
         A[1][1] = (m0_inv+m2_inv) * r02_sq;
 
@@ -868,6 +893,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
     auto& x                     = particles->x;
     auto& L                     = particles->L;
     auto& id                    = particles->id;
+    auto& trial_p               = this->trial_momenta;
     auto& inverse_halved_L      = particles->inverse_halved_L;
     auto& bonds                 = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes             = particles->bonds_ptr->bondTypes;
@@ -961,19 +987,19 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
 
         // distances after unconstrained update
         double p01[3];
-        p01[0] = p(atom0, 0)*m0_inv - p(atom1, 0)*m1_inv;
-        p01[1] = p(atom0, 1)*m0_inv - p(atom1, 1)*m1_inv;
-        p01[2] = p(atom0, 2)*m0_inv - p(atom1, 2)*m1_inv;
+        p01[0] = trial_p(atom0, 0)*m0_inv - trial_p(atom1, 0)*m1_inv;
+        p01[1] = trial_p(atom0, 1)*m0_inv - trial_p(atom1, 1)*m1_inv;
+        p01[2] = trial_p(atom0, 2)*m0_inv - trial_p(atom1, 2)*m1_inv;
 
         double p02[3];
-        p02[0] = p(atom0, 0)*m0_inv - p(atom2, 0)*m2_inv;
-        p02[1] = p(atom0, 1)*m0_inv - p(atom2, 1)*m2_inv;
-        p02[2] = p(atom0, 2)*m0_inv - p(atom2, 2)*m2_inv;
+        p02[0] = trial_p(atom0, 0)*m0_inv - trial_p(atom2, 0)*m2_inv;
+        p02[1] = trial_p(atom0, 1)*m0_inv - trial_p(atom2, 1)*m2_inv;
+        p02[2] = trial_p(atom0, 2)*m0_inv - trial_p(atom2, 2)*m2_inv;
 
         double p03[3];
-        p03[0] = p(atom0, 0)*m0_inv - p(atom3, 0)*m3_inv;
-        p03[1] = p(atom0, 1)*m0_inv - p(atom3, 1)*m3_inv;
-        p03[2] = p(atom0, 2)*m0_inv - p(atom3, 2)*m3_inv;
+        p03[0] = trial_p(atom0, 0)*m0_inv - trial_p(atom3, 0)*m3_inv;
+        p03[1] = trial_p(atom0, 1)*m0_inv - trial_p(atom3, 1)*m3_inv;
+        p03[2] = trial_p(atom0, 2)*m0_inv - trial_p(atom3, 2)*m3_inv;
 
         double A[3][3];
 

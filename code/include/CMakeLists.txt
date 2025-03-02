@@ -13,7 +13,7 @@ set(chemHMC_header
     particles.hpp
     atom.hpp
     bonds.hpp
-    coulomb.hpp
+    ../modules/potentials/non_bonded_interactions/coulomb.hpp
     ../modules/potentials/non_bonded_interactions/LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
