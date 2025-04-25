@@ -176,7 +176,6 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
     auto& bondTypes = particles->bonds_ptr->bondTypes;
     auto& coeff_x = particles->coeff_x;    // Inverse mass lookup table
     double dt = this->dt;
-
     Kokkos::parallel_for(
     "SHAKE_force_update",
     Kokkos::RangePolicy<>(0, size_1_clusters.extent(0)),
@@ -238,15 +237,16 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
         lambda /= dt*dt;
 
         // apply update to forces
-        f(atom1,0) -= lambda*rvec[0];
-        f(atom1,1) -= lambda*rvec[1];
-        f(atom1,2) -= lambda*rvec[2];
+        Kokkos::atomic_fetch_add(&f(atom1,0), -lambda*rvec[0]);
+        Kokkos::atomic_fetch_add(&f(atom1,1), -lambda*rvec[1]);
+        Kokkos::atomic_fetch_add(&f(atom1,2), -lambda*rvec[2]);
 
-        f(atom2,0) += lambda*rvec[0];
-        f(atom2,1) += lambda*rvec[1];
-        f(atom2,2) += lambda*rvec[2];
+        Kokkos::atomic_fetch_add(&f(atom2,0), lambda*rvec[0]);
+        Kokkos::atomic_fetch_add(&f(atom2,1), lambda*rvec[1]);
+        Kokkos::atomic_fetch_add(&f(atom2,2), lambda*rvec[2]);
         }
     );
+    Kokkos::fence();
 }
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
@@ -263,7 +263,6 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
     auto& bondTypes             = particles->bonds_ptr->bondTypes;
     auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
     double dt_2 = this->dt * this->dt;
-  
     Kokkos::parallel_for(
     "SHAKE_size_2_cluster_update",
     Kokkos::RangePolicy<>(0, size_2_clusters.extent(0)),
@@ -281,9 +280,9 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
         int bondtype0 = bonds(bond0_idx).type;
         int bondtype1 = bonds(bond1_idx).type;
 
-        int bond0_r0 = bondTypes(bondtype0).r0;
-        int bond1_r0 = bondTypes(bondtype1).r0;
-
+        double bond0_r0 = bondTypes(bondtype0).r0;
+        double bond1_r0 = bondTypes(bondtype1).r0;
+        
         // Identify the common atom. We check among the four atoms.
         int atom0 = -1, atom1 = -1, atom2 = -1;
         if (a == c || a == d) {
@@ -401,19 +400,20 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
         lambda01 /= dt_2;
         lambda02 /= dt_2;
 
-        f(atom0,0) -= lambda01*r01[0] + lambda02*r02[0];
-        f(atom0,1) -= lambda01*r01[1] + lambda02*r02[1];
-        f(atom0,2) -= lambda01*r01[2] + lambda02*r02[2];
+        Kokkos::atomic_fetch_add(&f(atom0,0), -lambda01*r01[0] - lambda02*r02[0]);
+        Kokkos::atomic_fetch_add(&f(atom0,1), -lambda01*r01[1] - lambda02*r02[1]);
+        Kokkos::atomic_fetch_add(&f(atom0,2), -lambda01*r01[2] - lambda02*r02[2]);
 
-        f(atom1,0) += lambda01*r01[0];
-        f(atom1,1) += lambda01*r01[1];
-        f(atom1,2) += lambda01*r01[2];
+        Kokkos::atomic_fetch_add(&f(atom1,0), lambda01*r01[0]);
+        Kokkos::atomic_fetch_add(&f(atom1,1), lambda01*r01[1]);
+        Kokkos::atomic_fetch_add(&f(atom1,2), lambda01*r01[2]);
 
-        f(atom2,0) += lambda02*r02[0];
-        f(atom2,1) += lambda02*r02[1];
-        f(atom2,2) += lambda02*r02[2];
+        Kokkos::atomic_fetch_add(&f(atom2,0), lambda02*r02[0]);
+        Kokkos::atomic_fetch_add(&f(atom2,1), lambda02*r02[1]);
+        Kokkos::atomic_fetch_add(&f(atom2,2), lambda02*r02[2]);
         }
     );
+    Kokkos::fence();
 }
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
@@ -430,7 +430,6 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
     auto& bondTypes             = particles->bonds_ptr->bondTypes;
     auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
     double dt_2 = this->dt * this->dt;
-  
     Kokkos::parallel_for(
     "SHAKE_size_2_cluster_update",
     Kokkos::RangePolicy<>(0, size_3_clusters.extent(0)),
@@ -452,9 +451,9 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
         int bondtype0 = bonds(bond0_idx).type;
         int bondtype1 = bonds(bond1_idx).type;
         int bondtype2 = bonds(bond2_idx).type;
-        int bond0_r0 = bondTypes(bondtype0).r0;
-        int bond1_r0 = bondTypes(bondtype1).r0;
-        int bond2_r0 = bondTypes(bondtype2).r0;
+        double bond0_r0 = bondTypes(bondtype0).r0;
+        double bond1_r0 = bondTypes(bondtype1).r0;
+        double bond2_r0 = bondTypes(bondtype2).r0;
 
         // Identify the common atom among the three bonds.
         // We check the two atoms in bond 0 to see if one of them is common in bonds 1 and 2.
@@ -652,21 +651,21 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
         lambda03 /= dt_2;
 
         // apply constraint forces
-        f(atom0,0) -= lambda01*r01[0] + lambda02*r02[0] + lambda03*r03[0];
-        f(atom0,1) -= lambda01*r01[1] + lambda02*r02[1] + lambda03*r03[1];
-        f(atom0,2) -= lambda01*r01[2] + lambda02*r02[2] + lambda03*r03[2];
+        Kokkos::atomic_fetch_add(&f(atom0,0), -lambda01*r01[0] - lambda02*r02[0] - lambda03*r03[0]);
+        Kokkos::atomic_fetch_add(&f(atom0,1), -lambda01*r01[1] - lambda02*r02[1] - lambda03*r03[1]);
+        Kokkos::atomic_fetch_add(&f(atom0,2), -lambda01*r01[2] - lambda02*r02[2] - lambda03*r03[2]);
 
-        f(atom1,0) += lambda01*r01[0];
-        f(atom1,1) += lambda01*r01[1];
-        f(atom1,2) += lambda01*r01[2];
+        Kokkos::atomic_fetch_add(&f(atom1,0), lambda01*r01[0]);
+        Kokkos::atomic_fetch_add(&f(atom1,1), lambda01*r01[1]);
+        Kokkos::atomic_fetch_add(&f(atom1,2), lambda01*r01[2]);
 
-        f(atom2,0) += lambda02*r02[0];
-        f(atom2,1) += lambda02*r02[1];
-        f(atom2,2) += lambda02*r02[2];
+        Kokkos::atomic_fetch_add(&f(atom2,0), lambda02*r02[0]);
+        Kokkos::atomic_fetch_add(&f(atom2,1), lambda02*r02[1]);
+        Kokkos::atomic_fetch_add(&f(atom2,2), lambda02*r02[2]);
 
-        f(atom3,0) += lambda03*r03[0];
-        f(atom3,1) += lambda03*r03[1];
-        f(atom3,2) += lambda03*r03[2];
+        Kokkos::atomic_fetch_add(&f(atom3,0), lambda03*r03[0]);
+        Kokkos::atomic_fetch_add(&f(atom3,1), lambda03*r03[1]);
+        Kokkos::atomic_fetch_add(&f(atom3,2), lambda03*r03[2]);
         }
     );
 }
@@ -681,11 +680,8 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
 
 void VELOCITY_VERLET_SHAKE::generate_trial_momenta() {
     auto& p = particles->p;
-    auto& L = particles->L;
-    auto& id = particles->id;
-    auto& x = particles->x;
     auto& f = particles->f;
-    auto& c = particles->coeff_p;    // Inverse mass lookup table
+    auto& c = particles->coeff_p;
     auto& dt = this->dt;
     this->trial_momenta = Kokkos::View<double*[3]>("trial_momenta",particles->N);
     Kokkos::deep_copy(trial_momenta,p);
@@ -700,6 +696,7 @@ void VELOCITY_VERLET_SHAKE::generate_trial_momenta() {
             trial_momenta(i, 2) -= 0.5*dt * c * f(i, 2);
         }
     );
+    Kokkos::fence();
 }
 
 void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
@@ -715,7 +712,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
     auto& coeff_x = particles->coeff_x;    // Inverse mass lookup table
 
     Kokkos::parallel_for(
-    "SHAKE_force_update",
+    "RATTLE_force_update",
     Kokkos::RangePolicy<>(0, size_1_clusters.extent(0)),
     KOKKOS_LAMBDA(const int i) {
         const int bond_idx = size_1_clusters(i);
@@ -755,13 +752,13 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
         double lambda = A/B;
 
         // apply update to forces
-        p(atom1,0) += lambda*rvec[0]*m1_inv;
-        p(atom1,1) += lambda*rvec[1]*m1_inv;
-        p(atom1,2) += lambda*rvec[2]*m1_inv;
+        Kokkos::atomic_fetch_add(&p(atom1,0),  lambda * rvec[0] * m1_inv);
+        Kokkos::atomic_fetch_add(&p(atom1,1),  lambda * rvec[1] * m1_inv);
+        Kokkos::atomic_fetch_add(&p(atom1,2),  lambda * rvec[2] * m1_inv);
 
-        p(atom2,0) -= lambda*rvec[0]*m2_inv;
-        p(atom2,1) -= lambda*rvec[1]*m2_inv;
-        p(atom2,2) -= lambda*rvec[2]*m2_inv;
+        Kokkos::atomic_fetch_add(&p(atom2,0), -lambda * rvec[0] * m2_inv);
+        Kokkos::atomic_fetch_add(&p(atom2,1), -lambda * rvec[1] * m2_inv);
+        Kokkos::atomic_fetch_add(&p(atom2,2), -lambda * rvec[2] * m2_inv);
         }
     );
 }
@@ -780,7 +777,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
     double dt_2 = this->dt * this->dt;
   
     Kokkos::parallel_for(
-    "SHAKE_size_2_cluster_update",
+    "RATTLE_size_2_cluster_update",
     Kokkos::RangePolicy<>(0, size_2_clusters.extent(0)),
     KOKKOS_LAMBDA(const int i) {
         // Get the two bond indices for this cluster.
@@ -796,8 +793,8 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
         int bondtype0 = bonds(bond0_idx).type;
         int bondtype1 = bonds(bond1_idx).type;
 
-        int bond0_r0 = bondTypes(bondtype0).r0;
-        int bond1_r0 = bondTypes(bondtype1).r0;
+        double bond0_r0 = bondTypes(bondtype0).r0;
+        double bond1_r0 = bondTypes(bondtype1).r0;
 
         // Identify the common atom. We check among the four atoms.
         int atom0 = -1, atom1 = -1, atom2 = -1;
@@ -872,17 +869,18 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_2_cluster() {
         lambda01 = D_inv * (A[1][1] * cvec[0] - A[0][1] * cvec[1]);
         lambda02 = D_inv * (-A[1][0] * cvec[0] + A[0][0] * cvec[1]);
 
-        p(atom0,0) += lambda01*r01[0] + lambda02*r02[0];
-        p(atom0,1) += lambda01*r01[1] + lambda02*r02[1];
-        p(atom0,2) += lambda01*r01[2] + lambda02*r02[2];
+        // apply constraint forces
+        Kokkos::atomic_fetch_add(&p(atom0,0),lambda01*r01[0] + lambda02*r02[0]);
+        Kokkos::atomic_fetch_add(&p(atom0,1),lambda01*r01[1] + lambda02*r02[1]);
+        Kokkos::atomic_fetch_add(&p(atom0,2),lambda01*r01[2] + lambda02*r02[2]);
 
-        p(atom1,0) -= lambda01*r01[0];
-        p(atom1,1) -= lambda01*r01[1];
-        p(atom1,2) -= lambda01*r01[2];
+        Kokkos::atomic_fetch_add(&p(atom1,0),-lambda01*r01[0]);
+        Kokkos::atomic_fetch_add(&p(atom1,1),-lambda01*r01[1]);
+        Kokkos::atomic_fetch_add(&p(atom1,2),-lambda01*r01[2]);
 
-        p(atom2,0) -= lambda02*r02[0];
-        p(atom2,1) -= lambda02*r02[1];
-        p(atom2,2) -= lambda02*r02[2];
+        Kokkos::atomic_fetch_add(&p(atom2,0),-lambda02*r02[0]);
+        Kokkos::atomic_fetch_add(&p(atom2,1),-lambda02*r02[1]);
+        Kokkos::atomic_fetch_add(&p(atom2,2),-lambda02*r02[2]);
         }
     );
 }
@@ -900,7 +898,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
     auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
   
     Kokkos::parallel_for(
-    "SHAKE_size_2_cluster_update",
+    "RATTLE_size_2_cluster_update",
     Kokkos::RangePolicy<>(0, size_3_clusters.extent(0)),
     KOKKOS_LAMBDA(const int i) {
         // Get the three bond indices for this size_3 cluster.
@@ -920,9 +918,9 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
         int bondtype0 = bonds(bond0_idx).type;
         int bondtype1 = bonds(bond1_idx).type;
         int bondtype2 = bonds(bond2_idx).type;
-        int bond0_r0 = bondTypes(bondtype0).r0;
-        int bond1_r0 = bondTypes(bondtype1).r0;
-        int bond2_r0 = bondTypes(bondtype2).r0;
+        double bond0_r0 = bondTypes(bondtype0).r0;
+        double bond1_r0 = bondTypes(bondtype1).r0;
+        double bond2_r0 = bondTypes(bondtype2).r0;
 
         // Identify the common atom among the three bonds.
         // We check the two atoms in bond 0 to see if one of them is common in bonds 1 and 2.
@@ -1048,21 +1046,21 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
         lambda03 = A_inv[2][0]*cvec[0]+A_inv[2][1]*cvec[1]+A_inv[2][2]*cvec[2];
 
         // apply constraint forces
-        p(atom0,0) += lambda01*r01[0] + lambda02*r02[0] + lambda03*r03[0];
-        p(atom0,1) += lambda01*r01[1] + lambda02*r02[1] + lambda03*r03[1];
-        p(atom0,2) += lambda01*r01[2] + lambda02*r02[2] + lambda03*r03[2];
+        Kokkos::atomic_fetch_add(&p(atom0,0), lambda01*r01[0] + lambda02*r02[0] + lambda03*r03[0]);
+        Kokkos::atomic_fetch_add(&p(atom0,1), lambda01*r01[1] + lambda02*r02[1] + lambda03*r03[1]);
+        Kokkos::atomic_fetch_add(&p(atom0,2), lambda01*r01[2] + lambda02*r02[2] + lambda03*r03[2]);
 
-        p(atom1,0) -= lambda01*r01[0];
-        p(atom1,1) -= lambda01*r01[1];
-        p(atom1,2) -= lambda01*r01[2];
+        Kokkos::atomic_fetch_add(&p(atom1,0), -lambda01*r01[0]);
+        Kokkos::atomic_fetch_add(&p(atom1,1), -lambda01*r01[1]);
+        Kokkos::atomic_fetch_add(&p(atom1,2), -lambda01*r01[2]);
 
-        p(atom2,0) -= lambda02*r02[0];
-        p(atom2,1) -= lambda02*r02[1];
-        p(atom2,2) -= lambda02*r02[2];
+        Kokkos::atomic_fetch_add(&p(atom2,0), -lambda02*r02[0]);
+        Kokkos::atomic_fetch_add(&p(atom2,1), -lambda02*r02[1]);
+        Kokkos::atomic_fetch_add(&p(atom2,2), -lambda02*r02[2]);
 
-        p(atom3,0) -= lambda03*r03[0];
-        p(atom3,1) -= lambda03*r03[1];
-        p(atom3,2) -= lambda03*r03[2];
+        Kokkos::atomic_fetch_add(&p(atom3,0), -lambda03*r03[0]);
+        Kokkos::atomic_fetch_add(&p(atom3,1), -lambda03*r03[1]);
+        Kokkos::atomic_fetch_add(&p(atom3,2), -lambda03*r03[2]);
         }
     );
 }

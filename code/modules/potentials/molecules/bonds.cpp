@@ -267,12 +267,10 @@ void Bonds::force_bonds(const particles_instance& particles, type_f& f) {
     auto& bonds = this->unconstrained_bonds;
     auto& bondTypes = this->bondTypes;
 
-    typedef Kokkos::TeamPolicy<Tag_force_bonds> team_policy;
     Kokkos::parallel_for(
         "compute_force_bonds",
-        team_policy(bonds.extent(0), Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_force_bonds, const Kokkos::TeamPolicy<>::member_type& teamMember) {
-            const int i = teamMember.league_rank();
+        Kokkos::RangePolicy<>(0, bonds.extent(0)),
+        KOKKOS_LAMBDA(int i) {
 
             int atom1 = bonds(i).atom1;
             int atom2 = bonds(i).atom2;
@@ -297,11 +295,14 @@ void Bonds::force_bonds(const particles_instance& particles, type_f& f) {
             double force_mag = -2.0 * k * dr / r;
             
             // Apply the forces to the atoms
-            Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, 3), [&](const int& d) {
-                double f_component = force_mag * (d == 0 ? dx : (d == 1 ? dy : dz));
-                Kokkos::atomic_add(&f(atom1,d), -f_component);
-                Kokkos::atomic_add(&f(atom2,d), f_component);
-            });
+            for (int d = 0; d < 3; ++d) {
+                double f_component =
+                  force_mag * (d == 0 ? dx :
+                               d == 1 ? dy : dz);
+          
+                Kokkos::atomic_add(&f(atom1, d), -f_component);
+                Kokkos::atomic_add(&f(atom2, d),  f_component);
+            }
         });
     Kokkos::fence();
 }
@@ -316,13 +317,10 @@ void Bonds::force_angles(const particles_instance& particles, type_f& f) {
     auto& angles = this->angles;
     auto& angleTypes = this->angleTypes;
 
-    typedef Kokkos::TeamPolicy<Tag_force_angles> team_policy;
     Kokkos::parallel_for(
         "compute_force_angles",
-        team_policy(angles.extent(0), Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_force_angles, const Kokkos::TeamPolicy<>::member_type& teamMember) {
-                const int i = teamMember.league_rank();
-
+        Kokkos::RangePolicy<>(0, angles.extent(0)),
+        KOKKOS_LAMBDA(int i) {
                 int atom1 = angles(i).atom1;
                 int atom2 = angles(i).atom2;
                 int atom3 = angles(i).atom3;
@@ -405,9 +403,8 @@ void Bonds::force_dihedrals(const particles_instance& particles, type_f& f) {
     typedef Kokkos::TeamPolicy<Tag_force_dihedrals> team_policy;
     Kokkos::parallel_for(
         "compute_force_dihedrals",
-        team_policy(dihedrals.extent(0), Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_force_dihedrals, const Kokkos::TeamPolicy<>::member_type& teamMember) {
-                const int i = teamMember.league_rank();
+        Kokkos::RangePolicy<>(0, dihedrals.extent(0)),
+        KOKKOS_LAMBDA(int i) {
 
                 int atom1 = dihedrals(i).atom1;
                 int atom2 = dihedrals(i).atom2;

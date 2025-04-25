@@ -12,6 +12,7 @@ void Neighbor_list_bonds::build_verlet_list(particles_instance& particles) {
 void Neighbor_list_bonds::build_initial_verlet_list(particles_instance& particles) {
     // Reset neighbor counts to zero
     Kokkos::deep_copy(this->neighbour_count, 0);
+    Kokkos::deep_copy(this->verlet_list, 0);
 
     // Capture all needed members of particles_instance
     auto& x = particles.x;
@@ -67,7 +68,7 @@ void Neighbor_list_bonds::build_initial_verlet_list(particles_instance& particle
 
 void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
     // Remove bonded and indirectly bonded atoms (angles, dihedrals) from the neighbor list
-    
+
     // Capture required variables explicitly
     auto& N = particles.N;
     auto& neighbour_count = this->neighbour_count;
@@ -75,89 +76,82 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
     auto& bonds = particles.bonds_ptr->bonds;
     auto& angles = particles.bonds_ptr->angles;
     auto& dihedrals = particles.bonds_ptr->dihedrals;
-
-    // Remove bonded atoms and associated interactions
+    // Remove bonded/angle/dihedral neighbours in one atomic-safe sweep
     Kokkos::parallel_for(
-        "verlet_remove_bonds",
+        "verlet_remove_all",
         Kokkos::TeamPolicy<Tag_verlet_remove_bonds>(N, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_verlet_remove_bonds, const Kokkos::TeamPolicy<>::member_type& teamMember) {
-            const int i = teamMember.league_rank();
-
-            int initial_neighbour_count = neighbour_count(i);
-
-            // Remove bonded atoms
-            Kokkos::parallel_for(
-                Kokkos::TeamThreadRange(teamMember, bonds.extent(0)),
-                [&](const int b) {
-                    int atom1 = bonds(b).atom1;
-                    int atom2 = bonds(b).atom2;
-                    if (atom1 != i) return;
-
-                    // Search for atom2 in the Verlet list of atom i and mark for removal
-                    int n = initial_neighbour_count;
-                    for (int k = 0; k < n; ++k) {
-                        if (verlet_list(i, k) == atom2) {
-                            verlet_list(i, k) = 0; // Mark for removal
-                            Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
-                            break;
-                        }
-                    }
-                });
-
-            // Remove atoms indirectly bonded via angles
-            Kokkos::parallel_for(
-                Kokkos::TeamThreadRange(teamMember, angles.extent(0)),
-                [&](const int a) {
-                    int atom1 = angles(a).atom1;
-                    int atom2 = angles(a).atom2;
-                    int atom3 = angles(a).atom3;
-
-                    if (atom1 != i) return;
-
-                    // Remove atom2 and atom3 from Verlet list
-                    int n = initial_neighbour_count;
-                    for (int k = 0; k < n; ++k) {
-                        if (verlet_list(i, k) == atom2 || verlet_list(i, k) == atom3) {
-                            verlet_list(i, k) = 0; // Mark for removal
-                            Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
-                        }
-                    }
-                });
-
-            // Remove atoms connected via dihedrals
-            Kokkos::parallel_for(
-                Kokkos::TeamThreadRange(teamMember, dihedrals.extent(0)),
-                [&](const int d) {
-                    int atom1 = dihedrals(d).atom1;
-                    int atom2 = dihedrals(d).atom2;
-                    int atom3 = dihedrals(d).atom3;
-                    int atom4 = dihedrals(d).atom4;
-
-                    if (atom1 != i) return;
-
-                    // Remove atom2, atom3, and atom4 from Verlet list
-                    int n = initial_neighbour_count;
-                    for (int k = 0; k < n; ++k) {
-                        if (verlet_list(i, k) == atom2 || verlet_list(i, k) == atom3 || verlet_list(i, k) == atom4) {
-                            verlet_list(i, k) = 0; // Mark for removal
-                            Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
-                        }
-                    }
+        KOKKOS_LAMBDA(const Tag_verlet_remove_bonds, const Kokkos::TeamPolicy<>::member_type& team) {
+        const int i = team.league_rank();
+        int n_initial = neighbour_count(i);
+    
+        // 1) Single parallel pass over the verlet slots
+        Kokkos::parallel_for(
+            Kokkos::TeamThreadRange(team, 0, n_initial),
+            [&](int k) {
+            int neighbour = verlet_list(i, k);
+            if (neighbour == 0) return;               // already empty
+    
+            // check if 'neighbour' is bonded, angle- or dihedral-excluded
+            bool exclude = false;
+    
+            // --- bonds ---
+            for (size_t b = 0; b < bonds.extent(0); ++b) {
+                if (bonds(b).atom1 == i && bonds(b).atom2 == neighbour) {
+                exclude = true;
+                break;
                 }
-            );
-            teamMember.team_barrier();
-            // Clean up list to remove zeros and shift valid entries up
-            Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
-                int n = initial_neighbour_count;
-                int write_idx = 0;
-
-                for (int read_idx = 0; read_idx < n; ++read_idx) {
-                    if (verlet_list(i, read_idx) != 0) {
-                        verlet_list(i, write_idx) = verlet_list(i, read_idx);
-                        ++write_idx;
-                    }
+            }
+            if (!exclude) {
+                // --- angles ---
+                for (size_t a = 0; a < angles.extent(0); ++a) {
+                if (angles(a).atom1 == i &&
+                    (angles(a).atom2 == neighbour || angles(a).atom3 == neighbour)) {
+                    exclude = true;
+                    break;
                 }
-            });
+                }
+            }
+            if (!exclude) {
+                // --- dihedrals ---
+                for (size_t d = 0; d < dihedrals.extent(0); ++d) {
+                if (dihedrals(d).atom1 == i &&
+                    (dihedrals(d).atom2 == neighbour ||
+                    dihedrals(d).atom3 == neighbour ||
+                    dihedrals(d).atom4 == neighbour)) {
+                    exclude = true;
+                    break;
+                }
+                }
+            }
+    
+            if (exclude) {
+                // only the first thread to swap out 'neighbour' will succeed
+                int old = Kokkos::atomic_compare_exchange(
+                &verlet_list(i, k),
+                neighbour,      // expected
+                0               // desired
+                );
+                if (old == neighbour) {
+                Kokkos::atomic_fetch_add(&neighbour_count(i), -1);
+                }
+            }
+            }
+        );
+    
+        team.team_barrier();
+    
+        // Compact out the zeros on one thread
+        Kokkos::single(Kokkos::PerTeam(team), [&]() {
+            int write = 0;
+            for (int read = 0; read < n_initial; ++read) {
+            int val = verlet_list(i, read);
+            if (val != 0) {
+                verlet_list(i, write++) = val;
+            }
+            }
+            // "write" is now the new neighbour_count
+            neighbour_count(i) = write;
+        });
         });
 
     Kokkos::fence();
