@@ -117,9 +117,8 @@ double Bonds::potential_angles(const particles_instance& particles) {
     // Outer parallel_reduce
     Kokkos::parallel_reduce(
         "angles-potential",
-        Kokkos::TeamPolicy<Tag_potential_angles>(angles.extent(0), Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_potential_angles, const Kokkos::TeamPolicy<>::member_type& team_member, double& V) {
-            const int i = team_member.league_rank();
+        Kokkos::RangePolicy<>(0, angles.extent(0)),
+        KOKKOS_LAMBDA(int i, double &V) {
 
             int atom1 = angles(i).atom1;
             int atom2 = angles(i).atom2;
@@ -164,9 +163,7 @@ double Bonds::potential_angles(const particles_instance& particles) {
             // Compute the angle potential
             double potential = k * dtheta * dtheta; // The usual factor of 0.5 is already part of k
 
-            Kokkos::single(Kokkos::PerTeam(team_member), [&]() {
-                V += potential;
-            });
+            V += potential;
         },
     result);
     return result;
@@ -185,9 +182,8 @@ double Bonds::potential_dihedrals(const particles_instance& particles) {
     // Outer parallel_reduce
     Kokkos::parallel_reduce(
         "dihedrals-potential",
-        Kokkos::TeamPolicy<Tag_potential_dihedrals>(dihedrals.extent(0), Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_potential_dihedrals, const member_type& teamMember, double& V) {
-            const int i = teamMember.league_rank();
+        Kokkos::RangePolicy<>(0, dihedrals.extent(0)),
+        KOKKOS_LAMBDA(int i, double &V) {
 
             int atom1 = dihedrals(i).atom1;
             int atom2 = dihedrals(i).atom2;
@@ -249,9 +245,7 @@ double Bonds::potential_dihedrals(const particles_instance& particles) {
             double potential = k1*(1 + cos(phi)) + k2*(1 - cos(2*phi)) +
                             k3*(1 + cos(3*phi)) + k4*(1 - cos(4*phi)); // The usual factor of 0.5 is already part of k
 
-            Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
-                V += potential;
-            });
+            V += potential;
         },
     result);
     return result;

@@ -162,6 +162,7 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
     SHAKE_size_1_cluster();
     SHAKE_size_2_cluster();
     SHAKE_size_3_cluster();
+    Kokkos::fence();
 }
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
@@ -676,6 +677,7 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
     RATTLE_size_1_cluster();
     RATTLE_size_2_cluster();
     RATTLE_size_3_cluster();
+    Kokkos::fence();
 }
 
 void VELOCITY_VERLET_SHAKE::generate_trial_momenta() {
