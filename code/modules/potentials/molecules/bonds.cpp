@@ -353,16 +353,21 @@ void Bonds::force_angles(const particles_instance& particles, type_f& f) {
 
                 double dtheta = acos(c) - theta0;
 
-                double s = sqrt(1.0 - c * c);
-                double a = -2.0 * k * dtheta / (s + 1e-8);
+                double s = sqrt(1.0 - c*c);
+                if (s < 1.e-8) s = 1.e-8;
+                s = 1.0/s;
+                double a = -2.0 * k * dtheta * s;
 
-                double f1x = a * (delx2 / r2 - delx1 * c / (r1 * r1));
-                double f1y = a * (dely2 / r2 - dely1 * c / (r1 * r1));
-                double f1z = a * (delz2 / r2 - delz1 * c / (r1 * r1));
+                double inv_r1 = 1.0/r1;
+                double inv_r2 = 1.0/r2;
 
-                double f3x = a * (delx1 / r1 - delx2 * c / (r2 * r2));
-                double f3y = a * (dely1 / r1 - dely2 * c / (r2 * r2));
-                double f3z = a * (delz1 / r1 - delz2 * c / (r2 * r2));
+                double f1x = a * inv_r1 * ( delx2*inv_r2 - c*delx1*inv_r1 );
+                double f1y = a * inv_r1 * ( dely2*inv_r2 - c*dely1*inv_r1 );
+                double f1z = a * inv_r1 * ( delz2*inv_r2 - c*delz1*inv_r1 );
+
+                double f3x = a * inv_r2 * ( delx1*inv_r1 - c*delx2*inv_r2 );
+                double f3y = a * inv_r2 * ( dely1*inv_r1 - c*dely2*inv_r2 );
+                double f3z = a * inv_r2 * ( delz1*inv_r1 - c*delz2*inv_r2 );
 
                 double f2x = -(f1x + f3x);
                 double f2y = -(f1y + f3y);
