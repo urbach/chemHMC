@@ -63,6 +63,7 @@ public:
 
     // file interaction
     void print_xyz(params_class params, int traj, double K, double V);
+    void print_force(params_class params, int traj);
 
     // initialization related stuff
     struct check_in_volume {};

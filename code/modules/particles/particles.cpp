@@ -126,6 +126,13 @@ void particles_instance::print_xyz(params_class params, int traj, double K, doub
         fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 
+void particles_instance::print_force(params_class params, int traj) {
+    fprintf(params.fileout, "     %d\n", N);
+    fprintf(params.fileout, "trajectory= %d  FORCES\n", traj);
+    for (int i = 0; i < N; i++)
+        fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", label_xyz[i].c_str(), h_f(i, 0)/internalforcetolammpsreal, h_f(i, 1)/internalforcetolammpsreal, h_f(i, 2)/internalforcetolammpsreal);
+}
+
 void particles_instance::hb() {
     Kokkos::parallel_for("hb_momenta", Kokkos::RangePolicy<hbTag>(0, N), *this);
 }
