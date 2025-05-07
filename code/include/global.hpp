@@ -11,8 +11,10 @@
 static const double N_A = 6.02214076e23;
 static const double kcaltointernal = 4.184e-4; //conversion from kcal/mol to amu * Å^2/fs^2
 static const double kjtointernal = 1.0e-4; //conversion from kJ/mol to amu * Å^2/fs^2
+
 // this one is here for clarity, compiler will make this the same variable anyways
 static const double internalforcetolammpsreal = kcaltointernal; //conversion from amu * Å/fs^2 to amu * (kcal/mol)/Å
+const double coulombtointernal = 332.062934*kcaltointernal; //conversion to amu* A^2/fs^2
 
 static const double kB_J = 1.380649e-23; //boltzmann constant in J/K
 static const double kB = kB_J * 1e-3 * N_A * kjtointernal; //boltzmann constant in amu * Å^2/(fs^2*K)

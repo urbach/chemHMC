@@ -306,7 +306,6 @@ void Coulomb::init(const particles_instance& particles) {
 
 double Coulomb::potential(const particles_instance& particles) {
     Kokkos::Timer coulomb_time;
-    const double conversion_factor = 332.062934*kcaltointernal; //conversion to amu* A^2/fs^2
     double V_real = compute_ewald_real(particles);
     double V_reciprocal = compute_ewald_reciprocal(particles);
     //self interaction only needs to be computed once
@@ -315,7 +314,7 @@ double Coulomb::potential(const particles_instance& particles) {
     }
 
     time_potential += coulomb_time.seconds();
-    return conversion_factor*(V_real + V_reciprocal + V_self);
+    return coulombtointernal*(V_real + V_reciprocal + V_self);
 }
 
 void Coulomb::force(const particles_instance& particles,type_f& f) {
@@ -536,9 +535,9 @@ void Coulomb::compute_ewald_real_forces(const particles_instance& particles,type
 
             // Update forces on atom i
             Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
-                Kokkos::atomic_add(&f(i, 0), fx_i);
-                Kokkos::atomic_add(&f(i, 1), fy_i);
-                Kokkos::atomic_add(&f(i, 2), fz_i);
+                Kokkos::atomic_add(&f(i, 0), coulombtointernal*fx_i);
+                Kokkos::atomic_add(&f(i, 1), coulombtointernal*fy_i);
+                Kokkos::atomic_add(&f(i, 2), coulombtointernal*fz_i);
             });
         }
     );
@@ -606,9 +605,9 @@ void Coulomb::compute_ewald_reciprocal_forces(const particles_instance& particle
                 double fz = force_prefactor * (S_re * sin_kr_i - S_im * cos_kr_i) * kz_real;
 
                 // Update forces
-                Kokkos::atomic_add(&f(i, 0), fx / (L[0] * L[1] * L[2]));
-                Kokkos::atomic_add(&f(i, 1), fy / (L[0] * L[1] * L[2]));
-                Kokkos::atomic_add(&f(i, 2), fz / (L[0] * L[1] * L[2]));
+                Kokkos::atomic_add(&f(i, 0), coulombtointernal*fx / (L[0] * L[1] * L[2]));
+                Kokkos::atomic_add(&f(i, 1), coulombtointernal*fy / (L[0] * L[1] * L[2]));
+                Kokkos::atomic_add(&f(i, 2), coulombtointernal*fz / (L[0] * L[1] * L[2]));
             });
         }
     );

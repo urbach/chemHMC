@@ -130,6 +130,6 @@ void HMC_class::run_MD() {
             integrator->particles->print_xyz(*params, i, Kf, Vf);
         }
     }
-    printf("time for HMC: %g  s\n", timer.seconds());
+    printf("time for MD: %g  s\n", timer.seconds());
     calc_manager->print_timings();
 }
