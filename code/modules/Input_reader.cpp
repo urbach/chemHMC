@@ -6,7 +6,8 @@
 #include "Neighbor_list.hpp"
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
-#include "potentials/non_bonded_interactions/coulomb.hpp"
+#include "potentials/non_bonded_interactions/coulomb_ewald.hpp"
+#include "potentials/non_bonded_interactions/coulomb_direct.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -418,14 +419,24 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
     }
 
     if (doc["coulomb"]) {
-        auto coulomb_ptr = std::make_shared<Coulomb>(doc,*params_ptr);
-        coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
-        coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
-        coulomb_ptr->ewald_alpha = check_and_assign_value<double>(doc["coulomb"], "alpha");
-        coulomb_ptr->ewald_accuracy = check_and_assign_value<double>(doc["coulomb"], "accuracy");
-        coulomb_ptr->k_max = check_and_assign_value<int>(doc["coulomb"], "k_max");
-        calc_manager_ptr->addCalc(coulomb_ptr);
-        UseNeighborList = true;
+        std::string algorithm = check_and_assign_value<std::string>(doc["coulomb"], "algorithm");
+        if (algorithm.compare("ewald") == 0) {
+            auto coulomb_ptr = std::make_shared<Coulomb_ewald>(doc,*params_ptr);
+            coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+            coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
+            coulomb_ptr->ewald_alpha = check_and_assign_value<double>(doc["coulomb"], "alpha");
+            coulomb_ptr->ewald_accuracy = check_and_assign_value<double>(doc["coulomb"], "accuracy");
+            coulomb_ptr->k_max = check_and_assign_value<int>(doc["coulomb"], "k_max");
+            calc_manager_ptr->addCalc(coulomb_ptr);
+            UseNeighborList = true;
+        }
+        else if (algorithm.compare("direct") == 0) {
+            auto coulomb_ptr = std::make_shared<Coulomb_direct>();
+            calc_manager_ptr->addCalc(coulomb_ptr);
+            coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+            coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
+            UseNeighborList = true;
+        }
     }
 
     if (UseNeighborList) {
@@ -440,6 +451,8 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         particles_ptr->neighbor_list->init_verlet_list(doc,particles_ptr->N);
         particles_ptr->neighbor_list->build_verlet_list(*particles_ptr);
     }
+
+    
 }
 
 void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::string& filename) {

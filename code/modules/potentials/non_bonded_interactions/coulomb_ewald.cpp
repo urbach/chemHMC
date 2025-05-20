@@ -1,9 +1,9 @@
 #include "global.hpp"
-#include "coulomb.hpp"
+#include "coulomb_ewald.hpp"
 #include "math.h" // for definition of M_PI (value of Pi)
 #include "Input_reader.hpp"
 
-Coulomb::Coulomb(YAML::Node doc, params_class& params) {
+Coulomb_ewald::Coulomb_ewald(YAML::Node doc, params_class& params) {
     ewald_accuracy = check_and_assign_value<double>(doc["coulomb"], "accuracy");
     ewald_alpha = check_and_assign_value<double>(doc["coulomb"], "alpha");
     sqrt_ewald_alpha = sqrt(ewald_alpha);
@@ -11,7 +11,7 @@ Coulomb::Coulomb(YAML::Node doc, params_class& params) {
     r_c2 = r_c * r_c;
 }
 
-void Coulomb::init(const particles_instance& particles) {
+void Coulomb_ewald::init(const particles_instance& particles) {
 
     double L[3];
     L[0] = particles.L[0];
@@ -304,7 +304,7 @@ void Coulomb::init(const particles_instance& particles) {
     printf("alpha: %f   k_max: %d", ewald_alpha, k_max);*/
 }
 
-double Coulomb::potential(const particles_instance& particles) {
+double Coulomb_ewald::potential(const particles_instance& particles) {
     Kokkos::Timer coulomb_time;
     double V_real = compute_ewald_real(particles);
     double V_reciprocal = compute_ewald_reciprocal(particles);
@@ -317,14 +317,14 @@ double Coulomb::potential(const particles_instance& particles) {
     return coulombtointernal*(V_real + V_reciprocal + V_self);
 }
 
-void Coulomb::force(const particles_instance& particles,type_f& f) {
+void Coulomb_ewald::force(const particles_instance& particles,type_f& f) {
     Kokkos::Timer coulomb_time;
     compute_ewald_real_forces(particles,f);
     compute_ewald_reciprocal_forces(particles,f);
     time_force += coulomb_time.seconds();
 }
 
-double Coulomb::compute_ewald_real(const particles_instance& particles) {
+double Coulomb_ewald::compute_ewald_real(const particles_instance& particles) {
     double V = 0.0;
 
     // Capture all needed members of particles_instance
@@ -385,7 +385,7 @@ double Coulomb::compute_ewald_real(const particles_instance& particles) {
     return 0.5*V;
 }
 
-double Coulomb::compute_ewald_reciprocal(const particles_instance& particles) {
+double Coulomb_ewald::compute_ewald_reciprocal(const particles_instance& particles) {
     double V = 0.0;
 
     // Capture all needed members of particles_instance
@@ -439,7 +439,7 @@ double Coulomb::compute_ewald_reciprocal(const particles_instance& particles) {
     return 2 * M_PI * V / (L[0] * L[1] * L[2]);
 }
 
-double Coulomb::compute_ewald_self(const particles_instance& particles) {
+double Coulomb_ewald::compute_ewald_self(const particles_instance& particles) {
     double V = 0.0;
 
     // Capture all needed members of particles_instance
@@ -467,7 +467,7 @@ double Coulomb::compute_ewald_self(const particles_instance& particles) {
     return -sqrt(ewald_alpha/M_PI) * V;
 }
 
-void Coulomb::compute_ewald_real_forces(const particles_instance& particles,type_f& f) {
+void Coulomb_ewald::compute_ewald_real_forces(const particles_instance& particles,type_f& f) {
     // Capture all needed members of "particles" here. We do not want to reference 
     // any members of "particle" directly inside of the kernel, as the class contains
     // functions that are not device safe. This would trigger a lot of compiler warnings.
@@ -544,7 +544,7 @@ void Coulomb::compute_ewald_real_forces(const particles_instance& particles,type
     Kokkos::fence();
 }
 
-void Coulomb::compute_ewald_reciprocal_forces(const particles_instance& particles,type_f& f) {
+void Coulomb_ewald::compute_ewald_reciprocal_forces(const particles_instance& particles,type_f& f) {
     // Capture all needed members of "particles" here. We do not want to reference 
     // any members of "particle" directly inside of the kernel, as the class contains
     // functions that are not device safe. This would trigger a lot of compiler warnings.

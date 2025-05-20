@@ -1,10 +1,10 @@
-#ifndef COULOMB_HPP
-#define COULOMB_HPP
+#ifndef COULOMB_EWALD_HPP
+#define COULOMB_EWALD_HPP
 
 #include "global.hpp"
 #include "particles.hpp"
 
-class Coulomb : public Calc {
+class Coulomb_ewald : public Calc {
 public:
     // Ewald sum
     double ewald_alpha; // width of the gaussians
@@ -21,7 +21,7 @@ public:
     double potential(const particles_instance& particles) override;
     void force(const particles_instance& particles, type_f& f) override;
 
-    Coulomb(YAML::Node doc, params_class& params);
+    Coulomb_ewald(YAML::Node doc, params_class& params);
 
     struct Tag_potential_ewald_real {};
     struct Tag_potential_ewald_reciprocal {};
