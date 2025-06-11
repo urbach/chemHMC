@@ -14,7 +14,10 @@ public:
     Kokkos::View<int**> verlet_list;
     Kokkos::View<int**>::HostMirror h_verlet_list;
 
-    void init_verlet_list(YAML::Node& doc, int N);
+    double neighbor_cutoff;
+    double neighbor_cutoff_squared;
+
+    void init_verlet_list(YAML::Node& doc, particles_instance& particles);
     struct Tag_build_verlet_list {};
     virtual void build_verlet_list(particles_instance& particles);
 

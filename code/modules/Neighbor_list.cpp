@@ -4,13 +4,26 @@
 #include "particles.hpp"
 #include "global.hpp"
 
-void Neighbor_list::init_verlet_list(YAML::Node& doc, int N) {
+void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& particles) {
+    int N = particles.N;
     int max_neighbors;
     if (doc["particles"]["MaxNeighbors"]) {
         max_neighbors = check_and_assign_value<int>(doc["particles"], "MaxNeighbors");
     } else {
         max_neighbors = 50; // should be replaced by good estimate
     }
+
+    // Set cutoff
+    double coul_cutoff = 0.0;
+    double lj_cutoff = 0.0;
+    if (doc["coulomb"]["cutoff"]) {
+        coul_cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+    }
+    if (doc["LJ"]["cutoff"]) {
+        lj_cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+    }
+    if (coul_cutoff > lj_cutoff) neighbor_cutoff = coul_cutoff;
+    else neighbor_cutoff = lj_cutoff;
 
     verlet_list = Kokkos::View<int**>("verlet_list", N, max_neighbors);
     h_verlet_list = Kokkos::create_mirror_view(verlet_list);

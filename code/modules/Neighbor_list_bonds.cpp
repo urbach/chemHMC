@@ -96,7 +96,8 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
     
             // --- bonds ---
             for (size_t b = 0; b < bonds.extent(0); ++b) {
-                if (bonds(b).atom1 == i && bonds(b).atom2 == neighbour) {
+                if (bonds(b).atom1 == i && bonds(b).atom2 == neighbour ||
+                    bonds(b).atom1 == neighbour && bonds(b).atom2 == i) {
                 exclude = true;
                 break;
                 }
@@ -104,8 +105,8 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
             if (!exclude) {
                 // --- angles ---
                 for (size_t a = 0; a < angles.extent(0); ++a) {
-                if (angles(a).atom1 == i &&
-                    (angles(a).atom2 == neighbour || angles(a).atom3 == neighbour)) {
+                if ((angles(a).atom1 == i || angles(a).atom2 == i || angles(a).atom3 == i) &&
+                    (angles(a).atom1 == neighbour || angles(a).atom2 == neighbour || angles(a).atom3 == neighbour)) {
                     exclude = true;
                     break;
                 }
@@ -114,8 +115,12 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
             if (!exclude) {
                 // --- dihedrals ---
                 for (size_t d = 0; d < dihedrals.extent(0); ++d) {
-                if (dihedrals(d).atom1 == i &&
-                    (dihedrals(d).atom2 == neighbour ||
+                if ((dihedrals(d).atom1 == i ||
+                    dihedrals(d).atom2 == i ||
+                    dihedrals(d).atom3 == i ||
+                    dihedrals(d).atom4 == i) &&
+                    (dihedrals(d).atom1 == neighbour ||
+                    dihedrals(d).atom2 == neighbour ||
                     dihedrals(d).atom3 == neighbour ||
                     dihedrals(d).atom4 == neighbour)) {
                     exclude = true;
@@ -159,4 +164,12 @@ void Neighbor_list_bonds::remove_bonds(particles_instance& particles) {
     // Synchronize updated Verlet lists and neighbor counts back to the host
     Kokkos::deep_copy(h_verlet_list, verlet_list);
     Kokkos::deep_copy(h_neighbour_count, neighbour_count);
+
+    /*for (int i = 0; i < h_verlet_list.extent(0);i++) {
+        printf("%d : ",i);
+        for (int j = 0; j < h_neighbour_count(i); j++) {
+            printf("%d ", h_verlet_list(i,j));  
+        }
+        printf("\n");
+    }*/
 }

@@ -15,6 +15,8 @@ struct params_class {
   int seed;
   int N;
 
+  bool hb_momenta = true;
+
   FILE* fileout;
   std::string start_configuration_file;
   std::string nameout;

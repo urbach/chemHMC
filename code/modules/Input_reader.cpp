@@ -12,6 +12,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <iostream>
+#include <array>
+#include <algorithm>
 
 Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& calc_manager) 
                 : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), calc_manager_ptr(calc_manager) {
@@ -388,10 +390,11 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         }
     }
 
+    // We need to read in lammps data because it may contain velocities
+    auto bonds_ptr = std::make_shared<Bonds>();
+    particles_ptr->bonds_ptr = bonds_ptr;
+    read_lammps(bonds_ptr, "data.lmp");
     if (doc["opls"]) {
-        auto bonds_ptr = std::make_shared<Bonds>();
-        particles_ptr->bonds_ptr = bonds_ptr;
-        read_lammps(bonds_ptr, "data.lmp");
         calc_manager_ptr->addCalc(bonds_ptr);
         if (doc["integrator"]["constrained_bonds"]) {
             std::string constrained_bonds = check_and_assign_value<std::string>(doc["integrator"], "constrained_bonds");
@@ -422,11 +425,6 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         std::string algorithm = check_and_assign_value<std::string>(doc["coulomb"], "algorithm");
         if (algorithm.compare("ewald") == 0) {
             auto coulomb_ptr = std::make_shared<Coulomb_ewald>(doc,*params_ptr);
-            coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
-            coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
-            coulomb_ptr->ewald_alpha = check_and_assign_value<double>(doc["coulomb"], "alpha");
-            coulomb_ptr->ewald_accuracy = check_and_assign_value<double>(doc["coulomb"], "accuracy");
-            coulomb_ptr->k_max = check_and_assign_value<int>(doc["coulomb"], "k_max");
             calc_manager_ptr->addCalc(coulomb_ptr);
             UseNeighborList = true;
         }
@@ -437,6 +435,8 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
             coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
             UseNeighborList = true;
         }
+        particles_ptr->cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+        particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
     }
 
     if (UseNeighborList) {
@@ -448,19 +448,18 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         else {
             particles_ptr->neighbor_list = new Neighbor_list();
         }
-        particles_ptr->neighbor_list->init_verlet_list(doc,particles_ptr->N);
+        particles_ptr->neighbor_list->init_verlet_list(doc,*particles_ptr);
         particles_ptr->neighbor_list->build_verlet_list(*particles_ptr);
     }
-
-    
 }
 
 void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::string& filename) {
+    // This function reads in lammps-style data files and extracts force-field information (bonds,angles etc.)
     std::ifstream infile(filename);
     std::string line;
 
     int numBonds = 0, numAngles = 0, numDihedrals = 0;
-    int numBondTypes = 0, numAngleTypes = 0, numDihedralTypes;
+    int numBondTypes = 0, numAngleTypes = 0, numDihedralTypes = 0;
 
     while (std::getline(infile, line)) {
         std::istringstream iss(line);
@@ -508,6 +507,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
 
     bool inBondSection = false, inAngleSection = false, inDihedralSection = false;
     bool inBondTypeSection = false, inAngleTypeSection = false, inDihedralTypeSection = false;
+    bool inVelocitySection = false;
 
     int bondIndex = 0, angleIndex = 0, dihedralIndex = 0;
     int bondTypeIndex = 0, angleTypeIndex = 0, dihedralTypeIndex = 0;
@@ -527,6 +527,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             inDihedralSection = false;
             inBondSection = false;
             inAngleSection = false;
+            inVelocitySection = false;
             continue;
         }
         if (line.find("Angle Coeffs") != std::string::npos) {
@@ -536,6 +537,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             inDihedralSection = false;
             inBondSection = false;
             inAngleSection = false;
+            inVelocitySection = false;
             continue;
         }
         if (line.find("Dihedral Coeffs") != std::string::npos) {
@@ -545,6 +547,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             inDihedralSection = false;
             inBondSection = false;
             inAngleSection = false;
+            inVelocitySection = false;
             continue;
         }
         if (line.find("Bonds") != std::string::npos) {
@@ -554,6 +557,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             inDihedralSection = false;
             inBondTypeSection = false;
             inAngleTypeSection = false;
+            inVelocitySection = false;
             continue;
         }
         if (line.find("Angles") != std::string::npos) {
@@ -563,6 +567,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             inDihedralSection = false;
             inBondTypeSection = false;
             inAngleTypeSection = false;
+            inVelocitySection = false;
             continue;
         }
         if (line.find("Dihedrals") != std::string::npos) {
@@ -572,6 +577,19 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             inDihedralSection = true;
             inBondTypeSection = false;
             inAngleTypeSection = false;
+            inVelocitySection = false;
+            continue;
+        }
+        if (line.find("Velocities") != std::string::npos) {
+            inBondSection = false;
+            inAngleSection = false;
+            inDihedralTypeSection = false;
+            inDihedralSection = false;
+            inBondTypeSection = false;
+            inAngleTypeSection = false;
+            inVelocitySection = true;
+            // If we read in velocities we do not want to reinitialize them later
+            params_ptr->hb_momenta = false;
             continue;
         }
 
@@ -654,6 +672,18 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
                 dihedralIndex++;
             }
         }
+
+        if (inVelocitySection) {
+            double vx,vy,vz;
+            int id;
+            if (iss >> id >> vx >> vy >> vz) {
+                id -= 1;
+                double m = particles_ptr->atom_type_list[particles_ptr->id[id]].mass;
+                particles_ptr->h_p(id,0) = m*vx;
+                particles_ptr->h_p(id,1) = m*vy;
+                particles_ptr->h_p(id,2) = m*vz;
+            }
+        }
     }
 
     // Copy data to device
@@ -663,6 +693,7 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
     Kokkos::deep_copy(bonds_ptr->bondTypes, bonds_ptr->h_bondTypes);
     Kokkos::deep_copy(bonds_ptr->angleTypes, bonds_ptr->h_angleTypes);
     Kokkos::deep_copy(bonds_ptr->dihedralTypes, bonds_ptr->h_dihedralTypes);
+    Kokkos::deep_copy(particles_ptr->p, particles_ptr->h_p);
 
     /*std::cout << "Number of Bonds: " << numBonds << std::endl;
     std::cout << "Number of Angles: " << numAngles << std::endl;
@@ -688,14 +719,14 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
     for (int i = 0; i < bonds_ptr->angles.extent(0); i++) {
         printf("angle number: %d \n", i);
         printf("atom1: %d atom2: %d atom3: %d k: %f theta0: %f\n", bonds_ptr->h_angles(i).atom1, bonds_ptr->h_angles(i).atom2, bonds_ptr->h_angles(i).atom3, bonds_ptr->h_angleTypes(bonds_ptr->h_angles(i).type-1).k, bonds_ptr->h_angleTypes(bonds_ptr->h_angles(i).type-1).theta0);
-    }
-    printf("EXTENT: %d", bonds_ptr->dihedrals.extent(0));
+    }*/
+    /*printf("EXTENT: %d", bonds_ptr->dihedrals.extent(0));
     for (int i = 0; i < bonds_ptr->dihedrals.extent(0); i++) {
         printf("dihedral number: %d \n", i);
         printf("atom1: %d atom2: %d atom3: %d atom4: %d\n", bonds_ptr->h_dihedrals(i).atom1, bonds_ptr->h_dihedrals(i).atom2, bonds_ptr->h_dihedrals(i).atom3, bonds_ptr->h_dihedrals(i).atom4);
-    }
+    }*/
 
-    for (int i = 0; i < bonds_ptr->dihedralTypes.extent(0); i++) {
+    /*for (int i = 0; i < bonds_ptr->dihedralTypes.extent(0); i++) {
         printf("dihedral number: %d \n", i);
         printf("atom1: %f atom2: %f atom3: %f atom4: %f\n", bonds_ptr->h_dihedralTypes(i).k1, bonds_ptr->h_dihedralTypes(i).k2, bonds_ptr->h_dihedralTypes(i).k3, bonds_ptr->h_dihedralTypes(i).k4);
     }*/

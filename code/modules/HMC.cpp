@@ -109,7 +109,12 @@ void HMC_class::run_MD() {
     Kokkos::fence();
 
     // hb momenta
-    integrator->particles->hb();
+    if (params->hb_momenta) {
+        printf("HB TRUE");
+        integrator->particles->hb();
+    }
+    double Ki = integrator->particles->compute_kinetic_E();
+    printf("K_initial: %f\n",Ki*tokcal);
     for (int i = 1; i <= params->Ntrajectories; i++) {
         Kokkos::Timer timer_traj;
 
@@ -120,7 +125,7 @@ void HMC_class::run_MD() {
         if ((i % params->print_info_every == 0)) {
             double Vf = calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();
-            printf("step %d: K = %.12g  V = %.12g \n", i, Kf*tokcal, Vf*tokcal);
+            printf("step %d: K = %.12g  V = %.12g H = %.12g \n", i, Kf*tokcal, Vf*tokcal, (Kf+Vf)*tokcal);
         }
         Kokkos::fence();
         if ((i % params->save_every == 0)) {
