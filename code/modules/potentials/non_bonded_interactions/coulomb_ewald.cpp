@@ -87,7 +87,7 @@ double Coulomb_ewald::potential(const particles_instance& particles) {
     // Remove self-interaction
     V_self = compute_ewald_self();
     // Convert to internal units
-    double V_total = (0.5*(V_reciprocal+V_real)-V_self) * coulombtointernal;
+    double V_total = ((V_reciprocal+V_real)-V_self) * coulombtointernal;
 
     time_potential += coulomb_time.seconds();
     return V_total;
@@ -105,7 +105,7 @@ void Coulomb_ewald::compute_structure_factors(const particles_instance& particle
     int i,k,l,m,n,ic;
     double k_magnitude_squared,clpm,slpm;
     int N = particles.N;
-    auto& h_id = particles.h_id;
+    auto& id = particles.id;
 
     n = 0;
 
@@ -122,15 +122,15 @@ void Coulomb_ewald::compute_structure_factors(const particles_instance& particle
             real_sf_k_minus_l = 0.0;
             imag_sf_k_minus_l = 0.0;
             for (i = 0; i < N; i++) {
-            real_sf_k_l += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+l,1,i) - h_sin_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+l,1,i));
-            imag_sf_k_l += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+l,1,i) + h_cos_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+l,1,i));
-            real_sf_k_minus_l += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+l,1,i) + h_sin_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+l,1,i));
-            imag_sf_k_minus_l += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+l,1,i) - h_cos_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+l,1,i));
+            real_sf_k_l += charge(id(i))*(cos_coeffs(k_max+k,0,i)*cos_coeffs(k_max+l,1,i) - sin_coeffs(k_max+k,0,i)*sin_coeffs(k_max+l,1,i));
+            imag_sf_k_l += charge(id(i))*(sin_coeffs(k_max+k,0,i)*cos_coeffs(k_max+l,1,i) + cos_coeffs(k_max+k,0,i)*sin_coeffs(k_max+l,1,i));
+            real_sf_k_minus_l += charge(id(i))*(cos_coeffs(k_max+k,0,i)*cos_coeffs(k_max+l,1,i) + sin_coeffs(k_max+k,0,i)*sin_coeffs(k_max+l,1,i));
+            imag_sf_k_minus_l += charge(id(i))*(sin_coeffs(k_max+k,0,i)*cos_coeffs(k_max+l,1,i) - cos_coeffs(k_max+k,0,i)*sin_coeffs(k_max+l,1,i));
             }
-            h_real_strucfacs(n) = real_sf_k_l;
-            h_imag_strucfacs(n++) = imag_sf_k_l;
-            h_real_strucfacs(n) = real_sf_k_minus_l;
-            h_imag_strucfacs(n++) = imag_sf_k_minus_l;
+            real_strucfacs(n) = real_sf_k_l;
+            imag_strucfacs(n++) = imag_sf_k_l;
+            real_strucfacs(n) = real_sf_k_minus_l;
+            imag_strucfacs(n++) = imag_sf_k_minus_l;
         }
         }
     }
@@ -146,15 +146,15 @@ void Coulomb_ewald::compute_structure_factors(const particles_instance& particle
             real_sf_l_minus_m = 0.0;
             imag_sf_l_minus_m = 0.0;
             for (i = 0; i < N; i++) {
-            real_sf_l_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) - h_sin_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i));
-            imag_sf_l_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) + h_cos_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i));
-            real_sf_l_minus_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) + h_sin_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i));
-            imag_sf_l_minus_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) - h_cos_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i));
+            real_sf_l_m += charge(id(i))*(cos_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) - sin_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i));
+            imag_sf_l_m += charge(id(i))*(sin_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) + cos_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i));
+            real_sf_l_minus_m += charge(id(i))*(cos_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) + sin_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i));
+            imag_sf_l_minus_m += charge(id(i))*(sin_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) - cos_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i));
             }
-            h_real_strucfacs(n) = real_sf_l_m;
-            h_imag_strucfacs(n++) = imag_sf_l_m;
-            h_real_strucfacs(n) = real_sf_l_minus_m;
-            h_imag_strucfacs(n++) = imag_sf_l_minus_m;
+            real_strucfacs(n) = real_sf_l_m;
+            imag_strucfacs(n++) = imag_sf_l_m;
+            real_strucfacs(n) = real_sf_l_minus_m;
+            imag_strucfacs(n++) = imag_sf_l_minus_m;
         }
         }
     }
@@ -170,15 +170,15 @@ void Coulomb_ewald::compute_structure_factors(const particles_instance& particle
             real_sf_k_minus_m = 0.0;
             imag_sf_k_minus_m = 0.0;
             for (i = 0; i < N; i++) {
-            real_sf_k_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+m,2,i) - h_sin_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+m,2,i));
-            imag_sf_k_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+m,2,i) + h_cos_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+m,2,i));
-            real_sf_k_minus_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+m,2,i) + h_sin_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+m,2,i));
-            imag_sf_k_minus_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*h_cos_coeffs(k_max+m,2,i) - h_cos_coeffs(k_max+k,0,i)*h_sin_coeffs(k_max+m,2,i));
+            real_sf_k_m += charge(id(i))*(cos_coeffs(k_max+k,0,i)*cos_coeffs(k_max+m,2,i) - sin_coeffs(k_max+k,0,i)*sin_coeffs(k_max+m,2,i));
+            imag_sf_k_m += charge(id(i))*(sin_coeffs(k_max+k,0,i)*cos_coeffs(k_max+m,2,i) + cos_coeffs(k_max+k,0,i)*sin_coeffs(k_max+m,2,i));
+            real_sf_k_minus_m += charge(id(i))*(cos_coeffs(k_max+k,0,i)*cos_coeffs(k_max+m,2,i) + sin_coeffs(k_max+k,0,i)*sin_coeffs(k_max+m,2,i));
+            imag_sf_k_minus_m += charge(id(i))*(sin_coeffs(k_max+k,0,i)*cos_coeffs(k_max+m,2,i) - cos_coeffs(k_max+k,0,i)*sin_coeffs(k_max+m,2,i));
             }
-            h_real_strucfacs(n) = real_sf_k_m;
-            h_imag_strucfacs(n++) = imag_sf_k_m;
-            h_real_strucfacs(n) = real_sf_k_minus_m;
-            h_imag_strucfacs(n++) = imag_sf_k_minus_m;
+            real_strucfacs(n) = real_sf_k_m;
+            imag_strucfacs(n++) = imag_sf_k_m;
+            real_strucfacs(n) = real_sf_k_minus_m;
+            imag_strucfacs(n++) = imag_sf_k_minus_m;
         }
         }
     }
@@ -201,34 +201,34 @@ void Coulomb_ewald::compute_structure_factors(const particles_instance& particle
             real_sf_k_minus_l_minus_m = 0.0;
             imag_sf_k_minus_l_minus_m = 0.0;
             for (i = 0; i < N; i++) {
-                clpm = h_cos_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) - h_sin_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                slpm = h_sin_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) + h_cos_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                real_sf_k_l_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*clpm - h_sin_coeffs(k_max+k,0,i)*slpm);
-                imag_sf_k_l_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*clpm + h_cos_coeffs(k_max+k,0,i)*slpm);
+                clpm = cos_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) - sin_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                slpm = sin_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) + cos_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                real_sf_k_l_m += charge(id(i))*(cos_coeffs(k_max+k,0,i)*clpm - sin_coeffs(k_max+k,0,i)*slpm);
+                imag_sf_k_l_m += charge(id(i))*(sin_coeffs(k_max+k,0,i)*clpm + cos_coeffs(k_max+k,0,i)*slpm);
 
-                clpm = h_cos_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) + h_sin_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                slpm = -h_sin_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) + h_cos_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                real_sf_k_minus_l_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*clpm - h_sin_coeffs(k_max+k,0,i)*slpm);
-                imag_sf_k_minus_l_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*clpm + h_cos_coeffs(k_max+k,0,i)*slpm);
+                clpm = cos_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) + sin_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                slpm = -sin_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) + cos_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                real_sf_k_minus_l_m += charge(id(i))*(cos_coeffs(k_max+k,0,i)*clpm - sin_coeffs(k_max+k,0,i)*slpm);
+                imag_sf_k_minus_l_m += charge(id(i))*(sin_coeffs(k_max+k,0,i)*clpm + cos_coeffs(k_max+k,0,i)*slpm);
 
-                clpm = h_cos_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) + h_sin_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                slpm = h_sin_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) - h_cos_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                real_sf_k_l_minus_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*clpm - h_sin_coeffs(k_max+k,0,i)*slpm);
-                imag_sf_k_l_minus_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*clpm + h_cos_coeffs(k_max+k,0,i)*slpm);
+                clpm = cos_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) + sin_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                slpm = sin_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) - cos_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                real_sf_k_l_minus_m += charge(id(i))*(cos_coeffs(k_max+k,0,i)*clpm - sin_coeffs(k_max+k,0,i)*slpm);
+                imag_sf_k_l_minus_m += charge(id(i))*(sin_coeffs(k_max+k,0,i)*clpm + cos_coeffs(k_max+k,0,i)*slpm);
 
-                clpm = h_cos_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) - h_sin_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                slpm = -h_sin_coeffs(k_max+l,1,i)*h_cos_coeffs(k_max+m,2,i) - h_cos_coeffs(k_max+l,1,i)*h_sin_coeffs(k_max+m,2,i);
-                real_sf_k_minus_l_minus_m += h_charge(h_id(i))*(h_cos_coeffs(k_max+k,0,i)*clpm - h_sin_coeffs(k_max+k,0,i)*slpm);
-                imag_sf_k_minus_l_minus_m += h_charge(h_id(i))*(h_sin_coeffs(k_max+k,0,i)*clpm + h_cos_coeffs(k_max+k,0,i)*slpm);
+                clpm = cos_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) - sin_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                slpm = -sin_coeffs(k_max+l,1,i)*cos_coeffs(k_max+m,2,i) - cos_coeffs(k_max+l,1,i)*sin_coeffs(k_max+m,2,i);
+                real_sf_k_minus_l_minus_m += charge(id(i))*(cos_coeffs(k_max+k,0,i)*clpm - sin_coeffs(k_max+k,0,i)*slpm);
+                imag_sf_k_minus_l_minus_m += charge(id(i))*(sin_coeffs(k_max+k,0,i)*clpm + cos_coeffs(k_max+k,0,i)*slpm);
             }
-            h_real_strucfacs(n) = real_sf_k_l_m;
-            h_imag_strucfacs(n++) = imag_sf_k_l_m;
-            h_real_strucfacs(n) = real_sf_k_minus_l_m;
-            h_imag_strucfacs(n++) = imag_sf_k_minus_l_m;
-            h_real_strucfacs(n) = real_sf_k_l_minus_m;
-            h_imag_strucfacs(n++) = imag_sf_k_l_minus_m;
-            h_real_strucfacs(n) = real_sf_k_minus_l_minus_m;
-            h_imag_strucfacs(n++) = imag_sf_k_minus_l_minus_m;
+            real_strucfacs(n) = real_sf_k_l_m;
+            imag_strucfacs(n++) = imag_sf_k_l_m;
+            real_strucfacs(n) = real_sf_k_minus_l_m;
+            imag_strucfacs(n++) = imag_sf_k_minus_l_m;
+            real_strucfacs(n) = real_sf_k_l_minus_m;
+            imag_strucfacs(n++) = imag_sf_k_l_minus_m;
+            real_strucfacs(n) = real_sf_k_minus_l_minus_m;
+            imag_strucfacs(n++) = imag_sf_k_minus_l_minus_m;
             }
         }
         }
@@ -236,52 +236,54 @@ void Coulomb_ewald::compute_structure_factors(const particles_instance& particle
 }
 
 void Coulomb_ewald::single_axis_structure_factors(const particles_instance& particles, int& n) {
-    int i,k,l,m,ic;
-    double real_sf_single,imag_sf_single;
-    double k_magnitude_squared,clpm,slpm;
+    int i,k,l,m,dim;
+    double real_sf_single,imag_sf_single,k_magnitude_squared;
     int N = particles.N;
-    auto& h_id = particles.h_id;
+    auto& id = particles.id;
 
-    for (ic = 0; ic < 3; ic++) {
-        k_magnitude_squared = kspace_base[ic]*kspace_base[ic];
+    // Handle the base case explicitly
+    for (dim = 0; dim < 3; dim++) {
+        k_magnitude_squared = kspace_base[dim]*kspace_base[dim];
         if (k_magnitude_squared <= k_max_magnitude_squared) {
         real_sf_single = 0.0;
         imag_sf_single = 0.0;
         for (i = 0; i < N; i++) {
-            h_cos_coeffs(k_max,ic,i) = 1.0;
-            h_sin_coeffs(k_max,ic,i) = 0.0;
-            h_cos_coeffs(k_max+1,ic,i) = cos(kspace_base[ic]*particles.h_x(i,ic));
-            h_sin_coeffs(k_max+1,ic,i) = sin(kspace_base[ic]*particles.h_x(i,ic));
-            h_cos_coeffs(k_max-1,ic,i) = h_cos_coeffs(k_max+1,ic,i);
-            h_sin_coeffs(k_max-1,ic,i) = -h_sin_coeffs(k_max+1,ic,i);
-            real_sf_single += h_charge(h_id(i))*h_cos_coeffs(k_max+1,ic,i);
-            imag_sf_single += h_charge(h_id(i))*h_sin_coeffs(k_max+1,ic,i);
+            cos_coeffs(k_max,dim,i) = 1.0; // Structure runs from -k to k, so k_max is k=0
+            sin_coeffs(k_max,dim,i) = 0.0;
+            cos_coeffs(k_max+1,dim,i) = cos(kspace_base[dim]*particles.x(i,dim));
+            sin_coeffs(k_max+1,dim,i) = sin(kspace_base[dim]*particles.x(i,dim));
+            cos_coeffs(k_max-1,dim,i) = cos_coeffs(k_max+1,dim,i);
+            sin_coeffs(k_max-1,dim,i) = -sin_coeffs(k_max+1,dim,i);
+            real_sf_single += charge(id(i))*cos_coeffs(k_max+1,dim,i);
+            imag_sf_single += charge(id(i))*sin_coeffs(k_max+1,dim,i);
         }
-        h_real_strucfacs(n) = real_sf_single;
-        h_imag_strucfacs(n++) = imag_sf_single;
+        real_strucfacs(n) = real_sf_single;
+        imag_strucfacs(n++) = imag_sf_single;
         }
     }
     
+    // Now we can use recurrence relations to build up all harmonics from the 
+    // base frequency
     for (m = 2; m <= k_max; m++) {
-        for (ic = 0; ic < 3; ic++) {
-        k_magnitude_squared = m*kspace_base[ic] * m*kspace_base[ic];
+        for (dim = 0; dim < 3; dim++) {
+        k_magnitude_squared = m*kspace_base[dim] * m*kspace_base[dim];
         if (k_magnitude_squared <= k_max_magnitude_squared) {
             real_sf_single = 0.0;
             imag_sf_single = 0.0;
             for (i = 0; i < N; i++) {
 
-            h_cos_coeffs(k_max+m,ic,i) = h_cos_coeffs(k_max+m-1,ic,i)*h_cos_coeffs(k_max+1,ic,i) -
-                h_sin_coeffs(k_max+m-1,ic,i)*h_sin_coeffs(k_max+1,ic,i);
+            cos_coeffs(k_max+m,dim,i) = cos_coeffs(k_max+m-1,dim,i)*cos_coeffs(k_max+1,dim,i) -
+                sin_coeffs(k_max+m-1,dim,i)*sin_coeffs(k_max+1,dim,i);
 
-            h_sin_coeffs(k_max+m,ic,i) = h_sin_coeffs(k_max+m-1,ic,i)*h_cos_coeffs(k_max+1,ic,i) +
-                h_cos_coeffs(k_max+m-1,ic,i)*h_sin_coeffs(k_max+1,ic,i);
-            h_cos_coeffs(k_max-m,ic,i) = h_cos_coeffs(k_max+m,ic,i);
-            h_sin_coeffs(k_max-m,ic,i) = -h_sin_coeffs(k_max+m,ic,i);
-            real_sf_single += h_charge(h_id(i))*h_cos_coeffs(k_max+m,ic,i);
-            imag_sf_single += h_charge(h_id(i))*h_sin_coeffs(k_max+m,ic,i);
+            sin_coeffs(k_max+m,dim,i) = sin_coeffs(k_max+m-1,dim,i)*cos_coeffs(k_max+1,dim,i) +
+                cos_coeffs(k_max+m-1,dim,i)*sin_coeffs(k_max+1,dim,i);
+            cos_coeffs(k_max-m,dim,i) = cos_coeffs(k_max+m,dim,i);
+            sin_coeffs(k_max-m,dim,i) = -sin_coeffs(k_max+m,dim,i);
+            real_sf_single += charge(id(i))*cos_coeffs(k_max+m,dim,i);
+            imag_sf_single += charge(id(i))*sin_coeffs(k_max+m,dim,i);
             }
-            h_real_strucfacs(n) = real_sf_single;
-            h_imag_strucfacs(n++) = imag_sf_single;
+            real_strucfacs(n) = real_sf_single;
+            imag_strucfacs(n++) = imag_sf_single;
         }
         }
     }
@@ -304,6 +306,7 @@ void Coulomb_ewald::estimate_alpha(int N, double V) {
 
 void Coulomb_ewald::estimate_k_max(double L[3], int N) {
     
+    // estimate how many k-vectors are needed in each direction
     kspace_base[0] = 2.0*M_PI/L[0];
     kspace_base[1] = 2.0*M_PI/L[1];
     kspace_base[2] = 2.0*M_PI/L[2];
@@ -550,8 +553,8 @@ double Coulomb_ewald::compute_ewald_reciprocal(const particles_instance& particl
     double V_reciprocal = 0.0;
     compute_structure_factors(particles);
     for (int k = 0; k < k_total; k++)
-        V_reciprocal += h_pot_coeffs(k) * (h_real_strucfacs(k)*h_real_strucfacs(k) +
-                    h_imag_strucfacs(k)*h_imag_strucfacs(k));
+        V_reciprocal += pot_coeffs(k) * (real_strucfacs(k)*real_strucfacs(k) +
+                    imag_strucfacs(k)*imag_strucfacs(k));
     return V_reciprocal;
 }
 
@@ -622,88 +625,6 @@ double Coulomb_ewald::compute_ewald_self() {
     return V_self;
 }
 
-/*double Coulomb_ewald::compute_ewald_reciprocal(const particles_instance& particles) {
-    double V = 0.0;
-
-    // Capture all needed members of particles_instance
-    auto& x = particles.x;
-    auto& N = particles.N;
-    auto& L = particles.L;
-    auto& h_id = particles.h_id;
-    auto& charge = this->charge;
-    auto& ewald_alpha = this->ewald_alpha;
-    auto& k_max = this->k_max;
-
-    int num_kpoints = (2 * k_max + 1) * (2 * k_max + 1) * (2 * k_max + 1);
-    // Outer parallel_reduce
-    Kokkos::parallel_reduce(
-        "ewald_reciprocal",
-        Kokkos::TeamPolicy<Tag_potential_ewald_reciprocal>(num_kpoints, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_potential_ewald_reciprocal, const Kokkos::TeamPolicy<>::member_type& teamMember, double& V) {
-            const int league_rank = teamMember.league_rank();
-            const int num_kpoints_2D = (2 * k_max + 1) * (2 * k_max + 1);
-            double alpha = ewald_alpha;
-
-            const int kz = league_rank / num_kpoints_2D - k_max;
-            const int ky = (league_rank % num_kpoints_2D) / (2 * k_max + 1) - k_max;
-            const int kx = league_rank % (2 * k_max + 1) - k_max;
-
-            if (kx == 0 && ky == 0 && kz == 0) return; // Skip the k=0 term
-
-            double tmpV = 0.0;
-            double kx_real = 2 * M_PI * kx / L[0];
-            double ky_real = 2 * M_PI * ky / L[1];
-            double kz_real = 2 * M_PI * kz / L[2];
-            double k2 = kx_real * kx_real + ky_real * ky_real + kz_real * kz_real;
-
-            double S_re = 0.0, S_im = 0.0;
-
-            Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& inner_re, double& inner_im) {
-                double kr = kx_real * x(j, 0) + ky_real * x(j, 1) + kz_real * x(j, 2);
-                inner_re += charge(h_id(j)) * cos(kr);
-                inner_im += charge(h_id(j)) * sin(kr);
-            }, Kokkos::Sum<double>(S_re), Kokkos::Sum<double>(S_im));
-
-            double exp_factor = exp(-k2 / (4 * alpha));
-            tmpV += (S_re * S_re + S_im * S_im) * exp_factor / k2;
-
-            Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
-                V += tmpV;
-            });
-        },
-    V);
-
-    return 2 * M_PI * V / (L[0] * L[1] * L[2]);
-}
-
-double Coulomb_ewald::compute_ewald_self(const particles_instance& particles) {
-    double V = 0.0; // Potential
-
-    // Capture all needed members of particles_instance
-    auto& N = particles.N;
-    auto& h_id = particles.h_id;
-    auto& charge = this->charge;
-    auto& ewald_alpha = this->ewald_alpha;
-
-    // Outer parallel_reduce
-    Kokkos::parallel_reduce(
-        "ewald_self",
-        Kokkos::TeamPolicy<Tag_potential_ewald_self>(N, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_potential_ewald_self, const Kokkos::TeamPolicy<>::member_type& teamMember, double& V) {
-            const int i = teamMember.league_rank();
-
-            double qi = charge(h_id(i));
-            double self_energy_contribution = qi * qi;
-
-            Kokkos::single(Kokkos::PerTeam(teamMember), [&]() {
-                V += self_energy_contribution;
-            });
-        },
-    V);
-
-    return -sqrt(ewald_alpha/M_PI) * V;
-}*/
-
 void Coulomb_ewald::compute_ewald_reciprocal_forces(const particles_instance& particles,type_f& f) {
     compute_structure_factors(particles);
     
@@ -718,23 +639,23 @@ void Coulomb_ewald::compute_ewald_reciprocal_forces(const particles_instance& pa
         kz = kmax_z+kvec_z(k);
 
         for (int i = 0; i < particles.N; i++) {
-            cypz = h_cos_coeffs(ky,1,i)*h_cos_coeffs(kz,2,i) - h_sin_coeffs(ky,1,i)*h_sin_coeffs(kz,2,i);
-            sypz = h_sin_coeffs(ky,1,i)*h_cos_coeffs(kz,2,i) + h_cos_coeffs(ky,1,i)*h_sin_coeffs(kz,2,i);
-            exprl = h_cos_coeffs(kx,0,i)*cypz - h_sin_coeffs(kx,0,i)*sypz;
-            expim = h_sin_coeffs(kx,0,i)*cypz + h_cos_coeffs(kx,0,i)*sypz;
-            partial = expim*h_real_strucfacs(k) - exprl*h_imag_strucfacs(k);
-            e_field(i,0) += partial*h_force_coeffs(k,0);
-            e_field(i,1) += partial*h_force_coeffs(k,1);
-            e_field(i,2) += partial*h_force_coeffs(k,2);
+            cypz = cos_coeffs(ky,1,i)*cos_coeffs(kz,2,i) - sin_coeffs(ky,1,i)*sin_coeffs(kz,2,i);
+            sypz = sin_coeffs(ky,1,i)*cos_coeffs(kz,2,i) + cos_coeffs(ky,1,i)*sin_coeffs(kz,2,i);
+            exprl = cos_coeffs(kx,0,i)*cypz - sin_coeffs(kx,0,i)*sypz;
+            expim = sin_coeffs(kx,0,i)*cypz + cos_coeffs(kx,0,i)*sypz;
+            partial = expim*real_strucfacs(k) - exprl*imag_strucfacs(k);
+            e_field(i,0) += partial*force_coeffs(k,0);
+            e_field(i,1) += partial*force_coeffs(k,1);
+            e_field(i,2) += partial*force_coeffs(k,2);
         }
     }
 
-    auto& h_id = particles.h_id;
+    auto& id = particles.id;
 
     for (int i = 0; i < particles.N; i++) {
-        f(i,0) += coulombtointernal * charge(h_id(i)) * e_field(i,0);
-        f(i,1) += coulombtointernal * charge(h_id(i)) * e_field(i,1);
-        f(i,2) += coulombtointernal * charge(h_id(i)) * e_field(i,2);
+        f(i,0) += coulombtointernal * charge(id(i)) * e_field(i,0);
+        f(i,1) += coulombtointernal * charge(id(i)) * e_field(i,1);
+        f(i,2) += coulombtointernal * charge(id(i)) * e_field(i,2);
     }
 }
 
@@ -808,73 +729,3 @@ void Coulomb_ewald::compute_ewald_real_forces(const particles_instance& particle
     );
     Kokkos::fence();
 }
-
-/*void Coulomb_ewald::compute_ewald_reciprocal_forces(const particles_instance& particles,type_f& f) {
-    // Capture all needed members of "particles" here. We do not want to reference 
-    // any members of "particle" directly inside of the kernel, as the class contains
-    // functions that are not device safe. This would trigger a lot of compiler warnings.
-    auto& x = particles.x;
-    auto& N = particles.N;
-    auto& L = particles.L;
-    auto& id = particles.id;
-    auto& charge = this->charge;
-    auto& ewald_alpha = this->ewald_alpha;
-    auto& k_max = this->k_max;
-
-    int num_kpoints = (2 * k_max + 1) * (2 * k_max + 1) * (2 * k_max + 1);
-    typedef Kokkos::TeamPolicy<Tag_force_ewald_reciprocal> team_policy;
-    Kokkos::parallel_for(
-        "compute_force_ewald_reciprocal",
-        team_policy(num_kpoints, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const Tag_force_ewald_reciprocal, const Kokkos::TeamPolicy<>::member_type& teamMember) {
-            const int league_rank = teamMember.league_rank();
-            const int num_kpoints_2D = (2 * k_max + 1) * (2 * k_max + 1);
-            double alpha = ewald_alpha;
-
-            const int kz = league_rank / num_kpoints_2D - k_max;
-            const int ky = (league_rank % num_kpoints_2D) / (2 * k_max + 1) - k_max;
-            const int kx = league_rank % (2 * k_max + 1) - k_max;
-
-            if (kx == 0 && ky == 0 && kz == 0) return; // Skip the k=0 term
-
-            double kx_real = 2 * M_PI * kx / L[0];
-            double ky_real = 2 * M_PI * ky / L[1];
-            double kz_real = 2 * M_PI * kz / L[2];
-            double k2 = kx_real * kx_real + ky_real * ky_real + kz_real * kz_real;
-
-            double exp_factor = exp(-k2 / (4 * alpha)) / k2;
-
-            // Compute the structure factors S_k
-            double S_re = 0.0, S_im = 0.0;
-
-            Kokkos::parallel_reduce(Kokkos::TeamThreadRange(teamMember, N), [=](const int j, double& inner_re, double& inner_im) {
-                double kr = kx_real * x(j, 0) + ky_real * x(j, 1) + kz_real * x(j, 2);
-                double charge_j = charge(id(j));
-                inner_re += charge_j * cos(kr);
-                inner_im += charge_j * sin(kr);
-            }, Kokkos::Sum<double>(S_re), Kokkos::Sum<double>(S_im));
-
-            // Compute the forces
-            Kokkos::parallel_for(Kokkos::TeamThreadRange(teamMember, N), [=](const int i) {
-                double qi = charge(id(i));
-                double kr_i = kx_real * x(i, 0) + ky_real * x(i, 1) + kz_real * x(i, 2);
-
-                double sin_kr_i = sin(kr_i);
-                double cos_kr_i = cos(kr_i);
-
-                double force_prefactor = 2.0 * qi * exp_factor;
-
-                // Force components
-                double fx = force_prefactor * (S_re * sin_kr_i - S_im * cos_kr_i) * kx_real;
-                double fy = force_prefactor * (S_re * sin_kr_i - S_im * cos_kr_i) * ky_real;
-                double fz = force_prefactor * (S_re * sin_kr_i - S_im * cos_kr_i) * kz_real;
-
-                // Update forces
-                Kokkos::atomic_add(&f(i, 0), coulombtointernal*fx / (L[0] * L[1] * L[2]));
-                Kokkos::atomic_add(&f(i, 1), coulombtointernal*fy / (L[0] * L[1] * L[2]));
-                Kokkos::atomic_add(&f(i, 2), coulombtointernal*fz / (L[0] * L[1] * L[2]));
-            });
-        }
-    );
-    Kokkos::fence();
-}*/
