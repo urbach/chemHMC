@@ -36,8 +36,13 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
 }
 
 void Neighbor_list::build_verlet_list(particles_instance& particles) {
+
+    if (update_every != ++moves_since_last_update) return;
+    moves_since_last_update = 0;
+
     // Reset neighbor counts to zero
     Kokkos::deep_copy(this->neighbour_count, 0);
+    Kokkos::deep_copy(this->verlet_list, 0);
 
     // Capture all needed members of particles_instance
     auto& x = particles.x;

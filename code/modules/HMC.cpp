@@ -23,6 +23,7 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     calc_manager->initialize();
     gen64.seed(params->seed);
     MD = input_reader.MD;
+    UseNeighborList = input_reader.UseNeighborList;
     // Optional minimization
     doc = input_reader.doc;
     if (doc["minimization"]) calc_manager->minimize_energy(doc);
@@ -53,7 +54,6 @@ void HMC_class::run() {
         double Ki = integrator->particles->compute_kinetic_E();
         // molecular dynamics
         integrator->integrate();
-        if (particles->algorithm == "verlet_list") particles->neighbor_list->build_verlet_list(*particles);
 
         // accept/reject
         double Vf = calc_manager->compute_potential();
@@ -63,7 +63,7 @@ void HMC_class::run() {
         double exp_mdh = exp(-dh);
 
         if ((i % params->print_info_every == 0)) {
-            printf("step %d: K = %.12g  V = %.12g \n", i, Kf*tokcal, Vf*tokcal);
+            printf("step %d: K = %.12g  V = %.12g exp_mdh = %.12g\n", i, Kf*tokcal, Vf*tokcal, exp_mdh);
         }
         Kokkos::fence();
 
@@ -110,17 +110,17 @@ void HMC_class::run_MD() {
 
     // hb momenta
     if (params->hb_momenta) {
-        printf("HB TRUE");
         integrator->particles->hb();
+    } else {
+        double Ki = integrator->particles->compute_kinetic_E();
+        printf("K_initial: %f\n",Ki*tokcal);
     }
-    double Ki = integrator->particles->compute_kinetic_E();
-    printf("K_initial: %f\n",Ki*tokcal);
+    
     for (int i = 1; i <= params->Ntrajectories; i++) {
         Kokkos::Timer timer_traj;
 
         // molecular dynamics
         integrator->integrate();
-        if (particles->algorithm == "verlet_list") particles->neighbor_list->build_verlet_list(*particles);
 
         if ((i % params->print_info_every == 0)) {
             double Vf = calc_manager->compute_potential();

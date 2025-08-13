@@ -5,7 +5,7 @@
 #include "yaml-cpp/yaml.h"
 #include "global.hpp"
 
-class particles_instance; // We need this here because we cant include particles.hpp directly
+class particles_instance; // We need to declare this here because we cant include particles.hpp directly
 
 class Neighbor_list {
 public:
@@ -13,6 +13,9 @@ public:
     Kokkos::View<int*>::HostMirror h_neighbour_count;
     Kokkos::View<int**> verlet_list;
     Kokkos::View<int**>::HostMirror h_verlet_list;
+
+    int update_every;
+    int moves_since_last_update = 0;
 
     double neighbor_cutoff;
     double neighbor_cutoff_squared;

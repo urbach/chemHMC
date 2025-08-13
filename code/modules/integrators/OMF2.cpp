@@ -20,6 +20,7 @@ void OMF2::integrate() {
         Kokkos::fence();
         particles->update_momenta(oneminus2lambda * dt);
         particles->update_positions(dt / 2.);
+        particles->neighbor_list->build_verlet_list(*particles);
         calc_manager->compute_force();
         Kokkos::fence();
         particles->update_momenta(2. * lambda * dt);

@@ -46,12 +46,11 @@ void Bonds::build_constrained_bond_list(std::vector<int> constrained_bond_type_i
 
 double Bonds::potential(const particles_instance& particles) {
     Kokkos::Timer bonds_timer;
-    double result = 0.0;
-    result += potential_bonds(particles);
-    result += potential_angles(particles);
-    result += potential_dihedrals(particles);
+    double bond_potential = potential_bonds(particles);
+    double angle_potential = potential_angles(particles);
+    double dihedral_potential = potential_dihedrals(particles);
     time_potential += bonds_timer.seconds();
-    return result;
+    return bond_potential + angle_potential + dihedral_potential;
 }
 
 void Bonds::force(const particles_instance& particles, type_f& f) {

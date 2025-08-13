@@ -7,6 +7,7 @@
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
 #include "potentials/non_bonded_interactions/coulomb_ewald.hpp"
+#include "potentials/non_bonded_interactions/coulomb_pppm.hpp"
 #include "potentials/non_bonded_interactions/coulomb_direct.hpp"
 #include <fstream>
 #include <iostream>
@@ -435,6 +436,11 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
             coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
             UseNeighborList = true;
         }
+        else if (algorithm.compare("pppm") == 0) {
+            auto coulomb_ptr = std::make_shared<Coulomb_pppm>(doc,*params_ptr);
+            calc_manager_ptr->addCalc(coulomb_ptr);
+            UseNeighborList = true;
+        }
         particles_ptr->cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
         particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
     }
@@ -448,7 +454,14 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         else {
             particles_ptr->neighbor_list = new Neighbor_list();
         }
+        // Set frequency of neighbor list build
+        if (doc["particles"]["update_every"]) {
+            particles_ptr->neighbor_list->update_every = check_and_assign_value<int>(doc["particles"], "update_every");
+        }
+        else particles_ptr->neighbor_list->update_every = 15;
         particles_ptr->neighbor_list->init_verlet_list(doc,*particles_ptr);
+        // set moves_since_last_update so that the build actually gets triggered
+        particles_ptr->neighbor_list->moves_since_last_update = particles_ptr->neighbor_list->update_every - 1;
         particles_ptr->neighbor_list->build_verlet_list(*particles_ptr);
     }
 }

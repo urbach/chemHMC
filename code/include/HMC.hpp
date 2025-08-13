@@ -19,6 +19,7 @@ public:
     bool randomize_traj = false;
     YAML::Node doc;
     bool MD = false;
+    bool UseNeighborList = false;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
     params_class* params;

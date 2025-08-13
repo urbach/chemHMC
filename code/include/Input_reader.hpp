@@ -19,14 +19,13 @@ public:
 
     YAML::Node doc;
     bool MD = false;
+    bool UseNeighborList = false;
 
 private:
     params_class* params_ptr;
     particles_instance*& particles_ptr;
     integrator_type*& integrator_ptr;
     Calc_Manager* calc_manager_ptr;
-
-    bool UseNeighborList = false;
 
     void parse_simulation_parameters(YAML::Node& doc);
     void parse_integrator_options(YAML::Node& doc);

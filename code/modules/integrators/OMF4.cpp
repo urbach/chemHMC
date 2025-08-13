@@ -23,6 +23,7 @@ void OMF4::integrate() {
     for (size_t i = 1; i < steps - 1; i++) {
         for (size_t j = 0; j < 5; j++) {
             particles->update_positions(eps[2 * j]);
+            particles->neighbor_list->build_verlet_list(*particles);
             particles->update_momenta(eps[2 * j + 1]);
         }
     }
