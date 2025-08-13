@@ -17,6 +17,8 @@ public:
     int update_every;
     int moves_since_last_update = 0;
 
+    double time_list_build = 0.0; // Time for neighbor list builds
+
     double neighbor_cutoff;
     double neighbor_cutoff_squared;
 

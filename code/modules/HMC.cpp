@@ -93,6 +93,7 @@ void HMC_class::run() {
     //printf("final step size: %f\n", integrator->dt);
     printf("time for HMC: %g  s\n", timer.seconds());
     calc_manager->print_timings();
+    printf("time for Neighbor list builds: %g s\n",particles->neighbor_list->time_list_build);
 }
 
 void HMC_class::run_MD() {

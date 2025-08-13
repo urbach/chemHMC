@@ -182,6 +182,7 @@ void LJ_verlet::init(const particles_instance& particles) {
 }
 
 double LJ_verlet::potential(const particles_instance& particles) {
+    Kokkos::Timer LJ_timer;
     double result = 0.0;
 
     // Capture all needed members of particle here to avoid referencing
@@ -217,12 +218,10 @@ double LJ_verlet::potential(const particles_instance& particles) {
                     double rx = x(i, 0) - x(particle_j, 0);
                     rx -= int(rx * inverse_halved_L[0]) * L[0];
                     double r2 = rx * rx;
-                    if (r2 > cutoff_squared) return;
 
                     double ry = x(i, 1) - x(particle_j, 1);
                     ry -= int(ry * inverse_halved_L[1]) * L[1];
                     r2 += ry * ry;
-                    if (r2 > cutoff_squared) return;
 
                     double rz = x(i, 2) - x(particle_j, 2);
                     rz -= int(rz * inverse_halved_L[2]) * L[2];
@@ -244,11 +243,12 @@ double LJ_verlet::potential(const particles_instance& particles) {
             });
         },
     result);
-
+    time_potential += LJ_timer.seconds();
     return 4.0 * result;
 }
 
 void LJ_verlet::force(const particles_instance& particles, type_f& f) {
+    Kokkos::Timer LJ_timer;
     // Capture all needed members of "particles" here. We do not want to reference 
     // any members of "particle" directly inside of the kernel, as the class contains
     // functions that are not device safe. This would trigger a lot of compiler warnings.
@@ -283,12 +283,10 @@ void LJ_verlet::force(const particles_instance& particles, type_f& f) {
                     double rx = x(i, 0) - x(particle_j, 0);
                     rx -= int(rx * inverse_halved_L[0]) * L[0];
                     double r2 = rx * rx;
-                    if (r2 > cutoff_squared) return;
 
                     double ry = x(i, 1) - x(particle_j, 1);
                     ry -= int(ry * inverse_halved_L[1]) * L[1];
                     r2 += ry * ry;
-                    if (r2 > cutoff_squared) return;
 
                     double rz = x(i, 2) - x(particle_j, 2);
                     rz -= int(rz * inverse_halved_L[2]) * L[2];
@@ -314,4 +312,5 @@ void LJ_verlet::force(const particles_instance& particles, type_f& f) {
                 });
         });
     Kokkos::fence();
+    time_force += LJ_timer.seconds();
 }
