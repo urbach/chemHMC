@@ -25,6 +25,7 @@ public:
     void init_verlet_list(YAML::Node& doc, particles_instance& particles);
     struct Tag_build_verlet_list {};
     virtual void build_verlet_list(particles_instance& particles);
+    void build_verlet_list2(particles_instance& particles);
 
     virtual ~Neighbor_list() = default;
 };

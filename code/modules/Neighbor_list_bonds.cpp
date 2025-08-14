@@ -22,7 +22,7 @@ void Neighbor_list_bonds::build_initial_verlet_list(particles_instance& particle
     auto& verlet_list = this->verlet_list;
     auto& L = particles.L;
     auto& inverse_halved_L = particles.inverse_halved_L;
-    auto& cutoff_squared = particles.cutoff_squared;
+    auto& cutoff_squared = this->neighbor_cutoff_squared;
     // Outer parallel_for
     Kokkos::parallel_for(
         "populate_verlet_list",
@@ -46,7 +46,7 @@ void Neighbor_list_bonds::build_initial_verlet_list(particles_instance& particle
                         rz -= int(rz * inverse_halved_L[2]) * L[2];
                         r2 += rz * rz;
 
-                        if (r2 < (cutoff_squared * 1.2)) {
+                        if (r2 < (cutoff_squared)) {
                             int current_count = Kokkos::atomic_fetch_add(&neighbour_count(i), 1);
                             if (current_count < verlet_list.extent(1)) {
                                 verlet_list(i, current_count) = j;
