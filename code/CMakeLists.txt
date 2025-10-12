@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.13)
+# 3.18 is required for libtorch, if we do not compile with libtorch 3.13 is ok
+cmake_minimum_required(VERSION 3.18) 
 project(chemHMC  CXX)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
@@ -62,6 +63,9 @@ ENDIF()
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 ######################################################
+##################### libtorch #######################
+find_package(Torch REQUIRED)
+######################################################
 # ###################### fmt: formating library ######################
 
 # find_package(fmt)
@@ -91,11 +95,13 @@ PRIVATE
 #######################################################
 
 macro(add_target_with_lib TARGETNAME)
-  # Make the executable
   add_executable(${TARGETNAME} ${ARGN})
+  target_link_libraries(${TARGETNAME} PRIVATE "${TORCH_LIBRARIES}")
   target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
   target_link_libraries(${TARGETNAME} PUBLIC chemHMC)
   target_link_libraries(${TARGETNAME} PUBLIC git_version)
+  target_compile_features(${TARGETNAME} PRIVATE cxx_std_17)
+  target_compile_options(${TARGETNAME} PRIVATE ${TORCH_CXX_FLAGS})
 endmacro()
 
 add_subdirectory(main)
