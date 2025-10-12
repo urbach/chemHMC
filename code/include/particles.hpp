@@ -10,7 +10,7 @@
 #include "global.hpp"
 #include "bonds.hpp"
 #include "Parameters.hpp"
-#include "Neighbor_list.hpp"
+#include "../modules/neighbor_list/Neighbor_list.hpp"
 #include <Kokkos_Core.hpp>
 
 class particles_instance {

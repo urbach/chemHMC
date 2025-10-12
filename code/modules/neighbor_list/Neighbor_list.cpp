@@ -25,9 +25,17 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
     if (coul_cutoff > lj_cutoff) neighbor_cutoff = coul_cutoff;
     else neighbor_cutoff = lj_cutoff;
     // square the cutoff and add a skin distance
-    neighbor_cutoff_squared = neighbor_cutoff*neighbor_cutoff*1.2;
+    double skin_distance = neighbor_cutoff * 0.1;
+    neighbor_cutoff_squared = (neighbor_cutoff + skin_distance) * (neighbor_cutoff + skin_distance);
+    skin_distance_squared = skin_distance * skin_distance;
     verlet_list = Kokkos::View<int**>("verlet_list", N, max_neighbors);
     h_verlet_list = Kokkos::create_mirror_view(verlet_list);
+
+    x_last = Kokkos::View<double*[3]>("x_last", N);
+    h_x_last = Kokkos::create_mirror_view(x_last);
+
+    disp2 = Kokkos::View<double*>("disp2", N);
+    h_disp2 = Kokkos::create_mirror_view(disp2);
 
     Kokkos::deep_copy(h_verlet_list, 0);
     Kokkos::deep_copy(verlet_list, h_verlet_list);
@@ -37,10 +45,49 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
 }
 
 void Neighbor_list::build_verlet_list(particles_instance& particles) {
-    Kokkos::Timer Neighbor_timer; 
-    if (update_every != ++moves_since_last_update) return;
-    moves_since_last_update = 0;
+    Kokkos::Timer neighbor_timer;
+    // First check if atoms have moved sufficiently since last build, if not,
+    // we can skip a new build
+    const int N  = particles.N;
+    const double L0 = particles.L[0], L1 = particles.L[1], L2 = particles.L[2];
+    const double ihL0 = particles.inverse_halved_L[0];
+    const double ihL1 = particles.inverse_halved_L[1];
+    const double ihL2 = particles.inverse_halved_L[2];
+    auto x     = particles.x;
+    auto xlast = x_last;
+    auto disp  = disp2;
 
+    double max_disp2 = 0.0;
+    Kokkos::parallel_reduce(
+        "update_and_max_disp2",
+        Kokkos::RangePolicy(0, N),
+        KOKKOS_LAMBDA (const int i, double& lmax) {
+            double dx = x(i,0) - xlast(i,0);
+            dx -= int(dx * ihL0) * L0;
+
+            double dy = x(i,1) - xlast(i,1);
+            dy -= int(dy * ihL1) * L1;
+
+            double dz = x(i,2) - xlast(i,2);
+            dz -= int(dz * ihL2) * L2;
+
+            double d2 = dx*dx + dy*dy + dz*dz;
+            disp(i) += d2;
+            lmax = (lmax < disp(i)) ? disp(i) : lmax;
+        },
+        Kokkos::Max<double>(max_disp2)
+    );
+
+    if (max_disp2 >= skin_distance_squared) {
+        build(particles);
+        Kokkos::deep_copy(x_last, x);
+        Kokkos::deep_copy(disp2, 0.0);
+    }
+
+    time_list_build += neighbor_timer.seconds();
+}
+
+void Neighbor_list::build(particles_instance& particles) {
     // Reset neighbor counts to zero
     Kokkos::deep_copy(this->neighbour_count, 0);
     Kokkos::deep_copy(this->verlet_list, 0);
@@ -60,7 +107,6 @@ void Neighbor_list::build_verlet_list(particles_instance& particles) {
     const double L0 = L[0], L1 = L[1], L2 = L[2];
     const int neighbor_count_length = neighbour_count.extent(0);
 
-    // Outer parallel_for
     Kokkos::parallel_for(
         "populate_verlet_list",
         Kokkos::TeamPolicy<Tag_build_verlet_list>(N, Kokkos::AUTO),
@@ -97,5 +143,6 @@ void Neighbor_list::build_verlet_list(particles_instance& particles) {
                     }
                 });
         });
-    time_list_build += Neighbor_timer.seconds();
+    // Copy to x_last so we can compare future steps to this build
+    Kokkos::deep_copy(x_last, particles.x);
 }

@@ -12,7 +12,7 @@
 #include "Input_reader.hpp"
 #include "Parameters.hpp"
 #include "particles.hpp"
-#include "Neighbor_list.hpp"
+#include "../neighbor_list/Neighbor_list.hpp"
 
 void particles_instance::InitX() {
     // Create all general kokkos views that are needed

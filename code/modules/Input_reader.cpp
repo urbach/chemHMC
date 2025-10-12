@@ -3,7 +3,7 @@
 #include "Calc_Manager.hpp"
 #include "Calc.hpp"
 #include "bonds.hpp"
-#include "Neighbor_list.hpp"
+#include "../modules/neighbor_list/Neighbor_list.hpp"
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
 #include "potentials/non_bonded_interactions/coulomb_ewald.hpp"
