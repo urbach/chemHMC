@@ -20,6 +20,7 @@ public:
 
     int update_every;
     int moves_since_last_update = 0;
+    bool list_used = false; // is set to false on each build, can be set to true by user
 
     double time_list_build = 0.0; // Time for neighbor list builds
 
@@ -44,7 +45,7 @@ public:
 };
 
 class Neighbor_list_cell : public Neighbor_list {
-    public:
+public:
     void build_verlet_list(particles_instance& particles) override;
     void build_initial_cell_list(particles_instance& particles);
     void init_verlet_list(YAML::Node& doc, particles_instance& particles);

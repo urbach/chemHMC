@@ -11,6 +11,7 @@
 static const double N_A = 6.02214076e23;
 static const double kcaltointernal = 4.184e-4; //conversion from kcal/mol to amu * Å^2/fs^2
 static const double kjtointernal = 1.0e-4; //conversion from kJ/mol to amu * Å^2/fs^2
+static const double evtointernal = 23.06*kcaltointernal; // conversion from electorn volts to amu * Å^2/fs^2
 
 // this one is here for clarity, compiler will make this the same variable anyways
 static const double internalforcetolammpsreal = kcaltointernal; //conversion from amu * Å/fs^2 to amu * (kcal/mol)/Å

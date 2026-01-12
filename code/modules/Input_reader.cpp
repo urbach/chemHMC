@@ -9,12 +9,14 @@
 #include "potentials/non_bonded_interactions/coulomb_ewald.hpp"
 #include "potentials/non_bonded_interactions/coulomb_pppm.hpp"
 #include "potentials/non_bonded_interactions/coulomb_direct.hpp"
+#include "potentials/MLIAP/mliap.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <iostream>
 #include <array>
 #include <algorithm>
+#include <torch/script.h>
 
 Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& calc_manager) 
                 : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), calc_manager_ptr(calc_manager) {
@@ -445,9 +447,16 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
     }
 
+    if (doc["MLIAP"]) {
+        std::shared_ptr<Calc> mliapCalc = std::make_shared<MLIAP>();
+        calc_manager_ptr->addCalc(mliapCalc);
+        UseNeighborList = true;
+    }
+
     if (UseNeighborList) {
         // If we have any pair potentials utilizing a neighbor list we initialize it here
         // and do a first build
+        particles_ptr->neighbor_list_used = true;
         if (doc["opls"]) {
             particles_ptr->neighbor_list = new Neighbor_list_bonds();
         }
@@ -458,7 +467,7 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         if (doc["particles"]["update_every"]) {
             particles_ptr->neighbor_list->update_every = check_and_assign_value<int>(doc["particles"], "update_every");
         }
-        else particles_ptr->neighbor_list->update_every = 15;
+        else particles_ptr->neighbor_list->update_every = 15; // default rebuild after 15 steps
         particles_ptr->neighbor_list->init_verlet_list(doc,*particles_ptr);
         // set moves_since_last_update so that the build actually gets triggered
         particles_ptr->neighbor_list->moves_since_last_update = particles_ptr->neighbor_list->update_every - 1;

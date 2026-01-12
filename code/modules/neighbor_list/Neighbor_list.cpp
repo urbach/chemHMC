@@ -22,6 +22,9 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
     if (doc["LJ"]["cutoff"]) {
         lj_cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
     }
+    if (doc["MLIAP"]["cutoff"]) {
+        lj_cutoff = check_and_assign_value<double>(doc["MLIAP"], "cutoff");
+    }
     if (coul_cutoff > lj_cutoff) neighbor_cutoff = coul_cutoff;
     else neighbor_cutoff = lj_cutoff;
     // square the cutoff and add a skin distance
@@ -39,9 +42,16 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
 
     Kokkos::deep_copy(h_verlet_list, 0);
     Kokkos::deep_copy(verlet_list, h_verlet_list);
+    
+    Kokkos::deep_copy(x_last, 0);
+    Kokkos::deep_copy(h_x_last, 0);
 
     neighbour_count = Kokkos::View<int*>("neighbour_count", N);
     h_neighbour_count = Kokkos::create_mirror_view(neighbour_count);
+
+    build(particles);
+    Kokkos::deep_copy(x_last, particles.x);
+    Kokkos::deep_copy(disp2, 0.0);
 }
 
 void Neighbor_list::build_verlet_list(particles_instance& particles) {
@@ -145,4 +155,5 @@ void Neighbor_list::build(particles_instance& particles) {
         });
     // Copy to x_last so we can compare future steps to this build
     Kokkos::deep_copy(x_last, particles.x);
+    list_used = false; // since new list hasnt been used yet
 }
