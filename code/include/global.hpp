@@ -8,20 +8,20 @@
 #endif
 
 // Useful constants
-static const double N_A = 6.02214076e23;
-static const double kcaltointernal = 4.184e-4; //conversion from kcal/mol to amu * Å^2/fs^2
-static const double kjtointernal = 1.0e-4; //conversion from kJ/mol to amu * Å^2/fs^2
-static const double evtointernal = 23.06*kcaltointernal; // conversion from electorn volts to amu * Å^2/fs^2
+constexpr double N_A = 6.02214076e23;
+constexpr double kcaltointernal = 4.184e-4; //conversion from kcal/mol to amu * Å^2/fs^2
+constexpr double kjtointernal = 1.0e-4; //conversion from kJ/mol to amu * Å^2/fs^2
+constexpr double evtointernal = 23.06*kcaltointernal; // conversion from electron volts to amu * Å^2/fs^2
 
 // this one is here for clarity, compiler will make this the same variable anyways
-static const double internalforcetolammpsreal = kcaltointernal; //conversion from amu * Å/fs^2 to amu * (kcal/mol)/Å
-const double coulombtokcal = 332.0637133; // Energy units used in coulomb module
-const double coulombtointernal = coulombtokcal*kcaltointernal; //conversion to amu* A^2/fs^2
-const double PIovertwo = 1.570796327;
-const double sqrtPI = 1.772453851;
+constexpr double internalforcetolammpsreal = kcaltointernal; //conversion from amu * Å/fs^2 to amu * (kcal/mol)/Å
+constexpr double coulombtokcal = 332.0637133; // Energy units used in coulomb module
+constexpr double coulombtointernal = coulombtokcal*kcaltointernal; //conversion to amu* A^2/fs^2
+constexpr double PIovertwo = 1.570796327;
+constexpr double sqrtPI = 1.772453851;
 
-static const double kB_J = 1.380649e-23; //boltzmann constant in J/K
-static const double kB = kB_J * 1e-3 * N_A * kjtointernal; //boltzmann constant in amu * Å^2/(fs^2*K)
+constexpr double kB_J = 1.380649e-23; //boltzmann constant in J/K
+constexpr double kB = kB_J * 1e-3 * N_A * kjtointernal; //boltzmann constant in amu * Å^2/(fs^2*K)
 
 #define dim_space 3
 

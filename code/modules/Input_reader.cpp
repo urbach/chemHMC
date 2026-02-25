@@ -88,7 +88,6 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     params_ptr->inverse_halved_L[1] = 2.0*params_ptr->inverse_L[1];
     params_ptr->inverse_halved_L[2] = 2.0*params_ptr->inverse_L[2];
     params_ptr->seed = check_and_assign_value<int>(doc, "seed");
-    params_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
     params_ptr->nameout = check_and_assign_value<std::string>(doc, "output_file");
     params_ptr->parameter_file = check_and_assign_value<std::string>(doc, "parameter_file");
     params_ptr->Ntrajectories = check_and_assign_value<int>(doc, "Ntrajectories");
@@ -97,6 +96,12 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     params_ptr->print_info_every = check_and_assign_value<int>(doc, "print_info_every");
     params_ptr->seed = check_and_assign_value<int>(doc, "seed");
 
+    if (doc["start_configuration_file"]) 
+    {   // positions may also be read from lammps datafile
+        params_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
+    } else {
+        Kokkos::abort("Since x is initialized via the start_conf_file, one has to be provided for now");
+    }
     std::string simulation_type = check_and_assign_value<std::string>(doc, "simulation_type");
     if (simulation_type == "MD") MD = true;
 
@@ -239,6 +244,27 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
 }
 
 void Input_reader::get_number_of_particles() {
+    if (doc["lammps_data_file"]) {
+        std::ifstream infile(doc["lammps_data_file"].as<std::string>());
+        if (!infile) {
+            throw std::runtime_error("Unable to open LAMMPS data file: " + doc["lammps_data_file"].as<std::string>());
+        }
+        std::string line;
+        while (std::getline(infile, line)) {
+            std::istringstream iss(line);
+            int count;
+            std::string keyword;
+            if (iss >> count) {
+                std::getline(iss, keyword);
+                keyword = keyword.substr(keyword.find_first_not_of(" \t"));
+                if (keyword == "atoms") {
+                    particles_ptr->N = count;
+                    return;
+                }
+            }
+        }
+        throw std::runtime_error("Number of atoms not found in LAMMPS data file.");
+    }
     std::ifstream infile(params_ptr->start_configuration_file);
     if (!infile) {
         throw std::runtime_error("Unable to open parameter file: " + params_ptr->start_configuration_file);
@@ -290,6 +316,55 @@ void Input_reader::assign_ids() {
 }
 
 void Input_reader::read_xyz() {
+    // if a lammps data file is available, we read atoms positions from that
+    if (doc["lammps_data_file"]) {
+        std::ifstream infile(doc["lammps_data_file"].as<std::string>());
+        if (!infile.is_open()) {
+            std::cerr << "Error opening LAMMPS data file: " << doc["lammps_data_file"].as<std::string>() << std::endl;
+            Kokkos::abort("abort");
+        }
+
+        std::string line;
+        bool inAtomSection = false;
+        while (std::getline(infile, line)) {
+            if (line.find("Atoms") != std::string::npos) {
+                inAtomSection = true;
+                break;
+            }
+        }
+
+        if (!inAtomSection) {
+            std::cerr << "Error: 'Atoms' section not found in LAMMPS data file" << std::endl;
+            Kokkos::abort("abort");
+        }
+
+        // Skip one line after section title
+        std::getline(infile, line);
+
+        for (int i = 0; i < particles_ptr->N; ++i) {
+            if (!std::getline(infile, line)) {
+                std::cerr << "Error: unexpected end of file while reading atom positions" << std::endl;
+                Kokkos::abort("abort");
+            }
+            std::istringstream iss(line);
+            int id, type, molecule_id;
+            double x, y, z, charge;
+            if (!(iss >> id >> molecule_id >> type >> charge >> x >> y >> z)) {
+                std::cerr << "Error parsing atom position at line " << i + 1 << std::endl;
+                Kokkos::abort("abort");
+            }
+            id -= 1; // zero-based indexing
+            particles_ptr->h_x(id, 0) = x;
+            particles_ptr->h_x(id, 1) = y;
+            particles_ptr->h_x(id, 2) = z;
+        }
+
+
+        infile.close();
+        Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
+        return;
+    }
+    // otherwise we just read it from the configuration file
     // Open the input file using ifstream
     std::ifstream infile(params_ptr->start_configuration_file);
     if (!infile.is_open()) {
@@ -393,11 +468,13 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         }
     }
 
-    // We need to read in lammps data because it may contain velocities
-    auto bonds_ptr = std::make_shared<Bonds>();
-    particles_ptr->bonds_ptr = bonds_ptr;
-    read_lammps(bonds_ptr, "data.lmp");
     if (doc["opls"]) {
+        auto bonds_ptr = std::make_shared<Bonds>();
+        particles_ptr->bonds_ptr = bonds_ptr;
+        std::string lammps_data_file = check_and_assign_value<std::string>(doc, "lammps_data_file");
+        read_lammps(bonds_ptr, lammps_data_file);
+        if(!doc["LJ"])
+            Kokkos::abort("ERROR: Cannot use OPLS without defining a Lennard-Jones potential!");
         calc_manager_ptr->addCalc(bonds_ptr);
         if (doc["integrator"]["constrained_bonds"]) {
             std::string constrained_bonds = check_and_assign_value<std::string>(doc["integrator"], "constrained_bonds");
@@ -661,9 +738,9 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int id, type, atom1, atom2;
             if (iss >> id >> type >> atom1 >> atom2) {
                 bonds_ptr->h_bonds(bondIndex).id = id;
-                bonds_ptr->h_bonds(bondIndex).type = type - 1; // lammps indices start at 1
-                bonds_ptr->h_bonds(bondIndex).atom1 = atom1 - 1; // lammps indices start at 1
-                bonds_ptr->h_bonds(bondIndex).atom2 = atom2 - 1; // lammps indices start at 1
+                bonds_ptr->h_bonds(bondIndex).type = type - 1;
+                bonds_ptr->h_bonds(bondIndex).atom1 = atom1 - 1;
+                bonds_ptr->h_bonds(bondIndex).atom2 = atom2 - 1;
                 bondIndex++;
             }
         }
@@ -686,11 +763,11 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
             int id, type, atom1, atom2, atom3, atom4;
             if (iss >> id >> type >> atom1 >> atom2 >> atom3 >> atom4) {
                 bonds_ptr->h_dihedrals(dihedralIndex).id = id;
-                bonds_ptr->h_dihedrals(dihedralIndex).type = type - 1; // lammps indices start at 1
-                bonds_ptr->h_dihedrals(dihedralIndex).atom1 = atom1 - 1; // lammps indices start at 1
-                bonds_ptr->h_dihedrals(dihedralIndex).atom2 = atom2 - 1; // lammps indices start at 1
-                bonds_ptr->h_dihedrals(dihedralIndex).atom3 = atom3 - 1; // lammps indices start at 1
-                bonds_ptr->h_dihedrals(dihedralIndex).atom4 = atom4 - 1; // lammps indices start at 1
+                bonds_ptr->h_dihedrals(dihedralIndex).type = type - 1;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom1 = atom1 - 1;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom2 = atom2 - 1;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom3 = atom3 - 1;
+                bonds_ptr->h_dihedrals(dihedralIndex).atom4 = atom4 - 1;
                 dihedralIndex++;
             }
         }
@@ -725,20 +802,24 @@ void Input_reader::read_lammps(std::shared_ptr<Bonds> bonds_ptr, const std::stri
     std::cout << "Actual Dihedrals Read: " << dihedralIndex << std::endl;
     std::cout << "Number of Bond Types: " << numBondTypes << std::endl;
     std::cout << "Number of Angle Types: " << numAngleTypes << std::endl;
-    std::cout << "Number of Dihedral Types: " << numDihedralTypes << std::endl;
+    std::cout << "Number of Dihedral Types: " << numDihedralTypes << std::endl;*/
 
-    for (int i = 0; i < bonds_ptr->bonds.extent(0); i++) {
+    /*for (int i = 0; i < particles_ptr->h_x.extent(0); i++) {
+        printf("atom %d: %f %f %f \n", i, particles_ptr->h_x(i,0),particles_ptr->h_x(i,1),particles_ptr->h_x(i,2));
+    }*/
+
+    /*for (int i = 0; i < bonds_ptr->bonds.extent(0); i++) {
         printf("bond number: %d \n", i);
-        printf("bond type: %d \n", bonds_ptr->h_bonds(i).type);
-        printf("atom1: %d atom2: %d k: %f r0: %f\n", bonds_ptr->h_bonds(i).atom1-1, bonds_ptr->h_bonds(i).atom2-1, bonds_ptr->h_bondTypes(bonds_ptr->h_bonds(i).type-1).k, bonds_ptr->h_bondTypes(bonds_ptr->h_bonds(i).type-1).r0);
-    }
+        printf("bond type: %d \n", bonds_ptr->h_bonds(i).type+1);
+        printf("atom1: %d atom2: %d k: %f r0: %f\n", bonds_ptr->h_bonds(i).atom1+1, bonds_ptr->h_bonds(i).atom2+1, bonds_ptr->h_bondTypes(bonds_ptr->h_bonds(i).type).k, bonds_ptr->h_bondTypes(bonds_ptr->h_bonds(i).type).r0);
+    }*/
     
-    for (int i = 0; i < bonds_ptr->bondTypes.extent(0); i++) {
+    /*for (int i = 0; i < bonds_ptr->bondTypes.extent(0); i++) {
         printf("bond type number: %d \n", i);
         printf("type: %d k: %f r0: %f\n", bonds_ptr->h_bondTypes(i).type, bonds_ptr->h_bondTypes(i).k, bonds_ptr->h_bondTypes(i).r0);
-    }
+    }*/
     
-    for (int i = 0; i < bonds_ptr->angles.extent(0); i++) {
+    /*for (int i = 0; i < bonds_ptr->angles.extent(0); i++) {
         printf("angle number: %d \n", i);
         printf("atom1: %d atom2: %d atom3: %d k: %f theta0: %f\n", bonds_ptr->h_angles(i).atom1, bonds_ptr->h_angles(i).atom2, bonds_ptr->h_angles(i).atom3, bonds_ptr->h_angleTypes(bonds_ptr->h_angles(i).type-1).k, bonds_ptr->h_angleTypes(bonds_ptr->h_angles(i).type-1).theta0);
     }*/

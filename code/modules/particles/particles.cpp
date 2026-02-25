@@ -24,6 +24,12 @@ void particles_instance::InitX() {
     h_f = Kokkos::create_mirror(f);
     id = type_id("id", N); // particle type id
     h_id = Kokkos::create_mirror(id);
+    // set to a specific number so failure of initialization
+    // can be spotted more easily
+    Kokkos::deep_copy(h_id, 1337);
+    Kokkos::deep_copy(h_x, 1337);
+    Kokkos::deep_copy(h_p, 1337);
+    Kokkos::deep_copy(h_f, 1337);
 }
 
 void particles_instance::compute_coeff_momenta() {

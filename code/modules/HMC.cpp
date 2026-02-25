@@ -113,18 +113,14 @@ void HMC_class::run_MD() {
 
     // hb momenta
     if (params->hb_momenta) {
+        printf("Momenta initialized\n");
         integrator->particles->hb();
-    } else {
-        double Ki = integrator->particles->compute_kinetic_E();
-        printf("K_initial: %f\n",Ki*tokcal);
     }
-    
+    double Ki = integrator->particles->compute_kinetic_E();
+    printf("K_initial: %f\n",Ki*tokcal);
     for (int i = 1; i <= params->Ntrajectories; i++) {
-        Kokkos::Timer timer_traj;
-
         // molecular dynamics
         integrator->integrate();
-
         if ((i % params->print_info_every == 0)) {
             double Vf = calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();

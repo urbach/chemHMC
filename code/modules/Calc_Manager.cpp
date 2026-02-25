@@ -148,14 +148,17 @@ double Calc_Manager::gradient_descent_minimzation(YAML::Node& doc) {
     for (int i = 0; i < max_iter; i++) {
         Kokkos::deep_copy(particles->p,0.0);
         compute_force();
+        Kokkos::fence();
         Kokkos::deep_copy(particles->h_f,particles->f);
         particles->update_momenta(dt);
         Kokkos::deep_copy(particles->h_p,particles->p);
         particles->update_positions(dt);
+        Kokkos::deep_copy(particles->h_x,particles->x);
         V_new = compute_potential();
-        if((std::fabs(V_new - V)*tokcal) < tolerance) {
+        printf("%d: V: %f V_new:%f\n", i, V*tokcal, V_new*tokcal);
+        if((std::fabs(V_new - V)*tokcal*10.0) < tolerance) {
             V = V_new;
-            printf("MINIMIZATION CONVERGED \n");
+            printf("MINIMIZATION CONVERGED AFTER %d STEPS\n", i);
             break;
         }
         V = V_new;
