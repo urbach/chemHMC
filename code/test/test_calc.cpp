@@ -102,7 +102,7 @@ void run_md_toteng_test(HMC_class& HMC) {
         T = particles->compute_kinetic_E();
         V = calc_manager->compute_potential();
         H = T + V;
-        printf("Step: %d H: %f \t T: %f\t V: %f\n",i,H*tokcal, T*tokcal, V*tokcal);
+        printf("Step: %ld H: %f \t T: %f\t V: %f\n",i,H*tokcal, T*tokcal, V*tokcal);
     }
     H = particles->compute_kinetic_E() + calc_manager->compute_potential();
     //printf("H DIFF: %f\n",(H - initial_H)*tokcal);
