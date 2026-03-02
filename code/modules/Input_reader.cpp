@@ -7,7 +7,6 @@
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
 #include "potentials/non_bonded_interactions/coulomb_ewald.hpp"
-#include "potentials/non_bonded_interactions/coulomb_pppm.hpp"
 #include "potentials/non_bonded_interactions/coulomb_direct.hpp"
 #include <fstream>
 #include <iostream>
@@ -511,11 +510,6 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
             calc_manager_ptr->addCalc(coulomb_ptr);
             coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
             coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
-            UseNeighborList = true;
-        }
-        else if (algorithm.compare("pppm") == 0) {
-            auto coulomb_ptr = std::make_shared<Coulomb_pppm>(doc,*params_ptr);
-            calc_manager_ptr->addCalc(coulomb_ptr);
             UseNeighborList = true;
         }
         particles_ptr->cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
