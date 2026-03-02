@@ -9,14 +9,12 @@
 #include "potentials/non_bonded_interactions/coulomb_ewald.hpp"
 #include "potentials/non_bonded_interactions/coulomb_pppm.hpp"
 #include "potentials/non_bonded_interactions/coulomb_direct.hpp"
-#include "potentials/MLIAP/mliap.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <iostream>
 #include <array>
 #include <algorithm>
-#include <torch/script.h>
 
 Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& calc_manager) 
                 : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), calc_manager_ptr(calc_manager) {
@@ -522,12 +520,6 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         }
         particles_ptr->cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
         particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
-    }
-
-    if (doc["MLIAP"]) {
-        std::shared_ptr<Calc> mliapCalc = std::make_shared<MLIAP>();
-        calc_manager_ptr->addCalc(mliapCalc);
-        UseNeighborList = true;
     }
 
     if (UseNeighborList) {

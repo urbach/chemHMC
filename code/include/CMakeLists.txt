@@ -14,20 +14,17 @@ set(chemHMC_header
     atom.hpp
     bonds.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_ewald.hpp
-    ../modules/potentials/non_bonded_interactions/coulomb_pppm.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_direct.hpp
     ../modules/potentials/non_bonded_interactions/LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
     ../modules/neighbor_list/Neighbor_list.hpp
-    ../modules/potentials/MLIAP/mliap.hpp
 )
 
 set(chemHMC_scr 
     ../modules/HMC.cpp
     ../modules/potentials/non_bonded_interactions/LJ.cpp
     ../modules/potentials/non_bonded_interactions/coulomb_ewald.cpp
-    ../modules/potentials/non_bonded_interactions/coulomb_pppm.cpp
     ../modules/potentials/non_bonded_interactions/coulomb_direct.cpp
     ../modules/Calc_Manager.cpp
     ../modules/Input_reader.cpp
@@ -42,7 +39,6 @@ set(chemHMC_scr
     ../modules/potentials/molecules/bonds.cpp
     ../modules/neighbor_list/Neighbor_list_bonds.cpp
     ../modules/neighbor_list/Neighbor_list_cell.cpp
-    ../modules/potentials/MLIAP/mliap.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
 target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)
