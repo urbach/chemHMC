@@ -132,6 +132,16 @@ void particles_instance::print_xyz(params_class params, int traj, double K, doub
         fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 
+void particles_instance::print_xyz_and_momenta(params_class params, int traj, double K, double V) {
+    fprintf(params.fileout, "     %d\n", N);
+    fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g. label x y z px py pz\n", 
+            traj, K/kcaltointernal, V/kcaltointernal);
+    for (int i = 0; i < N; i++)
+        fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g \t %-20.12g %-20.12g %-20.12g\n", 
+                label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2), 
+                h_p(i, 0), h_p(i, 1), h_p(i, 2));
+}
+
 void particles_instance::print_force(params_class params, int traj) {
     fprintf(params.fileout, "     %d\n", N);
     fprintf(params.fileout, "trajectory= %d  FORCES\n", traj);

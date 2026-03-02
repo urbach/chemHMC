@@ -278,8 +278,80 @@ void Input_reader::get_number_of_particles() {
 }
 
 void Input_reader::assign_ids() {
-    // this function reads in the atom types from the start_configuration_file
+    // This function reads in the atom types from the start_configuration_file
     // and assigns each an atom_type_id defined in the atom_type_list.
+    // If we have a lammps datafile we need to assign ids via type ids.
+    // This function assumes the "atom_style full" format.
+    if (doc["lammps_data_file"]) 
+    {
+        std::ifstream infile(doc["lammps_data_file"].as<std::string>());
+        if (!infile.is_open()) {
+            std::cerr << "Error opening LAMMPS data file: "
+                      << doc["lammps_data_file"].as<std::string>() << "\n";
+            Kokkos::abort("abort");
+        }
+
+        std::string line;
+        bool inAtomSection = false;
+        while (std::getline(infile, line)) {
+            if (line.find("Atoms") != std::string::npos) {
+                inAtomSection = true;
+                break;
+            }
+        }
+        if (!inAtomSection) {
+            std::cerr << "Error: 'Atoms' section not found in LAMMPS data file\n";
+            Kokkos::abort("abort");
+        }
+
+        // Skip one line after section title
+        std::getline(infile, line);
+
+        for (int i = 0; i < particles_ptr->N; ++i) {
+            if (!std::getline(infile, line)) {
+                std::cerr << "Error: unexpected end of file while reading Atoms section\n";
+                Kokkos::abort("abort");
+            }
+            std::istringstream iss(line);
+            int id, type, molecule_id;
+            double x, y, z, charge;
+
+            if (!(iss >> id >> molecule_id >> type >> charge >> x >> y >> z)) {
+                std::cerr << "Error parsing atom line " << (i + 1) << " in Atoms section\n";
+                Kokkos::abort("abort");
+            }
+
+            id -= 1; // zero-based indexing
+            if (id < 0 || id >= particles_ptr->N) {
+                std::cerr << "Bad atom id " << (id + 1) << " (N=" << particles_ptr->N << ")\n";
+                Kokkos::abort("abort");
+            }
+            int type_id = type - 1;
+
+            // Validate
+            if (type_id < 0 || static_cast<size_t>(type_id) >= particles_ptr->h_atom_type_list.extent(0)) {
+                std::cerr << "Bad atom type " << type
+                          << " (atom_type_list size=" << particles_ptr->h_atom_type_list.extent(0) << ")\n";
+                Kokkos::abort("abort");
+            }
+
+            particles_ptr->h_id(id) = type_id;
+        }
+
+        // Verify all assigned
+        for (int i = 0; i < particles_ptr->N; ++i) {
+            if (particles_ptr->h_id(i) < 0) {
+                std::cerr << "Error: atom " << i << " did not get an id assigned from LAMMPS data file\n";
+                Kokkos::abort("abort");
+            }
+        }
+
+        infile.close();
+        Kokkos::deep_copy(particles_ptr->id, particles_ptr->h_id);
+        Kokkos::fence();
+        return;
+    }
+    // if we have a normal .xyz file we need to assign ids by comparing labels
     std::ifstream infile(params_ptr->start_configuration_file);
     if (!infile) {
         throw std::runtime_error("Unable to open parameter file: " + params_ptr->start_configuration_file);
@@ -338,6 +410,10 @@ void Input_reader::read_xyz() {
             Kokkos::abort("abort");
         }
 
+        // clear labels
+        particles_ptr->label_xyz.clear();
+        particles_ptr->label_xyz.resize(particles_ptr->N);
+
         // Skip one line after section title
         std::getline(infile, line);
 
@@ -357,6 +433,9 @@ void Input_reader::read_xyz() {
             particles_ptr->h_x(id, 0) = x;
             particles_ptr->h_x(id, 1) = y;
             particles_ptr->h_x(id, 2) = z;
+            
+            // set label
+            particles_ptr->label_xyz[id] = particles_ptr->h_atom_type_list(type - 1).label;
         }
 
 
@@ -365,7 +444,6 @@ void Input_reader::read_xyz() {
         return;
     }
     // otherwise we just read it from the configuration file
-    // Open the input file using ifstream
     std::ifstream infile(params_ptr->start_configuration_file);
     if (!infile.is_open()) {
         std::cerr << "Error opening file " << params_ptr->start_configuration_file << std::endl;
@@ -471,7 +549,10 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
     if (doc["opls"]) {
         auto bonds_ptr = std::make_shared<Bonds>();
         particles_ptr->bonds_ptr = bonds_ptr;
-        std::string lammps_data_file = check_and_assign_value<std::string>(doc, "lammps_data_file");
+        std::string lammps_data_file;
+        if (doc["lammps_data_file"]) {
+            lammps_data_file = check_and_assign_value<std::string>(doc, "lammps_data_file");
+        } else {lammps_data_file = "data.lmp";}
         read_lammps(bonds_ptr, lammps_data_file);
         if(!doc["LJ"])
             Kokkos::abort("ERROR: Cannot use OPLS without defining a Lennard-Jones potential!");

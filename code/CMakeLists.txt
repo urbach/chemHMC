@@ -63,13 +63,19 @@ ENDIF()
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 ######################################################
+######################### MBX ########################
+#include_directories($ENV{MBX_HOME}/include $ENV{FFTW_HOME}/include)
+#link_directories($ENV{MBX_HOME}/lib $ENV{FFTW_HOME}/lib)
+
+#find_package(OpenMP REQUIRED)
+
 ##################### libtorch #######################
-find_package(Torch REQUIRED)
+#find_package(Torch REQUIRED)
 
-include_directories(${TORCH_INCLUDE_DIRS})
+#include_directories(${TORCH_INCLUDE_DIRS})
 
-message(STATUS "Torch include dirs: ${TORCH_INCLUDE_DIRS}")
-message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
+#message(STATUS "Torch include dirs: ${TORCH_INCLUDE_DIRS}")
+#message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
 ######################################################
 # ###################### fmt: formating library ######################
 
@@ -101,6 +107,8 @@ PRIVATE
 
 macro(add_target_with_lib TARGETNAME)
   add_executable(${TARGETNAME} ${ARGN})
+  #target_link_libraries(${TARGETNAME} PUBLIC OpenMP::OpenMP_CXX fftw3)
+  target_link_libraries(${TARGETNAME} PUBLIC $ENV{MBX_HOME}/lib/libmbx.a)
   target_link_libraries(${TARGETNAME} PRIVATE "${TORCH_LIBRARIES}")
   target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
   target_link_libraries(${TARGETNAME} PUBLIC chemHMC)

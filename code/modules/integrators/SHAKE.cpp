@@ -476,7 +476,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
             atom2 = (c == b) ? d : c;
             atom3 = (e == b) ? g : e;
         } else {
-            Kokkos::printf("WARNING: size 3 shake cluster without a common atom loaded!");
+            Kokkos::printf("WARNING: size 3 shake cluster without a common atom loaded!\n");
             return;
         }
 
@@ -944,7 +944,7 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_3_cluster() {
             atom2 = (c == b) ? d : c;
             atom3 = (e == b) ? g : e;
         } else {
-            Kokkos::printf("WARNING: size 3 shake cluster without a common atom loaded!");
+            Kokkos::printf("WARNING: size 3 shake cluster without a common atom loaded!\n");
             return;
         }
 

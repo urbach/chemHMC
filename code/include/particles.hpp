@@ -65,6 +65,7 @@ public:
     // file interaction
     void print_xyz(params_class params, int traj, double K, double V);
     void print_force(params_class params, int traj);
+    void print_xyz_and_momenta(params_class params, int traj, double K, double V);
 
     // initialization related stuff
     struct check_in_volume {};

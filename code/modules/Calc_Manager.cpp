@@ -58,6 +58,7 @@ double dot_product(const int N, const type_p& a, const type_p& b) {
 void Calc_Manager::minimize_energy(YAML::Node& doc) {
     std::string minimization_algorithm = check_and_assign_value<std::string>(doc["minimization"], "algorithm");
     double V;
+    printf("Starting geometry optimization...\n");
     if (minimization_algorithm == "gradient_descent") {
         V = gradient_descent_minimzation(doc);
     }   else if (minimization_algorithm == "conjugate_gradient") {
@@ -71,6 +72,7 @@ void Calc_Manager::minimize_energy(YAML::Node& doc) {
     if (doc["minimization"]["save_geometry"]) {
         save_optimized_geometry(V);
     }
+    printf("Done!\n");
 }
 
 double Calc_Manager::conjugate_gradient_minimzation(YAML::Node& doc) {
@@ -155,7 +157,6 @@ double Calc_Manager::gradient_descent_minimzation(YAML::Node& doc) {
         particles->update_positions(dt);
         Kokkos::deep_copy(particles->h_x,particles->x);
         V_new = compute_potential();
-        printf("%d: V: %f V_new:%f\n", i, V*tokcal, V_new*tokcal);
         if((std::fabs(V_new - V)*tokcal*10.0) < tolerance) {
             V = V_new;
             printf("MINIMIZATION CONVERGED AFTER %d STEPS\n", i);
@@ -171,7 +172,7 @@ void Calc_Manager::save_optimized_geometry(double V) const {
     FILE* opt_file = fopen("optimized_structure.xyz", "ab");
     if (opt_file) {
         fprintf(opt_file, "     %d\n", particles->N);
-        fprintf(opt_file, "optimized geometry. V=%f\n", V);
+        fprintf(opt_file, "optimized geometry. V=%f\n", V/kcaltointernal);
         for (int i = 0; i < particles->N; ++i) {
             fprintf(opt_file, "%-8s  %20.12g  %20.12g  %20.12g\n",
                 particles->label_xyz[i].c_str(), particles->h_x(i, 0), particles->h_x(i, 1), particles->h_x(i, 2));

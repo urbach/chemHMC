@@ -21,6 +21,7 @@ set(chemHMC_header
     Calc_Manager.hpp
     ../modules/neighbor_list/Neighbor_list.hpp
     ../modules/potentials/MLIAP/mliap.hpp
+    ../modules/potentials/MBX/MBX.hpp
 )
 
 set(chemHMC_scr 
@@ -43,6 +44,7 @@ set(chemHMC_scr
     ../modules/neighbor_list/Neighbor_list_bonds.cpp
     ../modules/neighbor_list/Neighbor_list_cell.cpp
     ../modules/potentials/MLIAP/mliap.cpp
+    ../modules/potentials/MBX/MBX.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
 target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)
