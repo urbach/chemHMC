@@ -6,5 +6,6 @@
 #include "OMF4.hpp"
 #include "velocity_verlet.hpp"
 #include "SHAKE.hpp"
+#include "general.hpp"
 
 #endif

@@ -135,7 +135,9 @@ void Input_reader::parse_integrator_options(YAML::Node& doc) {
             integrator_ptr = new VELOCITY_VERLET(doc, *params_ptr);
         } else if (name == "VELOCITY_VERLET_SHAKE") {
             integrator_ptr = new VELOCITY_VERLET_SHAKE(doc, *params_ptr);
-        } else {
+        } else if (name == "GENERAL") {
+            integrator_ptr = new GENERAL(doc, *params_ptr);
+        }  else {
             throw std::runtime_error("Error: Invalid integrator name: " + name);
         }
     } else {

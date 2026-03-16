@@ -1,5 +1,5 @@
 #ifndef LEAPFROG_HPP
-#define LEAPFROG
+#define LEAPFROG_HPP
 
 #include "integrator_type.hpp"
 

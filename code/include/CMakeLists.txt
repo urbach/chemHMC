@@ -8,6 +8,7 @@ set(chemHMC_header
     ../modules/integrators/velocity_verlet.hpp
     ../modules/integrators/integrator.hpp
     ../modules/integrators/SHAKE.hpp
+    ../modules/integrators/general.hpp
     Input_reader.hpp
     Parameters.hpp
     particles.hpp
@@ -34,6 +35,7 @@ set(chemHMC_scr
     ../modules/integrators/OMF4.cpp
     ../modules/integrators/velocity_verlet.cpp
     ../modules/integrators/SHAKE.cpp
+    ../modules/integrators/general.cpp
     ../modules/particles/particles.cpp
     ../modules/neighbor_list/Neighbor_list.cpp
     ../modules/potentials/molecules/bonds.cpp
