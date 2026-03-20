@@ -6,6 +6,17 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
   set(CMAKE_CUDA_ARCHITECTURES 86)
 endif()
 
+if(NOT DEFINED ENV{MBX_HOME})
+  message(FATAL_ERROR "MBX_HOME environment variable is not set")
+endif()
+
+if(NOT DEFINED ENV{FFTW_HOME})
+  message(FATAL_ERROR "FFTW_HOME environment variable is not set")
+endif()
+
+set(MBX_HOME $ENV{MBX_HOME})
+set(FFTW_HOME $ENV{FFTW_HOME})
+
 # no need to install Eigen with cmake and use find package
 #SET( EIGEN3_INCLUDE_DIR /home/marco/library/eigen )
 #IF( NOT EIGEN3_INCLUDE_DIR )
@@ -64,18 +75,18 @@ ENDIF()
 include_directories(${PROJECT_SOURCE_DIR}/include)
 ######################################################
 ######################### MBX ########################
-#include_directories($ENV{MBX_HOME}/include $ENV{FFTW_HOME}/include)
-#link_directories($ENV{MBX_HOME}/lib $ENV{FFTW_HOME}/lib)
+include_directories($ENV{MBX_HOME}/include $ENV{FFTW_HOME}/include)
+link_directories($ENV{MBX_HOME}/lib $ENV{FFTW_HOME}/lib)
 
-#find_package(OpenMP REQUIRED)
+find_package(OpenMP REQUIRED)
 
 ##################### libtorch #######################
-#find_package(Torch REQUIRED)
+find_package(Torch REQUIRED)
 
-#include_directories(${TORCH_INCLUDE_DIRS})
+include_directories(${TORCH_INCLUDE_DIRS})
 
-#message(STATUS "Torch include dirs: ${TORCH_INCLUDE_DIRS}")
-#message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
+message(STATUS "Torch include dirs: ${TORCH_INCLUDE_DIRS}")
+message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
 ######################################################
 # ###################### fmt: formating library ######################
 
@@ -107,12 +118,30 @@ PRIVATE
 
 macro(add_target_with_lib TARGETNAME)
   add_executable(${TARGETNAME} ${ARGN})
-  #target_link_libraries(${TARGETNAME} PUBLIC OpenMP::OpenMP_CXX fftw3)
-  target_link_libraries(${TARGETNAME} PUBLIC $ENV{MBX_HOME}/lib/libmbx.a)
-  target_link_libraries(${TARGETNAME} PRIVATE "${TORCH_LIBRARIES}")
-  target_link_libraries(${TARGETNAME} PUBLIC Kokkos::kokkos)
-  target_link_libraries(${TARGETNAME} PUBLIC chemHMC)
-  target_link_libraries(${TARGETNAME} PUBLIC git_version)
+
+  target_include_directories(${TARGETNAME} PRIVATE
+    ${MBX_HOME}/include
+    ${FFTW_HOME}/include
+    ${TORCH_INCLUDE_DIRS}
+  )
+
+  target_link_directories(${TARGETNAME} PRIVATE
+    ${MBX_HOME}/lib
+    ${FFTW_HOME}/lib
+  )
+
+  target_link_libraries(${TARGETNAME} PRIVATE
+    chemHMC
+    git_version
+    Kokkos::kokkos
+    OpenMP::OpenMP_CXX
+    ${TORCH_LIBRARIES}
+    mbx
+    fftw3
+  )
+
+  target_link_libraries(chemHMC PUBLIC OpenMP::OpenMP_CXX)
+
   target_compile_features(${TARGETNAME} PRIVATE cxx_std_17)
   target_compile_options(${TARGETNAME} PRIVATE ${TORCH_CXX_FLAGS})
 endmacro()
