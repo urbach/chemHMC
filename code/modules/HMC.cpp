@@ -103,8 +103,9 @@ void HMC_class::run_MD() {
     Kokkos::Timer timer;
     double tokcal = 1.0/kcaltointernal;
 
-    double Vi = calc_manager->compute_potential();
-    printf("INITIAL V: %f \n", Vi*tokcal);
+    double V_initial = calc_manager->compute_potential();
+    printf("INITIAL V: %f \n", V_initial*tokcal);
+    double Vi = V_initial;
 
     double beta = integrator->particles->get_beta();
     calc_manager->compute_force();
@@ -116,8 +117,9 @@ void HMC_class::run_MD() {
         printf("Momenta initialized\n");
         integrator->particles->hb();
     }
-    double Ki = integrator->particles->compute_kinetic_E();
-    printf("K_initial: %f\n",Ki*tokcal);
+    double K_initial = integrator->particles->compute_kinetic_E();
+    printf("K_initial: %f\n",K_initial*tokcal);
+    double Ki = K_initial;
     for (int i = 1; i <= params->Ntrajectories; i++) {
         // molecular dynamics
         integrator->integrate();
@@ -134,6 +136,9 @@ void HMC_class::run_MD() {
             integrator->particles->print_xyz(*params, i, Kf, Vf);
         }
     }
+    double K_last = integrator->particles->compute_kinetic_E();
+    double V_last = calc_manager->compute_potential();
+    printf("Hdiff: %f\n",(K_last+V_last)-(K_initial+V_initial));
     printf("time for MD: %g  s\n", timer.seconds());
     calc_manager->print_timings();
 }
