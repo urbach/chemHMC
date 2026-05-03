@@ -10,6 +10,7 @@
 #include "potentials/non_bonded_interactions/coulomb_pppm.hpp"
 #include "potentials/non_bonded_interactions/coulomb_direct.hpp"
 #include "potentials/MLIAP/mliap.hpp"
+#include "potentials/MBX/MBX.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -336,6 +337,10 @@ void Input_reader::assign_ids() {
             }
 
             particles_ptr->h_id(id) = type_id;
+
+            // we also read the molecule ids now
+            molecule_id -= 1;
+            particles_ptr->h_mol_id(id) = molecule_id;
         }
 
         // Verify all assigned
@@ -348,6 +353,7 @@ void Input_reader::assign_ids() {
 
         infile.close();
         Kokkos::deep_copy(particles_ptr->id, particles_ptr->h_id);
+        Kokkos::deep_copy(particles_ptr->mol_id, particles_ptr->h_mol_id);
         Kokkos::fence();
         return;
     }
@@ -609,6 +615,12 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         std::shared_ptr<Calc> mliapCalc = std::make_shared<MLIAP>();
         calc_manager_ptr->addCalc(mliapCalc);
         UseNeighborList = true;
+    }
+
+    if (doc["MBX"]) {
+        std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>();
+        calc_manager_ptr->addCalc(mbxCalc);
+        UseNeighborList = false;
     }
 
     if (UseNeighborList) {

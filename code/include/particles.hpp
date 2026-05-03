@@ -60,6 +60,10 @@ public:
     Kokkos::View<double**>::HostMirror h_sigma_mat; ///< host mirror of sigma_mat
     Kokkos::View<double*> coeff_x;    ///< list of coefficients for the position calculation
     Kokkos::View<double*>::HostMirror h_coeff_x;    ///< host mirror of coeff_x
+    Kokkos::View<int*> mol_id; ///< mapping from atom id to molecule id
+    Kokkos::View<int*> h_mol_id; ///< host mirror of mol_id
+
+
     double T;   ///< temperature
 
     // file interaction
