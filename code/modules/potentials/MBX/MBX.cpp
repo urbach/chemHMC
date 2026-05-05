@@ -95,7 +95,7 @@ void MBX::write_nrg_file(const particles_instance& particles, const std::string&
         std::vector<atom_index_t> atom_indices = it->second;
 
         // Sort atoms so O comes first, then H, H.
-        // mass < 6  -> H
+        // mass < 6  -> H // arbitrary value of 6 since we only handle water here anyways
         // mass >= 6 -> O
         std::stable_sort(atom_indices.begin(), atom_indices.end(),
             [&](atom_index_t a, atom_index_t b) {

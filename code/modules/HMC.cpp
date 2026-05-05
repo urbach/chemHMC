@@ -121,6 +121,7 @@ void HMC_class::run_MD() {
     for (int i = 1; i <= params->Ntrajectories; i++) {
         // molecular dynamics
         integrator->integrate();
+        Kokkos::deep_copy(integrator->particles->h_x,integrator->particles->x);
         if ((i % params->print_info_every == 0)) {
             double Vf = calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();

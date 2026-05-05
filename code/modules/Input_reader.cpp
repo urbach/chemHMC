@@ -394,8 +394,91 @@ void Input_reader::assign_ids() {
 }
 
 void Input_reader::read_xyz() {
-    // if a lammps data file is available, we read atoms positions from that
-    if (doc["lammps_data_file"]) {
+    if (doc["start_configuration_file"]) {
+        // If a start configuration file is given, we read atom data from that
+        std::ifstream infile(params_ptr->start_configuration_file);
+        if (!infile.is_open()) {
+            std::cerr << "Error opening file " << params_ptr->start_configuration_file << std::endl;
+            Kokkos::abort("abort");
+        }
+
+        // Count the number of lines in the file
+        int lines = 0;
+        std::string temp_line;
+        while (std::getline(infile, temp_line)) {
+            lines++;
+        }
+
+        // Check if the number of lines is a multiple of N + 2
+        if (lines % (particles_ptr->N + 2) != 0) {
+            std::cerr << "Error: input file " << params_ptr->start_configuration_file << " contains " << lines << " lines" << std::endl;
+            std::cerr << "       the number of lines must be a multiple of N+2 = " << particles_ptr->N + 2 << std::endl;
+            Kokkos::abort("abort");
+        }
+
+        // Calculate the number of configurations in the file
+        int confs = lines / (particles_ptr->N + 2);
+        std::cout << "Number of configurations in input file: " << confs << std::endl;
+
+        // Reset the file stream to the beginning
+        infile.clear();
+        infile.seekg(0, std::ios::beg);
+
+        // Skip lines to reach the last configuration
+        int lines_to_skip = (confs - 1) * (particles_ptr->N + 2);
+        for (int i = 0; i < lines_to_skip; ++i) {
+            if (!std::getline(infile, temp_line)) {
+                std::cerr << "Error: unexpected end of file while skipping to last configuration" << std::endl;
+                Kokkos::abort("abort");
+            }
+        }
+
+        // Read the number of atoms from the first line of the last configuration
+        if (!std::getline(infile, temp_line)) {
+            std::cerr << "Error: unexpected end of file while reading number of atoms" << std::endl;
+            Kokkos::abort("abort");
+        }
+        int num_atoms_in_file = std::stoi(temp_line);
+        if (num_atoms_in_file != particles_ptr->N) {
+            std::cerr << "Error: number of atoms in file (" << num_atoms_in_file << ") does not match expected N (" << particles_ptr->N << ")" << std::endl;
+            Kokkos::abort("abort");
+        }
+
+        // Read the comment line (we can skip or store it if needed)
+        if (!std::getline(infile, temp_line)) {
+            std::cerr << "Error: unexpected end of file while reading comment line" << std::endl;
+            Kokkos::abort("abort");
+        }
+        // Optionally, store or skip the comment line
+        std::string comment_line = temp_line;
+
+        std::cout << "Reading last configuration from input file " << params_ptr->start_configuration_file << std::endl;
+
+        // Read the atom data
+        particles_ptr->label_xyz.clear(); // Ensure label_xyz is empty before filling
+        for (int i = 0; i < particles_ptr->N; ++i) {
+            if (!std::getline(infile, temp_line)) {
+                std::cerr << "Error: unexpected end of file while reading atom data" << std::endl;
+                Kokkos::abort("abort");
+            }
+            std::istringstream iss(temp_line);
+            std::string id;
+            double x_val, y_val, z_val;
+            if (!(iss >> id >> x_val >> y_val >> z_val)) {
+                std::cerr << "Error parsing atom data on line " << i + 1 << std::endl;
+                Kokkos::abort("Error parsing xyz file");
+            }
+            particles_ptr->label_xyz.push_back(id);
+            particles_ptr->h_x(i, 0) = x_val;
+            particles_ptr->h_x(i, 1) = y_val;
+            particles_ptr->h_x(i, 2) = z_val;
+        }
+
+        infile.close();
+        Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
+
+    } else if (doc["lammps_data_file"]) {
+        // otherwise we try to get an input structure from a lammps data file
         std::ifstream infile(doc["lammps_data_file"].as<std::string>());
         if (!infile.is_open()) {
             std::cerr << "Error opening LAMMPS data file: " << doc["lammps_data_file"].as<std::string>() << std::endl;
@@ -448,88 +531,9 @@ void Input_reader::read_xyz() {
         infile.close();
         Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
         return;
+    } else {
+        Kokkos::abort("No starting configuration given!");
     }
-    // otherwise we just read it from the configuration file
-    std::ifstream infile(params_ptr->start_configuration_file);
-    if (!infile.is_open()) {
-        std::cerr << "Error opening file " << params_ptr->start_configuration_file << std::endl;
-        Kokkos::abort("abort");
-    }
-
-    // Count the number of lines in the file
-    int lines = 0;
-    std::string temp_line;
-    while (std::getline(infile, temp_line)) {
-        lines++;
-    }
-
-    // Check if the number of lines is a multiple of N + 2
-    if (lines % (particles_ptr->N + 2) != 0) {
-        std::cerr << "Error: input file " << params_ptr->start_configuration_file << " contains " << lines << " lines" << std::endl;
-        std::cerr << "       the number of lines must be a multiple of N+2 = " << particles_ptr->N + 2 << std::endl;
-        Kokkos::abort("abort");
-    }
-
-    // Calculate the number of configurations in the file
-    int confs = lines / (particles_ptr->N + 2);
-    std::cout << "Number of configurations in input file: " << confs << std::endl;
-
-    // Reset the file stream to the beginning
-    infile.clear();
-    infile.seekg(0, std::ios::beg);
-
-    // Skip lines to reach the last configuration
-    int lines_to_skip = (confs - 1) * (particles_ptr->N + 2);
-    for (int i = 0; i < lines_to_skip; ++i) {
-        if (!std::getline(infile, temp_line)) {
-            std::cerr << "Error: unexpected end of file while skipping to last configuration" << std::endl;
-            Kokkos::abort("abort");
-        }
-    }
-
-    // Read the number of atoms from the first line of the last configuration
-    if (!std::getline(infile, temp_line)) {
-        std::cerr << "Error: unexpected end of file while reading number of atoms" << std::endl;
-        Kokkos::abort("abort");
-    }
-    int num_atoms_in_file = std::stoi(temp_line);
-    if (num_atoms_in_file != particles_ptr->N) {
-        std::cerr << "Error: number of atoms in file (" << num_atoms_in_file << ") does not match expected N (" << particles_ptr->N << ")" << std::endl;
-        Kokkos::abort("abort");
-    }
-
-    // Read the comment line (we can skip or store it if needed)
-    if (!std::getline(infile, temp_line)) {
-        std::cerr << "Error: unexpected end of file while reading comment line" << std::endl;
-        Kokkos::abort("abort");
-    }
-    // Optionally, store or skip the comment line
-    std::string comment_line = temp_line;
-
-    std::cout << "Reading last configuration from input file " << params_ptr->start_configuration_file << std::endl;
-
-    // Read the atom data
-    particles_ptr->label_xyz.clear(); // Ensure label_xyz is empty before filling
-    for (int i = 0; i < particles_ptr->N; ++i) {
-        if (!std::getline(infile, temp_line)) {
-            std::cerr << "Error: unexpected end of file while reading atom data" << std::endl;
-            Kokkos::abort("abort");
-        }
-        std::istringstream iss(temp_line);
-        std::string id;
-        double x_val, y_val, z_val;
-        if (!(iss >> id >> x_val >> y_val >> z_val)) {
-            std::cerr << "Error parsing atom data on line " << i + 1 << std::endl;
-            Kokkos::abort("Error parsing xyz file");
-        }
-        particles_ptr->label_xyz.push_back(id);
-        particles_ptr->h_x(i, 0) = x_val;
-        particles_ptr->h_x(i, 1) = y_val;
-        particles_ptr->h_x(i, 2) = z_val;
-    }
-
-    infile.close();
-    Kokkos::deep_copy(particles_ptr->x, particles_ptr->h_x);
 }
 
 void Input_reader::populate_calc_list(YAML::Node& doc) {
