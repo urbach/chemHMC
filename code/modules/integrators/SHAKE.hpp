@@ -13,6 +13,7 @@ public:
     Kokkos::View<int* [2]> size_2_clusters;
     Kokkos::View<int* [3]> size_3_clusters;
     type_x trial_positions;
+    type_x old_positions;
     type_p trial_momenta;
 
     struct Tag_SHAKE {};
