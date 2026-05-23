@@ -11,19 +11,18 @@ VELOCITY_VERLET_SHAKE::VELOCITY_VERLET_SHAKE(YAML::Node doc, params_class params
 
 void VELOCITY_VERLET_SHAKE::integrate() {
     find_shake_clusters();
+    apply_RATTLE();
     calc_manager->compute_force();
     Kokkos::fence();
-    apply_SHAKE();
     for (size_t i = 0; i < steps; i++) {
         particles->update_momenta(dt / 2.);
-        particles->update_positions(dt);
+        apply_SHAKE();
         particles->neighbor_list->build_verlet_list(*particles);
         
         calc_manager->compute_force();
         Kokkos::fence();
-        apply_SHAKE();
-        apply_RATTLE();
         particles->update_momenta(dt / 2.);
+        apply_RATTLE();
     }
 }
 
@@ -140,7 +139,9 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
     auto& x = particles->x;
     auto& c = particles->coeff_x;    // Inverse mass lookup table
     auto& dt = this->dt;
+    this->old_positions = Kokkos::View<double*[3]>("old_positions", particles->N);
     this->trial_positions = Kokkos::View<double*[3]>("trial_positions",particles->N);
+    Kokkos::deep_copy(old_positions, x);
     Kokkos::deep_copy(trial_positions,x);
     auto& trial_positions = this->trial_positions;
     // do an unconstrained update on all positions
@@ -160,6 +161,7 @@ void VELOCITY_VERLET_SHAKE::generate_trial_positions() {
 
 void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
     generate_trial_positions();
+    Kokkos::deep_copy(particles->x, trial_positions);
     SHAKE_size_1_cluster();
     SHAKE_size_2_cluster();
     SHAKE_size_3_cluster();
@@ -168,8 +170,9 @@ void VELOCITY_VERLET_SHAKE::apply_SHAKE() {
 
 void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
     auto& size_1_clusters = this->size_1_clusters;
-    auto& f = particles->f;
     auto& x = particles->x;
+    auto& old_x = this->old_positions;
+    auto& p = particles->p;
     auto& trial_x = this->trial_positions;
     auto& L = particles->L;
     auto& id = particles->id;
@@ -179,7 +182,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
     auto& coeff_x = particles->coeff_x;    // Inverse mass lookup table
     double dt = this->dt;
     Kokkos::parallel_for(
-    "SHAKE_force_update",
+    "SHAKE_position_update",
     Kokkos::RangePolicy<>(0, size_1_clusters.extent(0)),
     KOKKOS_LAMBDA(const int i) {
         const int bond_idx = size_1_clusters(i);
@@ -196,11 +199,11 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
 
         // distance
         double rvec[3];
-        rvec[0] = x(atom1, 0) - x(atom2, 0);
+        rvec[0] = old_x(atom1, 0) - old_x(atom2, 0);
         rvec[0] -= int(rvec[0] * inverse_halved_L[0]) * L[0];
-        rvec[1] = x(atom1, 1) - x(atom2, 1);
+        rvec[1] = old_x(atom1, 1) - old_x(atom2, 1);
         rvec[1] -= int(rvec[1] * inverse_halved_L[1]) * L[1];
-        rvec[2] = x(atom1, 2) - x(atom2, 2);
+        rvec[2] = old_x(atom1, 2) - old_x(atom2, 2);
         rvec[2] -= int(rvec[2] * inverse_halved_L[2]) * L[2];
         double r2 = rvec[0]*rvec[0]+rvec[1]*rvec[1]+rvec[2]*rvec[2];
 
@@ -236,16 +239,16 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_1_cluster() {
         else lambda = lambda2;
 
         // scale lambda so the forces have the proper magnitude when applied
-        lambda /= dt*dt;
-
-        // apply update to forces
-        Kokkos::atomic_fetch_add(&f(atom1,0), -lambda*rvec[0]);
-        Kokkos::atomic_fetch_add(&f(atom1,1), -lambda*rvec[1]);
-        Kokkos::atomic_fetch_add(&f(atom1,2), -lambda*rvec[2]);
-
-        Kokkos::atomic_fetch_add(&f(atom2,0), lambda*rvec[0]);
-        Kokkos::atomic_fetch_add(&f(atom2,1), lambda*rvec[1]);
-        Kokkos::atomic_fetch_add(&f(atom2,2), lambda*rvec[2]);
+        for (int dir = 0; dir < 3; dir++) {
+            double dx1 = m1_inv * lambda * rvec[dir];
+            double dx2 = -m2_inv * lambda * rvec[dir];
+            x(atom1, dir) = trial_x(atom1, dir) + dx1;
+            x(atom2, dir) = trial_x(atom2, dir) + dx2;
+            x(atom1, dir) -= L[dir] * floor(x(atom1, dir) / L[dir]);
+            x(atom2, dir) -= L[dir] * floor(x(atom2, dir) / L[dir]);
+            p(atom1, dir) += lambda * rvec[dir] / dt;
+            p(atom2, dir) -= lambda * rvec[dir] / dt;
+        }
         }
     );
     Kokkos::fence();
@@ -255,8 +258,9 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
     auto& max_iter              = this->max_iter;
     auto& tolerance             = this->tolerance;
     auto& size_2_clusters       = this->size_2_clusters;
-    auto& f                     = particles->f;
     auto& x                     = particles->x;
+    auto& old_x                 = this->old_positions;
+    auto& p                     = particles->p;
     auto& trial_x               = this->trial_positions;
     auto& L                     = particles->L;
     auto& id                    = particles->id;
@@ -264,7 +268,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
     auto& bonds                 = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes             = particles->bonds_ptr->bondTypes;
     auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
-    double dt_2 = this->dt * this->dt;
+    double dt = this->dt;
     Kokkos::parallel_for(
     "SHAKE_size_2_cluster_update",
     Kokkos::RangePolicy<>(0, size_2_clusters.extent(0)),
@@ -312,19 +316,19 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
 
         // atom distances
         double r01[3];
-        r01[0] = x(atom0, 0) - x(atom1, 0);
+        r01[0] = old_x(atom0, 0) - old_x(atom1, 0);
         r01[0] -= int(r01[0] * inverse_halved_L[0]) * L[0];
-        r01[1] = x(atom0, 1) - x(atom1, 1);
+        r01[1] = old_x(atom0, 1) - old_x(atom1, 1);
         r01[1] -= int(r01[1] * inverse_halved_L[1]) * L[1];
-        r01[2] = x(atom0, 2) - x(atom1, 2);
+        r01[2] = old_x(atom0, 2) - old_x(atom1, 2);
         r01[2] -= int(r01[2] * inverse_halved_L[2]) * L[2];
         double r01_sq = r01[0]*r01[0]+r01[1]*r01[1]+r01[2]*r01[2];
         double r02[3];
-        r02[0] = x(atom0, 0) - x(atom2, 0);
+        r02[0] = old_x(atom0, 0) - old_x(atom2, 0);
         r02[0] -= int(r02[0] * inverse_halved_L[0]) * L[0];
-        r02[1] = x(atom0, 1) - x(atom2, 1);
+        r02[1] = old_x(atom0, 1) - old_x(atom2, 1);
         r02[1] -= int(r02[1] * inverse_halved_L[1]) * L[1];
-        r02[2] = x(atom0, 2) - x(atom2, 2);
+        r02[2] = old_x(atom0, 2) - old_x(atom2, 2);
         r02[2] -= int(r02[2] * inverse_halved_L[2]) * L[2];
         double r02_sq = r02[0]*r02[0]+r02[1]*r02[1]+r02[2]*r02[2];
 
@@ -399,20 +403,22 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_2_cluster() {
             niter++;
         }
 
-        lambda01 /= dt_2;
-        lambda02 /= dt_2;
+        for (int dir = 0; dir < 3; dir++) {
+            double impulse0 = lambda01*r01[dir] + lambda02*r02[dir];
+            double impulse1 = -lambda01*r01[dir];
+            double impulse2 = -lambda02*r02[dir];
 
-        Kokkos::atomic_fetch_add(&f(atom0,0), -lambda01*r01[0] - lambda02*r02[0]);
-        Kokkos::atomic_fetch_add(&f(atom0,1), -lambda01*r01[1] - lambda02*r02[1]);
-        Kokkos::atomic_fetch_add(&f(atom0,2), -lambda01*r01[2] - lambda02*r02[2]);
+            x(atom0, dir) = trial_x(atom0, dir) + m0_inv * impulse0;
+            x(atom1, dir) = trial_x(atom1, dir) + m1_inv * impulse1;
+            x(atom2, dir) = trial_x(atom2, dir) + m2_inv * impulse2;
+            x(atom0, dir) -= L[dir] * floor(x(atom0, dir) / L[dir]);
+            x(atom1, dir) -= L[dir] * floor(x(atom1, dir) / L[dir]);
+            x(atom2, dir) -= L[dir] * floor(x(atom2, dir) / L[dir]);
 
-        Kokkos::atomic_fetch_add(&f(atom1,0), lambda01*r01[0]);
-        Kokkos::atomic_fetch_add(&f(atom1,1), lambda01*r01[1]);
-        Kokkos::atomic_fetch_add(&f(atom1,2), lambda01*r01[2]);
-
-        Kokkos::atomic_fetch_add(&f(atom2,0), lambda02*r02[0]);
-        Kokkos::atomic_fetch_add(&f(atom2,1), lambda02*r02[1]);
-        Kokkos::atomic_fetch_add(&f(atom2,2), lambda02*r02[2]);
+            p(atom0, dir) += impulse0 / dt;
+            p(atom1, dir) += impulse1 / dt;
+            p(atom2, dir) += impulse2 / dt;
+        }
         }
     );
     Kokkos::fence();
@@ -422,8 +428,9 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
     auto& max_iter              = this->max_iter;
     auto& tolerance             = this->tolerance;
     auto& size_3_clusters       = this->size_3_clusters;
-    auto& f                     = particles->f;
     auto& x                     = particles->x;
+    auto& old_x                 = this->old_positions;
+    auto& p                     = particles->p;
     auto& trial_x               = this->trial_positions;
     auto& L                     = particles->L;
     auto& id                    = particles->id;
@@ -431,7 +438,7 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
     auto& bonds                 = particles->bonds_ptr->constrained_bonds;
     auto& bondTypes             = particles->bonds_ptr->bondTypes;
     auto& coeff_x               = particles->coeff_x;  // Inverse mass lookup table
-    double dt_2 = this->dt * this->dt;
+    double dt = this->dt;
     Kokkos::parallel_for(
     "SHAKE_size_2_cluster_update",
     Kokkos::RangePolicy<>(0, size_3_clusters.extent(0)),
@@ -492,29 +499,29 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
 
         // current distances
         double r01[3];
-        r01[0] = x(atom0, 0) - x(atom1, 0);
+        r01[0] = old_x(atom0, 0) - old_x(atom1, 0);
         r01[0] -= int(r01[0] * inverse_halved_L[0]) * L[0];
-        r01[1] = x(atom0, 1) - x(atom1, 1);
+        r01[1] = old_x(atom0, 1) - old_x(atom1, 1);
         r01[1] -= int(r01[1] * inverse_halved_L[1]) * L[1];
-        r01[2] = x(atom0, 2) - x(atom1, 2);
+        r01[2] = old_x(atom0, 2) - old_x(atom1, 2);
         r01[2] -= int(r01[2] * inverse_halved_L[2]) * L[2];
         double r01_sq = r01[0]*r01[0]+r01[1]*r01[1]+r01[2]*r01[2];
 
         double r02[3];
-        r02[0] = x(atom0, 0) - x(atom2, 0);
+        r02[0] = old_x(atom0, 0) - old_x(atom2, 0);
         r02[0] -= int(r02[0] * inverse_halved_L[0]) * L[0];
-        r02[1] = x(atom0, 1) - x(atom2, 1);
+        r02[1] = old_x(atom0, 1) - old_x(atom2, 1);
         r02[1] -= int(r02[1] * inverse_halved_L[1]) * L[1];
-        r02[2] = x(atom0, 2) - x(atom2, 2);
+        r02[2] = old_x(atom0, 2) - old_x(atom2, 2);
         r02[2] -= int(r02[2] * inverse_halved_L[2]) * L[2];
         double r02_sq = r02[0]*r02[0]+r02[1]*r02[1]+r02[2]*r02[2];
 
         double r03[3];
-        r03[0] = x(atom0, 0) - x(atom3, 0);
+        r03[0] = old_x(atom0, 0) - old_x(atom3, 0);
         r03[0] -= int(r03[0] * inverse_halved_L[0]) * L[0];
-        r03[1] = x(atom0, 1) - x(atom3, 1);
+        r03[1] = old_x(atom0, 1) - old_x(atom3, 1);
         r03[1] -= int(r03[1] * inverse_halved_L[1]) * L[1];
-        r03[2] = x(atom0, 2) - x(atom3, 2);
+        r03[2] = old_x(atom0, 2) - old_x(atom3, 2);
         r03[2] -= int(r03[2] * inverse_halved_L[2]) * L[2];
         double r03_sq = r03[0]*r03[0]+r03[1]*r03[1]+r03[2]*r03[2];
 
@@ -647,27 +654,26 @@ void VELOCITY_VERLET_SHAKE::SHAKE_size_3_cluster() {
             niter++;
         }
         
-        // Scale lambda appropriately
-        lambda01 /= dt_2;
-        lambda02 /= dt_2;
-        lambda03 /= dt_2;
+        for (int dir = 0; dir < 3; dir++) {
+            double impulse0 = lambda01*r01[dir] + lambda02*r02[dir] + lambda03*r03[dir];
+            double impulse1 = -lambda01*r01[dir];
+            double impulse2 = -lambda02*r02[dir];
+            double impulse3 = -lambda03*r03[dir];
 
-        // apply constraint forces
-        Kokkos::atomic_fetch_add(&f(atom0,0), -lambda01*r01[0] - lambda02*r02[0] - lambda03*r03[0]);
-        Kokkos::atomic_fetch_add(&f(atom0,1), -lambda01*r01[1] - lambda02*r02[1] - lambda03*r03[1]);
-        Kokkos::atomic_fetch_add(&f(atom0,2), -lambda01*r01[2] - lambda02*r02[2] - lambda03*r03[2]);
+            x(atom0, dir) = trial_x(atom0, dir) + m0_inv * impulse0;
+            x(atom1, dir) = trial_x(atom1, dir) + m1_inv * impulse1;
+            x(atom2, dir) = trial_x(atom2, dir) + m2_inv * impulse2;
+            x(atom3, dir) = trial_x(atom3, dir) + m3_inv * impulse3;
+            x(atom0, dir) -= L[dir] * floor(x(atom0, dir) / L[dir]);
+            x(atom1, dir) -= L[dir] * floor(x(atom1, dir) / L[dir]);
+            x(atom2, dir) -= L[dir] * floor(x(atom2, dir) / L[dir]);
+            x(atom3, dir) -= L[dir] * floor(x(atom3, dir) / L[dir]);
 
-        Kokkos::atomic_fetch_add(&f(atom1,0), lambda01*r01[0]);
-        Kokkos::atomic_fetch_add(&f(atom1,1), lambda01*r01[1]);
-        Kokkos::atomic_fetch_add(&f(atom1,2), lambda01*r01[2]);
-
-        Kokkos::atomic_fetch_add(&f(atom2,0), lambda02*r02[0]);
-        Kokkos::atomic_fetch_add(&f(atom2,1), lambda02*r02[1]);
-        Kokkos::atomic_fetch_add(&f(atom2,2), lambda02*r02[2]);
-
-        Kokkos::atomic_fetch_add(&f(atom3,0), lambda03*r03[0]);
-        Kokkos::atomic_fetch_add(&f(atom3,1), lambda03*r03[1]);
-        Kokkos::atomic_fetch_add(&f(atom3,2), lambda03*r03[2]);
+            p(atom0, dir) += impulse0 / dt;
+            p(atom1, dir) += impulse1 / dt;
+            p(atom2, dir) += impulse2 / dt;
+            p(atom3, dir) += impulse3 / dt;
+        }
         }
     );
 }
@@ -683,22 +689,8 @@ void VELOCITY_VERLET_SHAKE::apply_RATTLE() {
 
 void VELOCITY_VERLET_SHAKE::generate_trial_momenta() {
     auto& p = particles->p;
-    auto& f = particles->f;
-    auto& c = particles->coeff_p;
-    auto& dt = this->dt;
     this->trial_momenta = Kokkos::View<double*[3]>("trial_momenta",particles->N);
     Kokkos::deep_copy(trial_momenta,p);
-    auto& trial_momenta = this->trial_momenta;
-    // do an unconstrained update on all positions
-    Kokkos::parallel_for(
-        "RATTLE_unconstrained_update",
-        Kokkos::RangePolicy<>(0, trial_momenta.extent(0)),
-        KOKKOS_LAMBDA(const int i) {
-            trial_momenta(i, 0) -= 0.5*dt * c * f(i, 0);
-            trial_momenta(i, 1) -= 0.5*dt * c * f(i, 1);
-            trial_momenta(i, 2) -= 0.5*dt * c * f(i, 2);
-        }
-    );
     Kokkos::fence();
 }
 
@@ -752,16 +744,15 @@ void VELOCITY_VERLET_SHAKE::RATTLE_size_1_cluster() {
         double A = (rvec[0]*pvec[0]+rvec[1]*pvec[1]+rvec[2]*pvec[2]);
         double B = r2 * (m1_inv+m2_inv);
 
-        double lambda = A/B;
+        double lambda = -A/B;
 
-        // apply update to forces
-        Kokkos::atomic_fetch_add(&p(atom1,0),  lambda * rvec[0] * m1_inv);
-        Kokkos::atomic_fetch_add(&p(atom1,1),  lambda * rvec[1] * m1_inv);
-        Kokkos::atomic_fetch_add(&p(atom1,2),  lambda * rvec[2] * m1_inv);
+        Kokkos::atomic_fetch_add(&p(atom1,0),  lambda * rvec[0]);
+        Kokkos::atomic_fetch_add(&p(atom1,1),  lambda * rvec[1]);
+        Kokkos::atomic_fetch_add(&p(atom1,2),  lambda * rvec[2]);
 
-        Kokkos::atomic_fetch_add(&p(atom2,0), -lambda * rvec[0] * m2_inv);
-        Kokkos::atomic_fetch_add(&p(atom2,1), -lambda * rvec[1] * m2_inv);
-        Kokkos::atomic_fetch_add(&p(atom2,2), -lambda * rvec[2] * m2_inv);
+        Kokkos::atomic_fetch_add(&p(atom2,0), -lambda * rvec[0]);
+        Kokkos::atomic_fetch_add(&p(atom2,1), -lambda * rvec[1]);
+        Kokkos::atomic_fetch_add(&p(atom2,2), -lambda * rvec[2]);
         }
     );
 }
