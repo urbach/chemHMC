@@ -103,8 +103,6 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     } else {
         Kokkos::abort("Since x is initialized via the start_conf_file, one has to be provided for now");
     }
-    std::string simulation_type = check_and_assign_value<std::string>(doc, "simulation_type");
-    if (simulation_type == "MD") MD = true;
 
     // Read number of particles from the starting configuration
     std::ifstream xyz_file(params_ptr->nameout);

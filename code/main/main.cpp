@@ -15,12 +15,15 @@ int main(int argc, char** argv) {
         HMC_class HMC;
         HMC.init(argc, argv);
         
-        if (!HMC.MD) {
+        if (HMC.simulation_type == SimulationType::HMC) {
             printf("Starting HMC run.\n");
             HMC.run();
-        } else {
+        } else if (HMC.simulation_type == SimulationType::MD){
             printf("Starting MD run.\n");
             HMC.run_MD();
+        } else if (HMC.simulation_type == SimulationType::VolumeMoveHMC){
+            printf("Starting HMC run with volume MC moves.\n");
+            HMC.run_VolumeMoveHMC();
         }
         printf("total kokkos time = %f s\n", timer.seconds());
     }

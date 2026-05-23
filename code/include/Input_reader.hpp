@@ -18,7 +18,6 @@ public:
     void parse_input(int argc, char** argv);
 
     YAML::Node doc;
-    bool MD = false;
     bool UseNeighborList = false;
 
 private:

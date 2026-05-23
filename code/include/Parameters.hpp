@@ -7,6 +7,8 @@ struct params_class {
   double L[dim_space];
   double inverse_L[dim_space];
   double inverse_halved_L[dim_space];
+  double pressure; // Input pressure in atmospheres
+  double volume_step; // Max step size for volume moves
   int Ntrajectories;
   int thermalization_steps;
   int save_every;

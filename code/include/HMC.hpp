@@ -8,6 +8,8 @@
 #include "Calc_Manager.hpp"
 #include <random>
 
+enum class SimulationType {None, HMC, MD, VolumeMoveHMC};
+
 class HMC_class {
 public:
     integrator_type* integrator;
@@ -18,7 +20,7 @@ public:
     int acceptance = 0;
     bool randomize_traj = false;
     YAML::Node doc;
-    bool MD = false;
+    SimulationType simulation_type = SimulationType::None;
     bool UseNeighborList = false;
     // we need a random generator on the host for the accept/reject
     std::mt19937_64 gen64;
@@ -31,6 +33,7 @@ public:
 
     void run();
     void run_MD();
+    void run_VolumeMoveHMC();
     double gen_random();
 };
 #endif // !HMC_H
