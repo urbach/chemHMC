@@ -20,9 +20,10 @@ particles:
 LJ:
   cutoff: 12.0
   algorithm: verlet_list
+  shift_potential:
 
 integrator:
-  name: GENERAL
+  name: LEAP
   dt: 1.0
   steps: 1
   cycles: 2

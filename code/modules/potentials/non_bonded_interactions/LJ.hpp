@@ -38,7 +38,7 @@ private:
 
 class LJ_verlet : public Calc {
 public:
-    LJ_verlet() = default;
+    LJ_verlet(YAML::Node doc);
     ~LJ_verlet() override = default;
 
     void init(const particles_instance& particles) override;
@@ -54,6 +54,13 @@ private:
     Kokkos::View<double**> sigma_mat; ///< matrix containing the LJ_sigma parameters
     Kokkos::View<double**>::HostMirror h_epsilon_mat; ///< host mirror of epsilon_mat
     Kokkos::View<double**>::HostMirror h_sigma_mat; ///< host mirror of sigma_mat
+
+    /// If shifted potential is requested
+    bool shift_potential = false;
+    Kokkos::View<double**> shift_mat; ///< matrix containing the shift values for the potential
+    Kokkos::View<double**>::HostMirror h_shift_mat; ///< host mirror of shift_mat
+
+    void compute_potential_shifts(double cutoff_squared);
 
     double L[dim_space];
     double inverse_L[dim_space];

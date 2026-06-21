@@ -459,7 +459,7 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         }
         else if (algorithm.compare("verlet_list") == 0) {
             particles_ptr->algorithm = "verlet_list";
-            std::shared_ptr<Calc> ljCalc = std::make_shared<LJ_verlet>();
+            std::shared_ptr<Calc> ljCalc = std::make_shared<LJ_verlet>(doc);
             particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
             particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
             calc_manager_ptr->addCalc(ljCalc);

@@ -2,9 +2,9 @@ parameter_file: parameters.inp
 start_configuration_file: argon.xyz
 output_file: argon.xyz
 seed: 123
-Ntrajectories: 1000 
+Ntrajectories: 400000 
 thermalization_steps: 0
-save_every: 10000
+save_every: 10000000
 print_info_every: 100
 simulation_type: MD
 
@@ -20,10 +20,11 @@ particles:
 LJ:
   cutoff: 12.0
   algorithm: verlet_list
+  shift_potential:
 
 integrator:
-  name: GENERAL
-  dt: 1.0
+  name: LEAP
+  dt: 0.5
   steps: 1
   cycles: 2
   a: [0.61363334499325854129, 0.38636665500674145871, 0.38636665500674145871, 0.61363334499325854129]

@@ -159,6 +159,24 @@ void LJ::force(const particles_instance& particles, type_f& f) {
 //       VERLET LIST        //
 //////////////////////////////
 
+LJ_verlet::LJ_verlet(YAML::Node doc) {
+    if (doc["LJ"]["shift_potential"]) shift_potential = true;
+}
+
+void LJ_verlet::compute_potential_shifts(double cutoff_squared) {
+    for (size_t i = 0; i < h_shift_mat.extent(0); ++i) {
+        for (size_t j = 0; j < h_shift_mat.extent(1); ++j) {
+            const double sigma = h_sigma_mat(i, j);
+            const double epsilon = h_epsilon_mat(i, j);
+            const double sr2 = sigma * sigma / cutoff_squared;
+            const double sr6 = sr2 * sr2 * sr2;
+            // factor of 4 is added later in potential()
+            h_shift_mat(i, j) = epsilon * sr6 * (sr6 - 1.0);
+        }
+    }
+    Kokkos::deep_copy(shift_mat, h_shift_mat);
+}
+
 void LJ_verlet::init(const particles_instance& particles) {
     std::cout << particles.N << std::endl;
     h_epsilon_mat = particles.h_epsilon_mat;
@@ -169,6 +187,13 @@ void LJ_verlet::init(const particles_instance& particles) {
     // Copy data from host to device memory so its accessible in the kernel
     Kokkos::deep_copy(epsilon_mat, h_epsilon_mat); 
     Kokkos::deep_copy(sigma_mat, h_sigma_mat);
+
+    // If shift mat is requested we set it up now and compute its values
+    if (shift_potential) {
+        shift_mat = Kokkos::View<double**>("h_LJ_shift_mat", particles.h_sigma_mat.extent(0), particles.h_sigma_mat.extent(1));
+        h_shift_mat = Kokkos::create_mirror(shift_mat);
+        compute_potential_shifts(particles.cutoff_squared);
+    }
     L[0] = particles.L[0];
     L[1] = particles.L[1];
     L[2] = particles.L[2];
@@ -196,6 +221,7 @@ double LJ_verlet::potential(const particles_instance& particles) {
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
+    auto& shift_mat = this->shift_mat;
 
     // Outer parallel_reduce
     Kokkos::parallel_reduce(
@@ -233,6 +259,7 @@ double LJ_verlet::potential(const particles_instance& particles) {
                         double sr2 = sigma * sigma / r2;
                         double sr6 = sr2 * sr2 * sr2;
                         innerV += epsilon * sr6 * (sr6 - 1.0);
+                        if (shift_potential) innerV -= shift_mat(type_i, type_j);
                     }
                 },
                 tmpV);
