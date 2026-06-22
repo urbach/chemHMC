@@ -64,6 +64,7 @@ public:
 
     // file interaction
     void print_xyz(params_class params, int traj, double K, double V);
+    void print_deltaE(params_class params, int traj, double K, double V, double deltaE);
     void print_force(params_class params, int traj);
 
     // initialization related stuff

@@ -132,6 +132,10 @@ void particles_instance::print_xyz(params_class params, int traj, double K, doub
         fprintf(params.fileout, "%s  %-20.12g %-20.12g %-20.12g\n", label_xyz[i].c_str(), h_x(i, 0), h_x(i, 1), h_x(i, 2));
 }
 
+void particles_instance::print_deltaE(params_class params, int traj, double K, double V, double deltaE) {
+    fprintf(params.fileout, "trajectory= %d  kinetic_energy= %.12g  potential= %.12g  deltaE= %.12g\n", traj, K, V, deltaE);
+}
+
 void particles_instance::print_force(params_class params, int traj) {
     fprintf(params.fileout, "     %d\n", N);
     fprintf(params.fileout, "trajectory= %d  FORCES\n", traj);

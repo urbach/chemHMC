@@ -21,7 +21,6 @@ void GENERAL::integrate() {
             particles->neighbor_list->build_verlet_list(*particles);
         }
     }
-    
     // Rest of the chain (n-1 steps)
     for (size_t i = 0; i < steps - 1; i++) {
         // Momenta step
@@ -48,5 +47,5 @@ void GENERAL::integrate() {
     // Final momenta step
     calc_manager->compute_force();
     Kokkos::fence();
-    particles->update_momenta(dt * a[-1]);
+    particles->update_momenta(dt * a.back());
 }
