@@ -143,8 +143,6 @@ void Input_reader::parse_integrator_options(YAML::Node& doc) {
     } else {
         throw std::runtime_error("Error: No integrator specified in input file.");
     }
-    integrator_ptr->dt = check_and_assign_value<double>(doc["integrator"], "dt");
-    integrator_ptr->steps = check_and_assign_value<int>(doc["integrator"], "steps");
     integrator_ptr->particles = particles_ptr;
 }
 

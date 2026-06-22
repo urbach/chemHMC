@@ -5,6 +5,8 @@
 #include "particles.hpp"
 
 integrator_type::integrator_type(YAML::Node doc, params_class params) {
+    steps = check_and_assign_value<int>(doc["integrator"], "steps");
+    dt = check_and_assign_value<double>(doc["integrator"], "dt");
 }
 
 void integrator_type::set_calc_manager(Calc_Manager& calc_manager_ref) {

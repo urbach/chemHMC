@@ -17,6 +17,8 @@ OMF4::OMF4(YAML::Node doc, params_class params) :
 void OMF4::integrate() {
 
     // initial half-step for the momenta
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(0.5 * eps[9]);
 
     // nsteps-1 full steps
@@ -24,15 +26,23 @@ void OMF4::integrate() {
         for (size_t j = 0; j < 5; j++) {
             particles->update_positions(eps[2 * j]);
             particles->neighbor_list->build_verlet_list(*particles);
+            calc_manager->compute_force();
+            Kokkos::fence();
             particles->update_momenta(eps[2 * j + 1]);
         }
     }
     // almost one more full step
     for (size_t j = 0; j < 4; j++) {
         particles->update_positions(eps[2 * j]);
+        particles->neighbor_list->build_verlet_list(*particles);
+        calc_manager->compute_force();
+        Kokkos::fence();
         particles->update_momenta(eps[2 * j + 1]);
     }
     particles->update_positions(eps[8]);
+    particles->neighbor_list->build_verlet_list(*particles);
     // final half-step in the momenta
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(0.5 * eps[9]);
 }
