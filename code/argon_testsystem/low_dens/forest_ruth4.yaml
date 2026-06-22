@@ -1,6 +1,6 @@
 parameter_file: parameters.inp
 start_configuration_file: argon.xyz
-output_file: argon.xyz
+output_file: argon_test.xyz
 seed: 123
 Ntrajectories: 400000 
 thermalization_steps: 0
@@ -23,6 +23,9 @@ LJ:
   shift_potential:
 
 integrator:
-  name: LEAP
-  dt: 0.5
+  name: GENERAL
+  dt: 0.01
   steps: 1
+  cycles: 3
+  a: [0.6756035959798288, -0.17560359597982886, -0.17560359597982886, 0.6756035959798288]
+  b: [1.3512071919596575, -1.7024143839193153, 1.3512071919596575]
