@@ -5,7 +5,7 @@ seed: 123
 Ntrajectories: 400000 
 thermalization_steps: 0
 save_every: 10000000
-print_info_every: 100
+print_info_every: 1
 simulation_type: MD
 
 geometry: 
@@ -23,6 +23,6 @@ LJ:
   shift_potential:
 
 integrator:
-  name: LEAP
-  dt: 0.5
+  name: OMF4
+  dt: 0.1
   steps: 1

@@ -16,7 +16,7 @@ geometry:
 particles:
   MaxNeighbors: 450
   temperature: 300.0
-  
+
 LJ:
   cutoff: 12.0
   algorithm: verlet_list
@@ -24,7 +24,7 @@ LJ:
 
 integrator:
   name: GENERAL
-  dt: 0.01
+  dt: 10.0
   steps: 1
   cycles: 3
   a: [0.6756035959798288, -0.17560359597982886, -0.17560359597982886, 0.6756035959798288]

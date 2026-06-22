@@ -1,10 +1,10 @@
 parameter_file: parameters.inp
 start_configuration_file: argon.xyz
-output_file: argon_test.xyz
+output_file: argon_dt-0.001_leapfrog.xyz
 seed: 123
-Ntrajectories: 400000 
+Ntrajectories: 10000000
 thermalization_steps: 0
-save_every: 10000000
+save_every: 1
 print_info_every: 100
 simulation_type: MD
 
@@ -16,7 +16,7 @@ geometry:
 particles:
   MaxNeighbors: 450
   temperature: 300.0
-  
+
 LJ:
   cutoff: 12.0
   algorithm: verlet_list
@@ -24,7 +24,7 @@ LJ:
 
 integrator:
   name: GENERAL
-  dt: 10.0
+  dt: 0.001
   steps: 1
   cycles: 1
   a: [0.5, 0.5]

@@ -1,11 +1,11 @@
 parameter_file: parameters.inp
 start_configuration_file: argon.xyz
-output_file: argon_dt-0.01_omelyan2.xyz
+output_file: argon_test.xyz
 seed: 123
-Ntrajectories: 1000000
+Ntrajectories: 400000 
 thermalization_steps: 0
-save_every: 1
-print_info_every: 1000
+save_every: 10000000
+print_info_every: 100
 simulation_type: MD
 
 geometry: 
@@ -24,8 +24,8 @@ LJ:
 
 integrator:
   name: GENERAL
-  dt: 0.01
+  dt: 1.0
   steps: 1
-  cycles: 2
-  a: [0.1931833275037703, 0.6136333449924594, 0.1931833275037703]
-  b: [0.5, 0.5]
+  cycles: 4
+  a: [0.17861737035228015, -0.0662687622691261, 0.7753027838336919, -0.0662687622691261, 0.17861737035228015]
+  b: [0.7123304664993196, -0.21233046649931964, -0.21233046649931964, 0.7123304664993196]
