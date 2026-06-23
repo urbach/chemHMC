@@ -1,0 +1,28 @@
+parameter_file: parameters.inp
+start_configuration_file: argon.xyz
+output_file: argon.xyz
+seed: 123
+Ntrajectories: 400000 
+thermalization_steps: 0
+save_every: 10000000
+print_info_every: 1
+simulation_type: MD
+
+geometry: 
+  Lx: 100.0
+  Ly: 100.0
+  Lz: 100.0
+
+particles:
+  MaxNeighbors: 450
+  temperature: 300.0
+  
+LJ:
+  cutoff: 12.0
+  algorithm: verlet_list
+  shift_potential:
+
+integrator:
+  name: OMF2
+  dt: 0.05
+  steps: 1

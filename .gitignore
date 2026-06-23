@@ -65,7 +65,6 @@ code/builds/qbig_pascal/*
 
 code/argon_testsystem/Data/
 code/argon_testsystem/Plots/
-code/argon_testsystem/Input_files/
 code/argon_testsystem/low_dens/leapfrog2/
 code/argon_testsystem/low_dens/omelyan2/
 code/argon_testsystem/low_dens/forest_ruth4/
