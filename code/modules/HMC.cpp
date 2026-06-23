@@ -127,19 +127,18 @@ void HMC_class::run_MD() {
         if ((i % params->print_info_every == 0)) {
             double Vf = calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();
-            printf("step %d: deltaK = %.12g  deltaV = %.12g deltaH = %.12g \n", i, fabs(Kf - Ki), fabs(Vf - Vi), fabs((Kf + Vf) - (K_initial + V_initial)));
+            printf("trajectory = %d: deltaE = %.12g\n", i, fabs((Kf + Vf) - (K_initial + V_initial)));
         }
         Kokkos::fence();
         if ((i % params->save_every == 0)) {
             double Vf = calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
-            integrator->particles->print_deltaE(*params, i, Kf, Vf, (Kf + Vf) - (K_initial + V_initial));
+            integrator->particles->print_deltaE(*params, i, fabs((Kf + Vf) - (K_initial + V_initial)));
         }
     }
     double K_last = integrator->particles->compute_kinetic_E();
     double V_last = calc_manager->compute_potential();
-    printf("Hdiff: %e\n", fabs((K_last + V_last) - (K_initial + V_initial)));
     printf("time for MD: %g  s\n", timer.seconds());
     calc_manager->print_timings();
 }
