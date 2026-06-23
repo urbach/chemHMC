@@ -1,8 +1,8 @@
 parameter_file: parameters.inp
 start_configuration_file: argon.xyz
-output_file: argon_dt-0.01_omelyan2.xyz
+output_file: argon_dt-50.0_omelyan2.xyz
 seed: 123
-Ntrajectories: 1000000
+Ntrajectories: 5000
 thermalization_steps: 0
 save_every: 1
 print_info_every: 1000
@@ -24,7 +24,7 @@ LJ:
 
 integrator:
   name: GENERAL
-  dt: 0.01
+  dt: 50.0
   steps: 1
   cycles: 2
   a: [0.1931833275037703, 0.6136333449924594, 0.1931833275037703]

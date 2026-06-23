@@ -62,3 +62,11 @@ code/builds/qbig_pascal/*
 !code/builds/qbig_pascal/load_modules_qbig_pascal.sh
 !code/builds/qbig_pascal/do_cmake_pascal.sh
 !code/builds/qbig_pascal/scr.sh
+
+code/argon_testsystem/Data/
+code/argon_testsystem/Plots/
+code/argon_testsystem/Input_files/
+code/argon_testsystem/low_dens/leapfrog2/
+code/argon_testsystem/low_dens/omelyan2/
+code/argon_testsystem/low_dens/forest_ruth4/
+code/argon_testsystem/low_dens/OMF4/

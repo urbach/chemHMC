@@ -1,0 +1,46 @@
+# Figure Properties
+figure.figsize: 5.5, 3.5
+
+# font stuff
+text.usetex: True
+font.family: sans-serif
+font.size: 12
+
+# axes stuff
+axes.titlesize: 12
+axes.titley: 1.05
+axes.labelsize: 10
+xtick.labelsize: 10
+ytick.labelsize: 10
+legend.fontsize: 10
+figure.titlesize: 14
+
+# tick stuff
+xtick.major.size: 4
+xtick.major.width: 1
+xtick.minor.size: 4
+xtick.minor.width: 1
+
+ytick.major.size: 4
+ytick.major.width: 1
+ytick.minor.size: 4
+ytick.minor.width: 1
+
+xtick.top: True
+xtick.direction: in
+ytick.right: True
+ytick.direction: in
+
+
+# colors
+axes.prop_cycle: cycler(color=['008fd5', 'fc4f30', 'e5ae38', '6d904f', '8b8b8b', '810f7c', '0edb99', 'd54600', '2fdcfc', '376ee5', '714f90', '0f8113', 'da0e4f', '3cbeff', '004a6f', '008ed5', 'fda494'])
+
+# grid
+axes.grid: True
+grid.alpha: 0.3
+grid.linestyle: -
+grid.linewidth: 0.5
+
+# Lines properties
+lines.linewidth: 1
+errorbar.capsize: 3

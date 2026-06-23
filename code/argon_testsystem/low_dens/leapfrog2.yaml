@@ -1,8 +1,8 @@
 parameter_file: parameters.inp
 start_configuration_file: argon.xyz
-output_file: argon_dt-0.001_leapfrog.xyz
+output_file: argon_test.xyz
 seed: 123
-Ntrajectories: 10000000
+Ntrajectories: 100000
 thermalization_steps: 0
 save_every: 1
 print_info_every: 100
@@ -24,7 +24,7 @@ LJ:
 
 integrator:
   name: GENERAL
-  dt: 0.001
+  dt: 1.0
   steps: 1
   cycles: 1
   a: [0.5, 0.5]
