@@ -19,6 +19,8 @@ void OMF4::integrate() {
     // initial half-step for the momenta
     calc_manager->compute_force();
     Kokkos::fence();
+    calc_manager->compute_force();
+    Kokkos::fence();
     particles->update_momenta(0.5 * eps[9]);
 
     // nsteps-1 full steps
