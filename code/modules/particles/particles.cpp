@@ -133,7 +133,7 @@ void particles_instance::print_xyz(params_class params, int traj, double K, doub
 }
 
 void particles_instance::print_deltaE(params_class params, int traj, double deltaE) {
-    fprintf(params.fileout, "trajectory = %d: deltaE= %.12g\n", traj, deltaE);
+    fprintf(params.fileout, "trajectory %d: deltaE = %.12g\n", traj, deltaE);
 }
 
 void particles_instance::print_force(params_class params, int traj) {
