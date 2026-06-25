@@ -56,16 +56,20 @@ def plot_cost(schemes, savefile):
   for scheme in schemes:
     dts = scheme["dts"]
     stdEs = np.zeros(len(dts))
+    maxEs = np.zeros(len(dts))
     for i, dt in enumerate(dts):
       filename = scheme["data_dir"] + f"{dt}.xyz"
       trajectories, deltaE = get_data(filename)
       stdEs[i] = np.std(deltaE)
+      maxEs[i] = np.max(np.abs(deltaE))
 
     q = scheme["cycles"]
-    ax.plot(q/dts, stdEs, color=scheme["color"], linewidth=2.0, linestyle=scheme["style"], label=scheme["label"])
+    #ax.plot(q/dts, stdEs, color=scheme["color"], linewidth=2.0, linestyle=scheme["style"], label=scheme["label"])
+    ax.plot(q/dts, maxEs, color=scheme["color"], linewidth=2.0, linestyle=scheme["style"], label=scheme["label"])
   
   ax.set_xlabel(r"$\textrm{Cost, } \frac{q}{dt}$")
-  ax.set_ylabel(r"$\textrm{RMSE of } \Delta E$")
+  #ax.set_ylabel(r"$\textrm{RMSE of } \Delta E$")
+  ax.set_ylabel(r"$\textrm{max} (| \Delta E |) $")
   ax.set_xscale("log")
   ax.set_yscale("log")
 
