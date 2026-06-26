@@ -8,7 +8,7 @@
 #include <iomanip>
 #include "yaml-cpp/yaml.h"
 #include "global.hpp"
-#include "bonds.hpp"
+#include "../modules/potentials/molecules/bonds.hpp"
 #include "Parameters.hpp"
 #include "../modules/neighbor_list/Neighbor_list.hpp"
 #include <Kokkos_Core.hpp>
@@ -25,8 +25,8 @@ public:
     int seed;
     double coeff_p;
     double L[dim_space];
-    double inverse_L[dim_space];
-    double inverse_halved_L[dim_space];
+    double inverse_L[dim_space];    // 1/L
+    double inverse_halved_L[dim_space]; // 2/L
     double beta;
     double sbeta;// sqrt(beta)
     double cutoff;

@@ -20,15 +20,6 @@ void LJ::init(const particles_instance& particles) {
     // Copy data from host to device memory so its accessible in the kernel
     Kokkos::deep_copy(epsilon_mat, h_epsilon_mat); 
     Kokkos::deep_copy(sigma_mat, h_sigma_mat);
-    L[0] = particles.L[0];
-    L[1] = particles.L[1];
-    L[2] = particles.L[2];
-    inverse_L[0] = particles.inverse_L[0];
-    inverse_L[1] = particles.inverse_L[1];
-    inverse_L[2] = particles.inverse_L[2];
-    inverse_halved_L[0] = particles.inverse_halved_L[0];
-    inverse_halved_L[1] = particles.inverse_halved_L[1];
-    inverse_halved_L[2] = particles.inverse_halved_L[2];
     cutoff_squared = particles.cutoff_squared;
 }
 
@@ -39,8 +30,8 @@ double LJ::potential(const particles_instance& particles) {
     // functions that are not device safe. This would trigger a lot of compiler warnings.
     auto& x = particles.x;
     auto& id = particles.id;
-    auto& L = this->L;
-    auto& inverse_halved_L = this->inverse_halved_L;
+    auto& L = particles.L;
+    auto& inverse_halved_L = particles.inverse_halved_L;
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
@@ -102,8 +93,8 @@ void LJ::force(const particles_instance& particles, type_f& f) {
     // functions that are not device safe. This would trigger a lot of compiler warnings.
     auto& x = particles.x;
     auto& id = particles.id;
-    auto& L = this->L;
-    auto& inverse_halved_L = this->inverse_halved_L;
+    auto& L = particles.L;
+    auto& inverse_halved_L = particles.inverse_halved_L;
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
@@ -169,15 +160,6 @@ void LJ_verlet::init(const particles_instance& particles) {
     // Copy data from host to device memory so its accessible in the kernel
     Kokkos::deep_copy(epsilon_mat, h_epsilon_mat); 
     Kokkos::deep_copy(sigma_mat, h_sigma_mat);
-    L[0] = particles.L[0];
-    L[1] = particles.L[1];
-    L[2] = particles.L[2];
-    inverse_L[0] = particles.inverse_L[0];
-    inverse_L[1] = particles.inverse_L[1];
-    inverse_L[2] = particles.inverse_L[2];
-    inverse_halved_L[0] = particles.inverse_halved_L[0];
-    inverse_halved_L[1] = particles.inverse_halved_L[1];
-    inverse_halved_L[2] = particles.inverse_halved_L[2];
     cutoff_squared = particles.cutoff_squared;
 }
 
@@ -191,8 +173,8 @@ double LJ_verlet::potential(const particles_instance& particles) {
     auto& id = particles.id;
     auto& verlet_list = particles.neighbor_list->verlet_list;
     auto& neighbour_count = particles.neighbor_list->neighbour_count;
-    auto& L = this->L;
-    auto& inverse_halved_L = this->inverse_halved_L;
+    auto& L = particles.L;
+    auto& inverse_halved_L = particles.inverse_halved_L;
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
@@ -256,8 +238,8 @@ void LJ_verlet::force(const particles_instance& particles, type_f& f) {
     auto& id = particles.id;
     auto& verlet_list = particles.neighbor_list->verlet_list;
     auto& neighbour_count = particles.neighbor_list->neighbour_count;
-    auto& L = this->L;
-    auto& inverse_halved_L = this->inverse_halved_L;
+    auto& L = particles.L;
+    auto& inverse_halved_L = particles.inverse_halved_L;
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;

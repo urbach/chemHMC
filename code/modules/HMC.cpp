@@ -114,7 +114,7 @@ void HMC_class::run_VolumeMoveHMC() {
     double tokcal = 1.0/kcaltointernal;
 
     double P_atm = params->pressure;
-    double atm_to_internal_pressure = 2.558e-11;
+    double atm_to_internal_pressure = 6.10e-9;
     double P_ext = P_atm * atm_to_internal_pressure;
 
     double max_delta_lnV = params->volume_step;
@@ -221,9 +221,16 @@ void HMC_class::run_VolumeMoveHMC() {
         double V_new = V_old * exp(delta_lnV);
         double scale = pow(V_new / V_old, 1.0 / 3.0);
 
+        // set new boxlength parameters
         integrator->particles->L[0] = L_old[0] * scale;
         integrator->particles->L[1] = L_old[1] * scale;
         integrator->particles->L[2] = L_old[2] * scale;
+        integrator->particles->inverse_L[0] = 1/integrator->particles->L[0];
+        integrator->particles->inverse_L[1] = 1/integrator->particles->L[1];
+        integrator->particles->inverse_L[2] = 1/integrator->particles->L[2];
+        integrator->particles->inverse_halved_L[0] = 2*integrator->particles->inverse_L[0];
+        integrator->particles->inverse_halved_L[1] = 2*integrator->particles->inverse_L[1];
+        integrator->particles->inverse_halved_L[2] = 2*integrator->particles->inverse_L[2];
 
         for (size_t a = 0; a < integrator->particles->N; a++) {
             int mol = integrator->particles->h_mol_id(a);
@@ -256,9 +263,16 @@ void HMC_class::run_VolumeMoveHMC() {
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
         }
         else {
+            // restore old boxlength parameters
             integrator->particles->L[0] = L_old[0];
             integrator->particles->L[1] = L_old[1];
             integrator->particles->L[2] = L_old[2];
+            integrator->particles->inverse_L[0] = 1/integrator->particles->L[0];
+            integrator->particles->inverse_L[1] = 1/integrator->particles->L[1];
+            integrator->particles->inverse_L[2] = 1/integrator->particles->L[2];
+            integrator->particles->inverse_halved_L[0] = 2*integrator->particles->inverse_L[0];
+            integrator->particles->inverse_halved_L[1] = 2*integrator->particles->inverse_L[1];
+            integrator->particles->inverse_halved_L[2] = 2*integrator->particles->inverse_L[2];
 
             for (size_t a = 0; a < integrator->particles->N; a++) {
                 integrator->particles->h_x(a, 0) = x_old[3*a + 0];
@@ -280,13 +294,12 @@ void HMC_class::run_VolumeMoveHMC() {
                          * integrator->particles->L[1]
                          * integrator->particles->L[2];
 
-            printf("step %d: K = %.12g  V = %.12g H = %.12g Vol = %.12g rhoN = %.12g exp_mdh = %.12g vol_acc = %.6g\n",
+            printf("step %d: K = %.12g  V = %.12g Lx = %.12g Vol = %.12g exp_mdh = %.12g vol_acc = %.6g\n",
                    i,
                    K_now*tokcal,
                    V_now*tokcal,
-                   (K_now + V_now)*tokcal,
+                   integrator->particles->L[0],
                    V_box,
-                   integrator->particles->N / V_box,
                    exp_mdh,
                    volume_acceptance / double(volume_attempts));
         }

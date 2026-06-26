@@ -12,7 +12,7 @@ set(chemHMC_header
     Parameters.hpp
     particles.hpp
     atom.hpp
-    bonds.hpp
+    ../modules/potentials/molecules/bonds.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_ewald.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_pppm.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_direct.hpp

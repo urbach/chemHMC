@@ -2,7 +2,6 @@
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
 #include "Calc.hpp"
-#include "bonds.hpp"
 #include "../modules/neighbor_list/Neighbor_list.hpp"
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
