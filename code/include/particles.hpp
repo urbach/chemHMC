@@ -33,6 +33,7 @@ public:
     double cutoff_squared;
     std::string name_xyz;
     bool neighbor_list_used = false;
+    int number_of_molecules = 0;
 
     type_x  x;      ///< Kokkos view containing the positions
     type_p  p;      ///< Kokkos view containing the momenta

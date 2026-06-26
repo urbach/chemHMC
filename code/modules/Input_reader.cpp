@@ -338,8 +338,13 @@ void Input_reader::assign_ids() {
             // we also read the molecule ids now
             molecule_id -= 1;
             particles_ptr->h_mol_id(id) = molecule_id;
+            // and save the largest read molecule id + 1 as number of molecules.
+            // We cannot just save the last read molid because the ids might not be sorted.
+            // If there are any mol_ids inbetween 0 and max missing (e.g. deleted molecules from previous run)
+            // the program will just break ;)
+            if (molecule_id > particles_ptr->number_of_molecules) particles_ptr->number_of_molecules = molecule_id;
         }
-
+        particles_ptr->number_of_molecules++; // increment since mol ids are 0-based
         // Verify all assigned
         for (int i = 0; i < particles_ptr->N; ++i) {
             if (particles_ptr->h_id(i) < 0) {

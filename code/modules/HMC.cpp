@@ -132,22 +132,23 @@ void HMC_class::run_VolumeMoveHMC() {
     size_t volume_acceptance = 0;
     size_t volume_attempts = 0;
 
+    // start NPT run 
+    // every cycle attempts a HMC move and then a Volume move
     for (int i = 1; i <= params->Ntrajectories; i++) {
         Kokkos::Timer timer_traj;
 
-        integrator->particles->hb();
+        // HMC move
+        integrator->particles->hb(); // set initial momenta
         double Ki = integrator->particles->compute_kinetic_E();
-
         integrator->integrate();
 
         double Vf = calc_manager->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
-
         double dh = beta * (Kf + Vf - Ki - Vi);
         double exp_mdh = exp(-dh);
-
         Kokkos::fence();
 
+        // accept/reject HMC move
         if (i < params->thermalization_steps) {
             Vi = Vf;
             Ki = Kf;
@@ -167,8 +168,8 @@ void HMC_class::run_VolumeMoveHMC() {
             }
         }
 
+        // Attempt volume move
         volume_attempts++;
-
         double L_old[3] = {
             integrator->particles->L[0],
             integrator->particles->L[1],
@@ -176,26 +177,17 @@ void HMC_class::run_VolumeMoveHMC() {
         };
 
         double V_old = L_old[0] * L_old[1] * L_old[2];
-
         Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
-
         std::vector<double> x_old(3 * integrator->particles->N);
-
         for (size_t a = 0; a < integrator->particles->N; a++) {
             x_old[3*a + 0] = integrator->particles->h_x(a, 0);
             x_old[3*a + 1] = integrator->particles->h_x(a, 1);
             x_old[3*a + 2] = integrator->particles->h_x(a, 2);
         }
 
-        int max_mol_id = -1;
-
-        for (size_t a = 0; a < integrator->particles->N; a++) {
-            if (integrator->particles->h_mol_id(a) > max_mol_id) {
-                max_mol_id = integrator->particles->h_mol_id(a);
-            }
-        }
-
-        size_t n_mol = max_mol_id + 1;
+        // Since this is a constant-N run the number of mols never changes and we can just
+        // set it to the initial value
+        size_t n_mol = integrator->particles->number_of_molecules; 
 
         std::vector<double> com(3 * n_mol, 0.0);
         std::vector<double> mol_mass(n_mol, 0.0);
@@ -249,20 +241,17 @@ void HMC_class::run_VolumeMoveHMC() {
         if (integrator->particles->neighbor_list_used) {
             integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
         }
-
+        // accept/reject volume move
         double V_trial = calc_manager->compute_potential();
-
         double dH_vol = beta * (V_trial - Vi + P_ext * (V_new - V_old))
                       - double(n_mol) * log(V_new / V_old);
-
         double exp_mdH_vol = exp(-dH_vol);
-
-        if (gen_random() < exp_mdH_vol) {
+        if (gen_random() < exp_mdH_vol) { // accept
             volume_acceptance++;
             Vi = V_trial;
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
         }
-        else {
+        else { // reject
             // restore old boxlength parameters
             integrator->particles->L[0] = L_old[0];
             integrator->particles->L[1] = L_old[1];
@@ -279,14 +268,13 @@ void HMC_class::run_VolumeMoveHMC() {
                 integrator->particles->h_x(a, 1) = x_old[3*a + 1];
                 integrator->particles->h_x(a, 2) = x_old[3*a + 2];
             }
-
             Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
-
             if (integrator->particles->neighbor_list_used) {
                 integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
             }
         }
 
+        // print info
         if ((i % params->print_info_every == 0)) {
             double K_now = integrator->particles->compute_kinetic_E();
             double V_now = calc_manager->compute_potential();
@@ -303,7 +291,7 @@ void HMC_class::run_VolumeMoveHMC() {
                    exp_mdh,
                    volume_acceptance / double(volume_attempts));
         }
-
+        // print configuration
         if ((i % params->save_every == 0)) {
             double K_now = integrator->particles->compute_kinetic_E();
             double V_now = calc_manager->compute_potential();
