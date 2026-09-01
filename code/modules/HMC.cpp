@@ -169,7 +169,7 @@ void HMC_class::run_VolumeMoveHMC() {
         }
 
         // Attempt volume move
-        volume_attempts++;
+        if (i >= params->thermalization_steps) volume_attempts++;
         double L_old[3] = {
             integrator->particles->L[0],
             integrator->particles->L[1],
@@ -191,22 +191,36 @@ void HMC_class::run_VolumeMoveHMC() {
 
         std::vector<double> com(3 * n_mol, 0.0);
         std::vector<double> mol_mass(n_mol, 0.0);
+        std::vector<size_t> first_atom(n_mol, integrator->particles->N);
+
+        for (size_t a = 0; a < integrator->particles->N; a++) {
+            int mol = integrator->particles->h_mol_id(a);
+            if (first_atom[mol] == integrator->particles->N) first_atom[mol] = a;
+        }
 
         for (size_t a = 0; a < integrator->particles->N; a++) {
             int mol = integrator->particles->h_mol_id(a);
             int type = integrator->particles->h_id(a);
             double m = integrator->particles->h_atom_type_list(type).mass;
 
-            com[3*mol + 0] += m * integrator->particles->h_x(a, 0);
-            com[3*mol + 1] += m * integrator->particles->h_x(a, 1);
-            com[3*mol + 2] += m * integrator->particles->h_x(a, 2);
+            double dx = integrator->particles->h_x(a, 0) - integrator->particles->h_x(first_atom[mol], 0);
+            double dy = integrator->particles->h_x(a, 1) - integrator->particles->h_x(first_atom[mol], 1);
+            double dz = integrator->particles->h_x(a, 2) - integrator->particles->h_x(first_atom[mol], 2);
+
+            dx -= round(dx / L_old[0]) * L_old[0];
+            dy -= round(dy / L_old[1]) * L_old[1];
+            dz -= round(dz / L_old[2]) * L_old[2];
+
+            com[3*mol + 0] += m * dx;
+            com[3*mol + 1] += m * dy;
+            com[3*mol + 2] += m * dz;
             mol_mass[mol] += m;
         }
 
         for (size_t mol = 0; mol < n_mol; mol++) {
-            com[3*mol + 0] /= mol_mass[mol];
-            com[3*mol + 1] /= mol_mass[mol];
-            com[3*mol + 2] /= mol_mass[mol];
+            com[3*mol + 0] = integrator->particles->h_x(first_atom[mol], 0) + com[3*mol + 0] / mol_mass[mol];
+            com[3*mol + 1] = integrator->particles->h_x(first_atom[mol], 1) + com[3*mol + 1] / mol_mass[mol];
+            com[3*mol + 2] = integrator->particles->h_x(first_atom[mol], 2) + com[3*mol + 2] / mol_mass[mol];
         }
 
         double delta_lnV = max_delta_lnV * (2.0 * gen_random() - 1.0);
@@ -244,10 +258,10 @@ void HMC_class::run_VolumeMoveHMC() {
         // accept/reject volume move
         double V_trial = calc_manager->compute_potential();
         double dH_vol = beta * (V_trial - Vi + P_ext * (V_new - V_old))
-                      - double(n_mol) * log(V_new / V_old);
+                      - double(n_mol + 1) * log(V_new / V_old);
         double exp_mdH_vol = exp(-dH_vol);
         if (gen_random() < exp_mdH_vol) { // accept
-            volume_acceptance++;
+            if (i >= params->thermalization_steps) volume_acceptance++;
             Vi = V_trial;
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
         }
@@ -289,7 +303,7 @@ void HMC_class::run_VolumeMoveHMC() {
                    integrator->particles->L[0],
                    V_box,
                    exp_mdh,
-                   volume_acceptance / double(volume_attempts));
+                   volume_attempts > 0 ? volume_acceptance / double(volume_attempts) : 0.0);
         }
         // print configuration
         if ((i % params->save_every == 0)) {
@@ -301,7 +315,7 @@ void HMC_class::run_VolumeMoveHMC() {
     }
 
     printf("Acceptance: %g\n", acceptance / ((double)(params->Ntrajectories - params->thermalization_steps)));
-    printf("Volume acceptance: %g\n", volume_acceptance / double(volume_attempts));
+    printf("Volume acceptance: %g\n", volume_attempts > 0 ? volume_acceptance / double(volume_attempts) : 0.0);
     printf("time for HMC NPT: %g  s\n", timer.seconds());
     calc_manager->print_timings();
 
