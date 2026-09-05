@@ -154,9 +154,11 @@ bool periodic_com_test()
 bool umbrella_energy_test(particles_instance& particles)
 {
     bool passed = true;
+    double density_conversion = 18.01528e24 / N_A;
     std::string density_output = "/tmp/chemHMC_test_density_cv.out";
     std::string Q6_output = "/tmp/chemHMC_test_Q6_cv.out";
     std::string combined_output = "/tmp/chemHMC_test_combined_cv.out";
+    double written_density = 0.0;
     std::remove(density_output.c_str());
     std::remove(Q6_output.c_str());
     std::remove(combined_output.c_str());
@@ -167,12 +169,14 @@ bool umbrella_energy_test(particles_instance& particles)
             "output_every: 1\n"
             "density:\n"
             "  spring_constant: 20.0\n"
-            "  center: 0.04\n");
+            "  center: 1.2\n");
         Umbrella_Sampling umbrella(config);
         umbrella.init(particles);
-        double difference = umbrella.density - umbrella.density_center;
-        double expected = 0.5 * kB * particles.T * umbrella.density_spring_constant * difference * difference;
+        double difference = umbrella.density * density_conversion - 1.2;
+        double expected = 0.5 * 20.0 * kcaltointernal * difference * difference;
         if (std::abs(umbrella.bias_energy - expected) > 1.0e-14) passed = false;
+        if (std::abs(umbrella.density_center - 1.2 / density_conversion) > 1.0e-14) passed = false;
+        if (std::abs(umbrella.density_spring_constant - 20.0 * kcaltointernal * density_conversion * density_conversion) > 1.0e-14) passed = false;
     }
 
     {
@@ -185,7 +189,7 @@ bool umbrella_energy_test(particles_instance& particles)
         Umbrella_Sampling umbrella(config);
         umbrella.init(particles);
         double difference = umbrella.Q6 - umbrella.Q6_center;
-        double expected = 0.5 * kB * particles.T * umbrella.Q6_spring_constant * difference * difference;
+        double expected = 0.5 * 30.0 * kcaltointernal * difference * difference;
         if (std::abs(umbrella.bias_energy - expected) > 1.0e-14) passed = false;
     }
 
@@ -195,18 +199,18 @@ bool umbrella_energy_test(particles_instance& particles)
             "output_every: 2\n"
             "density:\n"
             "  spring_constant: 20.0\n"
-            "  center: 0.04\n"
+            "  center: 1.2\n"
             "Q6:\n"
             "  spring_constant: 30.0\n"
             "  center: 0.05\n");
         Umbrella_Sampling umbrella(config);
         umbrella.init(particles);
 
-        double density_difference = umbrella.density - umbrella.density_center;
+        double density_difference = umbrella.density * density_conversion - 1.2;
         double Q6_difference = umbrella.Q6 - umbrella.Q6_center;
-        double expected = 0.5 * kB * particles.T
-                        * (umbrella.density_spring_constant * density_difference * density_difference
-                        + umbrella.Q6_spring_constant * Q6_difference * Q6_difference);
+        double expected = 0.5 * kcaltointernal
+                        * (20.0 * density_difference * density_difference
+                        + 30.0 * Q6_difference * Q6_difference);
         if (std::abs(umbrella.bias_energy - expected) > 1.0e-14) passed = false;
 
         double density = umbrella.density;
@@ -227,6 +231,7 @@ bool umbrella_energy_test(particles_instance& particles)
         umbrella.evaluate_volume_trial(particles);
         umbrella.accept_trial();
         if (umbrella.density != trial_density || umbrella.Q6 != Q6 || umbrella.bias_energy != trial_bias_energy) passed = false;
+        written_density = umbrella.density * density_conversion;
 
         umbrella.write_output(1);
         umbrella.write_output(2);
@@ -237,15 +242,25 @@ bool umbrella_energy_test(particles_instance& particles)
 
     std::ifstream output(combined_output);
     std::string line;
-    int line_count = 0;
+    int parameter_header_count = 0;
+    int column_header_count = 0;
+    int data_line_count = 0;
     int field_count = 0;
     while (std::getline(output, line)) {
-        line_count++;
+        if (!line.empty() && line[0] == '#') {
+            if (line == "# density_center(g/cm^3) 1.2 density_spring_constant(kcal/mol/(g/cm^3)^2) 20 Q6_center 0.05 Q6_spring_constant(kcal/mol) 30") parameter_header_count++;
+            if (line == "# step density(g/cm^3) Q6 bias_energy(kcal/mol)") column_header_count++;
+            continue;
+        }
+        data_line_count++;
         std::istringstream values(line);
         double value;
-        while (values >> value) field_count++;
+        while (values >> value) {
+            field_count++;
+            if (field_count == 2 && std::abs(value - written_density) > 1.0e-11) passed = false;
+        }
     }
-    if (line_count != 1 || field_count != 8) passed = false;
+    if (parameter_header_count != 1 || column_header_count != 1 || data_line_count != 1 || field_count != 4) passed = false;
 
     std::remove(density_output.c_str());
     std::remove(Q6_output.c_str());

@@ -32,7 +32,7 @@ public:
     void reject_trial();
     void write_output(int step);
 private:
-    double compute_bias_energy(double density_value, double Q6_value, double temperature) const;
+    double compute_bias_energy(double density_value, double Q6_value) const;
     std::size_t molecule_count = 0;
     CV_Manager cv_manager;
     std::ofstream output;
