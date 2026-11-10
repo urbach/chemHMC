@@ -1,7 +1,7 @@
 #include "SHAKE.hpp"
 
 #include "Input_reader.hpp"
-#include "bonds.hpp"
+#include "../potentials/molecules/bonds.hpp"
 
 
 VELOCITY_VERLET_SHAKE::VELOCITY_VERLET_SHAKE(YAML::Node doc, params_class params): integrator_type(doc, params) {

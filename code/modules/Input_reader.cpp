@@ -2,7 +2,6 @@
 #include "Parameters.hpp"
 #include "Calc_Manager.hpp"
 #include "Calc.hpp"
-#include "bonds.hpp"
 #include "../modules/neighbor_list/Neighbor_list.hpp"
 #include "potentials/non_bonded_interactions/LJ.hpp"
 #include "atom.hpp"
@@ -100,9 +99,9 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     if (doc["start_configuration_file"]) 
     {   // positions may also be read from lammps datafile
         params_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
-    } else {
-        Kokkos::abort("Since x is initialized via the start_conf_file, one has to be provided for now");
-    }
+    }// else {
+    //    Kokkos::abort("Since x is initialized via the start_conf_file, one has to be provided for now");
+    //}
 
     // Read number of particles from the starting configuration
     std::ifstream xyz_file(params_ptr->nameout);
@@ -223,8 +222,10 @@ void Input_reader::parse_particles_options(YAML::Node& doc) {
     particles_ptr->T = check_and_assign_value<double>(doc["particles"], "temperature");
     particles_ptr->beta = 1/(kB*particles_ptr->T);
     particles_ptr->sbeta = sqrt(particles_ptr->beta);
-    particles_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
-
+    if (doc["start_configuration_file"]) 
+    { 
+        particles_ptr->start_configuration_file = check_and_assign_value<std::string>(doc, "start_configuration_file");
+    }
     particles_ptr->L[0] = params_ptr->L[0];
     particles_ptr->L[1] = params_ptr->L[1];
     particles_ptr->L[2] = params_ptr->L[2];
@@ -339,8 +340,13 @@ void Input_reader::assign_ids() {
             // we also read the molecule ids now
             molecule_id -= 1;
             particles_ptr->h_mol_id(id) = molecule_id;
+            // and save the largest read molecule id + 1 as number of molecules.
+            // We cannot just save the last read molid because the ids might not be sorted.
+            // If there are any mol_ids inbetween 0 and max missing (e.g. deleted molecules from previous run)
+            // the program will just break ;)
+            if (molecule_id > particles_ptr->number_of_molecules) particles_ptr->number_of_molecules = molecule_id;
         }
-
+        particles_ptr->number_of_molecules++; // increment since mol ids are 0-based
         // Verify all assigned
         for (int i = 0; i < particles_ptr->N; ++i) {
             if (particles_ptr->h_id(i) < 0) {
@@ -620,7 +626,7 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
     }
 
     if (doc["MBX"]) {
-        std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>();
+        std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>(doc["MBX"]);
         calc_manager_ptr->addCalc(mbxCalc);
         UseNeighborList = false;
     }

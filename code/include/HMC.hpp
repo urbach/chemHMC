@@ -8,6 +8,8 @@
 #include "Calc_Manager.hpp"
 #include <random>
 
+class Umbrella_Sampling;
+
 enum class SimulationType {None, HMC, MD, VolumeMoveHMC};
 
 class HMC_class {
@@ -27,11 +29,13 @@ public:
     params_class* params;
     particles_instance* particles;
     Calc_Manager* calc_manager;
+    Umbrella_Sampling* umbrella_sampling = nullptr;
 
     HMC_class() {};
     void init(int argc, char** argv, bool check_overwrite = true);
 
     void run();
+    void run_umbrella_sampling();
     void run_MD();
     void run_VolumeMoveHMC();
     double gen_random();

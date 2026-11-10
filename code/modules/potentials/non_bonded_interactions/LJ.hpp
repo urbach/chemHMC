@@ -55,9 +55,6 @@ private:
     Kokkos::View<double**>::HostMirror h_epsilon_mat; ///< host mirror of epsilon_mat
     Kokkos::View<double**>::HostMirror h_sigma_mat; ///< host mirror of sigma_mat
 
-    double L[dim_space];
-    double inverse_L[dim_space];
-    double inverse_halved_L[dim_space];
     double cutoff_squared;
 };
 #endif

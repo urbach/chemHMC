@@ -12,13 +12,15 @@ set(chemHMC_header
     Parameters.hpp
     particles.hpp
     atom.hpp
-    bonds.hpp
+    ../modules/potentials/molecules/bonds.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_ewald.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_pppm.hpp
     ../modules/potentials/non_bonded_interactions/coulomb_direct.hpp
     ../modules/potentials/non_bonded_interactions/LJ.hpp
     Calc.hpp
     Calc_Manager.hpp
+    CV_Manager.hpp
+    Umbrella_Sampling.hpp
     ../modules/neighbor_list/Neighbor_list.hpp
     ../modules/potentials/MLIAP/mliap.hpp
     ../modules/potentials/MBX/MBX.hpp
@@ -31,6 +33,8 @@ set(chemHMC_scr
     ../modules/potentials/non_bonded_interactions/coulomb_pppm.cpp
     ../modules/potentials/non_bonded_interactions/coulomb_direct.cpp
     ../modules/Calc_Manager.cpp
+    ../modules/CV_Manager.cpp
+    ../modules/Umbrella_Sampling.cpp
     ../modules/Input_reader.cpp
     ../modules/integrators/integrator_type.cpp
     ../modules/integrators/leapfrog.cpp
