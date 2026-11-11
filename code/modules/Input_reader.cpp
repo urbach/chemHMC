@@ -18,8 +18,10 @@
 #include <algorithm>
 #include <torch/script.h>
 
-Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& calc_manager) 
-                : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), calc_manager_ptr(calc_manager) {
+Input_reader::Input_reader(params_class* params, integrator_type*& integrator,particles_instance*& particles, Calc_Manager*& target_calc_manager
+                            , Calc_Manager*& proposal_calc_manager) 
+                            : params_ptr(params), integrator_ptr(integrator), particles_ptr(particles), target_calc_manager_ptr(target_calc_manager), 
+                            proposal_calc_manager_ptr(proposal_calc_manager) {
     if (!params) {
         throw std::runtime_error("Error: Null pointer passed as params to Input_reader constructor.");
     }
@@ -541,26 +543,29 @@ void Input_reader::read_xyz() {
 }
 
 void Input_reader::populate_calc_list(YAML::Node& doc) {
-    if (doc["LJ"]) {
-        std::string algorithm = check_and_assign_value<std::string>(doc["LJ"], "algorithm");
+    YAML::Node hamiltonian = doc["Hamiltonian"];
+    particles_ptr->cutoff = 0.0;
+    particles_ptr->cutoff_squared = 0.0;
+    if (hamiltonian["LJ"]) {
+        std::string algorithm = check_and_assign_value<std::string>(hamiltonian["LJ"], "algorithm");
         if (algorithm.compare("cutoff") == 0) {
             particles_ptr->algorithm = "cutoff";
             std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
-            particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+            particles_ptr->cutoff = check_and_assign_value<double>(hamiltonian["LJ"], "cutoff");
             particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
-            calc_manager_ptr->addCalc(ljCalc);
+            target_calc_manager_ptr->addCalc(ljCalc);
         }
         else if (algorithm.compare("verlet_list") == 0) {
             particles_ptr->algorithm = "verlet_list";
             std::shared_ptr<Calc> ljCalc = std::make_shared<LJ_verlet>();
-            particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+            particles_ptr->cutoff = check_and_assign_value<double>(hamiltonian["LJ"], "cutoff");
             particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
-            calc_manager_ptr->addCalc(ljCalc);
+            target_calc_manager_ptr->addCalc(ljCalc);
             UseNeighborList = true;
         }
     }
 
-    if (doc["opls"]) {
+    if (hamiltonian["opls"]) {
         auto bonds_ptr = std::make_shared<Bonds>();
         particles_ptr->bonds_ptr = bonds_ptr;
         std::string lammps_data_file;
@@ -568,9 +573,9 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
             lammps_data_file = check_and_assign_value<std::string>(doc, "lammps_data_file");
         } else {lammps_data_file = "data.lmp";}
         read_lammps(bonds_ptr, lammps_data_file);
-        if(!doc["LJ"])
+        if(!hamiltonian["LJ"])
             Kokkos::abort("ERROR: Cannot use OPLS without defining a Lennard-Jones potential!");
-        calc_manager_ptr->addCalc(bonds_ptr);
+        target_calc_manager_ptr->addCalc(bonds_ptr);
         if (doc["integrator"]["constrained_bonds"]) {
             std::string constrained_bonds = check_and_assign_value<std::string>(doc["integrator"], "constrained_bonds");
             std::vector<int> constrained_bond_indices;
@@ -596,46 +601,146 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         }
     }
 
-    if (doc["coulomb"]) {
-        std::string algorithm = check_and_assign_value<std::string>(doc["coulomb"], "algorithm");
+    if (hamiltonian["coulomb"]) {
+        std::string algorithm = check_and_assign_value<std::string>(hamiltonian["coulomb"], "algorithm");
         if (algorithm.compare("ewald") == 0) {
-            auto coulomb_ptr = std::make_shared<Coulomb_ewald>(doc,*params_ptr);
-            calc_manager_ptr->addCalc(coulomb_ptr);
+            auto coulomb_ptr = std::make_shared<Coulomb_ewald>(hamiltonian,*params_ptr);
+            target_calc_manager_ptr->addCalc(coulomb_ptr);
             UseNeighborList = true;
         }
         else if (algorithm.compare("direct") == 0) {
             auto coulomb_ptr = std::make_shared<Coulomb_direct>();
-            calc_manager_ptr->addCalc(coulomb_ptr);
-            coulomb_ptr->r_c = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+            target_calc_manager_ptr->addCalc(coulomb_ptr);
+            coulomb_ptr->r_c = check_and_assign_value<double>(hamiltonian["coulomb"], "cutoff");
             coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
             UseNeighborList = true;
         }
         else if (algorithm.compare("pppm") == 0) {
-            auto coulomb_ptr = std::make_shared<Coulomb_pppm>(doc,*params_ptr);
-            calc_manager_ptr->addCalc(coulomb_ptr);
+            auto coulomb_ptr = std::make_shared<Coulomb_pppm>(hamiltonian,*params_ptr);
+            target_calc_manager_ptr->addCalc(coulomb_ptr);
             UseNeighborList = true;
         }
-        particles_ptr->cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+        particles_ptr->cutoff = check_and_assign_value<double>(hamiltonian["coulomb"], "cutoff");
         particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
     }
 
-    if (doc["MLIAP"]) {
+    if (hamiltonian["MLIAP"]) {
         std::shared_ptr<Calc> mliapCalc = std::make_shared<MLIAP>();
-        calc_manager_ptr->addCalc(mliapCalc);
+        target_calc_manager_ptr->addCalc(mliapCalc);
         UseNeighborList = true;
     }
 
-    if (doc["MBX"]) {
-        std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>(doc["MBX"]);
-        calc_manager_ptr->addCalc(mbxCalc);
-        UseNeighborList = false;
+    if (hamiltonian["MBX"]) {
+        std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>(hamiltonian["MBX"]);
+        target_calc_manager_ptr->addCalc(mbxCalc);
+    }
+
+    double target_cutoff = particles_ptr->cutoff;
+    double proposal_cutoff = target_cutoff;
+    if (!doc["Proposal_Hamiltonian"]) {
+        // if no proposal hamiltonian is requested it is set to the target hamiltonian
+        delete proposal_calc_manager_ptr;
+        proposal_calc_manager_ptr = target_calc_manager_ptr;
+    } else {
+        YAML::Node proposal_hamiltonian = doc["Proposal_Hamiltonian"];
+        particles_ptr->cutoff = 0.0;
+        particles_ptr->cutoff_squared = 0.0;
+        if (proposal_hamiltonian["LJ"]) {
+            std::string algorithm = check_and_assign_value<std::string>(proposal_hamiltonian["LJ"], "algorithm");
+            if (algorithm.compare("cutoff") == 0) {
+                particles_ptr->algorithm = "cutoff";
+                std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
+                particles_ptr->cutoff = check_and_assign_value<double>(proposal_hamiltonian["LJ"], "cutoff");
+                particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+                proposal_calc_manager_ptr->addCalc(ljCalc);
+            }
+            else if (algorithm.compare("verlet_list") == 0) {
+                particles_ptr->algorithm = "verlet_list";
+                std::shared_ptr<Calc> ljCalc = std::make_shared<LJ_verlet>();
+                particles_ptr->cutoff = check_and_assign_value<double>(proposal_hamiltonian["LJ"], "cutoff");
+                particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+                proposal_calc_manager_ptr->addCalc(ljCalc);
+                UseNeighborList = true;
+            }
+        }
+
+        if (proposal_hamiltonian["opls"]) {
+            auto bonds_ptr = std::make_shared<Bonds>();
+            particles_ptr->bonds_ptr = bonds_ptr;
+            std::string lammps_data_file;
+            if (doc["lammps_data_file"]) {
+                lammps_data_file = check_and_assign_value<std::string>(doc, "lammps_data_file");
+            } else {lammps_data_file = "data.lmp";}
+            read_lammps(bonds_ptr, lammps_data_file);
+            if(!proposal_hamiltonian["LJ"])
+                Kokkos::abort("ERROR: Cannot use OPLS without defining a Lennard-Jones potential!");
+            proposal_calc_manager_ptr->addCalc(bonds_ptr);
+            if (doc["integrator"]["constrained_bonds"]) {
+                std::string constrained_bonds = check_and_assign_value<std::string>(doc["integrator"], "constrained_bonds");
+                std::vector<int> constrained_bond_indices;
+
+                // Use a stringstream to parse the comma-separated values
+                std::stringstream ss(constrained_bonds);
+                std::string token;
+
+                while (std::getline(ss, token, ',')) {
+                    try {
+                        int bond_index = std::stoi(token);  // Convert to integer
+                        constrained_bond_indices.push_back(bond_index);
+                    } catch (const std::invalid_argument& e) {
+                        std::cerr << "Invalid number in constrained_bonds: " << token << std::endl;
+                    } catch (const std::out_of_range& e) {
+                        std::cerr << "Number out of range in constrained_bonds: " << token << std::endl;
+                    }
+                }
+
+                bonds_ptr->build_constrained_bond_list(constrained_bond_indices);
+            } else {
+                bonds_ptr->unconstrained_bonds = bonds_ptr->bonds;
+            }
+        }
+
+        if (proposal_hamiltonian["coulomb"]) {
+            std::string algorithm = check_and_assign_value<std::string>(proposal_hamiltonian["coulomb"], "algorithm");
+            if (algorithm.compare("ewald") == 0) {
+                auto coulomb_ptr = std::make_shared<Coulomb_ewald>(proposal_hamiltonian,*params_ptr);
+                proposal_calc_manager_ptr->addCalc(coulomb_ptr);
+                UseNeighborList = true;
+            }
+            else if (algorithm.compare("direct") == 0) {
+                auto coulomb_ptr = std::make_shared<Coulomb_direct>();
+                proposal_calc_manager_ptr->addCalc(coulomb_ptr);
+                coulomb_ptr->r_c = check_and_assign_value<double>(proposal_hamiltonian["coulomb"], "cutoff");
+                coulomb_ptr->r_c2 = coulomb_ptr->r_c*coulomb_ptr->r_c;
+                UseNeighborList = true;
+            }
+            else if (algorithm.compare("pppm") == 0) {
+                auto coulomb_ptr = std::make_shared<Coulomb_pppm>(proposal_hamiltonian,*params_ptr);
+                proposal_calc_manager_ptr->addCalc(coulomb_ptr);
+                UseNeighborList = true;
+            }
+            particles_ptr->cutoff = check_and_assign_value<double>(proposal_hamiltonian["coulomb"], "cutoff");
+            particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
+        }
+
+        if (proposal_hamiltonian["MLIAP"]) {
+            std::shared_ptr<Calc> mliapCalc = std::make_shared<MLIAP>();
+            proposal_calc_manager_ptr->addCalc(mliapCalc);
+            UseNeighborList = true;
+        }
+
+        if (proposal_hamiltonian["MBX"]) {
+            std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>(proposal_hamiltonian["MBX"]);
+            proposal_calc_manager_ptr->addCalc(mbxCalc);
+        }
+        proposal_cutoff = particles_ptr->cutoff;
     }
 
     if (UseNeighborList) {
         // If we have any pair potentials utilizing a neighbor list we initialize it here
         // and do a first build
         particles_ptr->neighbor_list_used = true;
-        if (doc["opls"]) {
+        if (particles_ptr->bonds_ptr) {
             particles_ptr->neighbor_list = new Neighbor_list_bonds();
         }
         else {
@@ -650,6 +755,16 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         // set moves_since_last_update so that the build actually gets triggered
         particles_ptr->neighbor_list->moves_since_last_update = particles_ptr->neighbor_list->update_every - 1;
         particles_ptr->neighbor_list->build_verlet_list(*particles_ptr);
+    }
+
+    // Initialize all Calc objects after calculator and neighbor-list setup.
+    particles_ptr->cutoff = target_cutoff;
+    particles_ptr->cutoff_squared = target_cutoff * target_cutoff;
+    target_calc_manager_ptr->initialize();
+    if (proposal_calc_manager_ptr != target_calc_manager_ptr) {
+        particles_ptr->cutoff = proposal_cutoff;
+        particles_ptr->cutoff_squared = proposal_cutoff * proposal_cutoff;
+        proposal_calc_manager_ptr->initialize();
     }
 }
 

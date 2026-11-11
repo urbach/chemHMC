@@ -28,7 +28,10 @@ public:
     std::mt19937_64 gen64;
     params_class* params;
     particles_instance* particles;
-    Calc_Manager* calc_manager;
+    Calc_Manager* target_calc_manager; // Computes energies/forces for target hamiltonian
+    Calc_Manager* proposal_calc_manager; // Computes energies/forces for proposal hamiltonian
+    // Both calc_manager pointers might point to the same object if the same potential
+    // is used for the MD and accept/reject parts
     Umbrella_Sampling* umbrella_sampling = nullptr;
 
     HMC_class() {};

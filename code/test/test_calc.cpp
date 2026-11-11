@@ -15,7 +15,7 @@
 
 void run_pot_test(HMC_class& HMC) {
 
-    auto& calc_manager = HMC.calc_manager;
+    auto& calc_manager = HMC.target_calc_manager;
     auto& integrator = HMC.integrator;
     auto& particles = integrator->particles;
 
@@ -70,7 +70,7 @@ void run_pot_test(HMC_class& HMC) {
 
 void run_md_toteng_test(HMC_class& HMC) {
 
-    auto& calc_manager = HMC.calc_manager;
+    auto& calc_manager = HMC.target_calc_manager;
     auto& integrator = HMC.integrator;
     auto& particles = integrator->particles;
 
@@ -109,7 +109,7 @@ void run_md_toteng_test(HMC_class& HMC) {
 }
 
 void run_minimization_test(HMC_class& HMC) {
-    auto& calc_manager = HMC.calc_manager;
+    auto& calc_manager = HMC.target_calc_manager;
     auto& integrator = HMC.integrator;
     auto& particles = integrator->particles;
 
@@ -135,68 +135,3 @@ int main(int argc, char** argv) {
     }
     Kokkos::finalize();
 }
-
-/*void run() {
-
-    Kokkos::Timer timer;
-    double tokcal = 1.0/kcaltointernal;
-
-    double Vi = calc_manager->compute_potential();
-    printf("INITIAL V: %f \n", Vi*tokcal);
-
-    double beta = integrator->particles->get_beta();
-    calc_manager->compute_force();
-
-    Kokkos::fence();
-    // copy the configuration before the MD
-    Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-    for (int i = 1; i <= params->Ntrajectories; i++) {
-        Kokkos::Timer timer_traj;
-        // hb momenta
-        integrator->particles->hb();
-        double Ki = integrator->particles->compute_kinetic_E();
-        // molecular dynamics
-        integrator->integrate();
-
-        // accept/reject
-        double Vf = calc_manager->compute_potential();
-        double Kf = integrator->particles->compute_kinetic_E();
-
-        double dh = beta * (Kf + Vf - Ki - Vi);
-        double exp_mdh = exp(-dh);
-
-        if ((i % params->print_info_every == 0)) {
-            printf("step %d: K = %.12g  V = %.12g exp_mdh = %.12g\n", i, Kf*tokcal, Vf*tokcal, exp_mdh);
-        }
-        Kokkos::fence();
-
-        if (i < params->thermalization_steps) {
-            Vi = Vf;
-            Ki = Kf;
-            Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-        }
-        else {
-            double r = gen_random();// random number from 0 to 1
-            if (r < exp_mdh) {
-                acceptance++;
-                Vi = Vf;
-                Ki = Kf;
-                Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);// h_x=x;
-            }
-            else {
-                Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
-            }
-            // save
-            if ((i % params->save_every == 0)) {
-                integrator->particles->print_xyz(*params, i, Ki, Vi);
-            }
-        }
-    }
-    printf("Acceptance: %g\n", acceptance / ((double)(params->Ntrajectories - params->thermalization_steps)));
-    //printf("final step size: %f\n", integrator->dt);
-    printf("time for HMC: %g  s\n", timer.seconds());
-    calc_manager->print_timings();
-    if (integrator->particles->neighbor_list_used) {
-        printf("time for Neighbor list builds: %g s\n",particles->neighbor_list->time_list_build);
-    }
-}*/

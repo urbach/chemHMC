@@ -14,14 +14,14 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     params = new params_class();
     particles = new particles_instance();
     integrator = nullptr; // Specific integrator gets initialized by input reader
-    calc_manager = new Calc_Manager();
-    Input_reader input_reader = Input_reader(params, integrator, particles, calc_manager);
+    target_calc_manager = new Calc_Manager();
+    proposal_calc_manager = new Calc_Manager();
+    Input_reader input_reader = Input_reader(params, integrator, particles, target_calc_manager, proposal_calc_manager);
     // Create a std::shared_ptr from the raw pointer and pass it to the calc manager
-    calc_manager->set_particles(std::shared_ptr<particles_instance>(particles));
+    target_calc_manager->set_particles(std::shared_ptr<particles_instance>(particles));
+    proposal_calc_manager->set_particles(target_calc_manager->particles);
     input_reader.parse_input(argc, argv);
-    integrator->set_calc_manager(*calc_manager);
-    // Initialize all Calc objects
-    calc_manager->initialize();
+    integrator->set_calc_manager(*proposal_calc_manager);
     gen64.seed(params->seed);
     UseNeighborList = input_reader.UseNeighborList;
     // Optional minimization
@@ -37,7 +37,7 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
         }
         if (simulation_type == SimulationType::None) Kokkos::abort("No simulation type selected! Aborting...");
     }
-    if (doc["minimization"]) calc_manager->minimize_energy(doc);
+    if (doc["minimization"]) target_calc_manager->minimize_energy(doc);
     if (doc["umbrella_sampling"]) {
         umbrella_sampling = new Umbrella_Sampling(doc["umbrella_sampling"]);
         umbrella_sampling->init(*particles);
@@ -53,11 +53,11 @@ void HMC_class::run() {
     Kokkos::Timer timer;
     double tokcal = 1.0/kcaltointernal;
 
-    double Vi = calc_manager->compute_potential();
+    double Vi = target_calc_manager->compute_potential();
     printf("INITIAL V: %f \n", Vi*tokcal);
 
     double beta = integrator->particles->get_beta();
-    calc_manager->compute_force();
+    proposal_calc_manager->compute_force();
 
     Kokkos::fence();
     // copy the configuration before the MD
@@ -71,7 +71,7 @@ void HMC_class::run() {
         integrator->integrate();
 
         // accept/reject
-        double Vf = calc_manager->compute_potential();
+        double Vf = target_calc_manager->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
 
         double dh = beta * (Kf + Vf - Ki - Vi);
@@ -107,7 +107,8 @@ void HMC_class::run() {
     printf("Acceptance: %g\n", acceptance / ((double)(params->Ntrajectories - params->thermalization_steps)));
     //printf("final step size: %f\n", integrator->dt);
     printf("time for HMC: %g  s\n", timer.seconds());
-    calc_manager->print_timings();
+    proposal_calc_manager->print_timings();
+    if (target_calc_manager != proposal_calc_manager) target_calc_manager->print_timings();
     if (integrator->particles->neighbor_list_used) {
         printf("time for Neighbor list builds: %g s\n",particles->neighbor_list->time_list_build);
     }
@@ -130,11 +131,11 @@ void HMC_class::run_umbrella_sampling() {
         max_delta_lnV = params->volume_step;
     }
 
-    double Vi = calc_manager->compute_potential();
+    double Vi = target_calc_manager->compute_potential();
     printf("INITIAL V: %f \n", Vi*tokcal);
 
     double beta = integrator->particles->get_beta();
-    calc_manager->compute_force();
+    proposal_calc_manager->compute_force();
 
     Kokkos::fence();
     Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
@@ -144,7 +145,7 @@ void HMC_class::run_umbrella_sampling() {
         double Ki = integrator->particles->compute_kinetic_E();
         integrator->integrate();
 
-        double Vf = calc_manager->compute_potential();
+        double Vf = target_calc_manager->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
         umbrella_sampling->evaluate_trial(*particles);
 
@@ -266,7 +267,7 @@ void HMC_class::run_umbrella_sampling() {
                 integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
             }
 
-            double V_trial = calc_manager->compute_potential();
+            double V_trial = target_calc_manager->compute_potential();
             umbrella_sampling->evaluate_volume_trial(*particles);
             double dH_vol = beta * (V_trial - Vi + P_ext * (V_new - V_old)
                           + umbrella_sampling->trial_bias_energy - umbrella_sampling->bias_energy)
@@ -303,7 +304,7 @@ void HMC_class::run_umbrella_sampling() {
 
             if ((i % params->print_info_every == 0)) {
                 double K_now = integrator->particles->compute_kinetic_E();
-                double V_now = calc_manager->compute_potential();
+                double V_now = target_calc_manager->compute_potential();
                 double V_box = integrator->particles->L[0]
                              * integrator->particles->L[1]
                              * integrator->particles->L[2];
@@ -319,7 +320,7 @@ void HMC_class::run_umbrella_sampling() {
             }
             if ((i % params->save_every == 0)) {
                 double K_now = integrator->particles->compute_kinetic_E();
-                double V_now = calc_manager->compute_potential();
+                double V_now = target_calc_manager->compute_potential();
                 Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
                 integrator->particles->print_xyz(*params, i, K_now, V_now);
             }
@@ -334,7 +335,8 @@ void HMC_class::run_umbrella_sampling() {
     else {
         printf("time for umbrella sampling HMC: %g  s\n", timer.seconds());
     }
-    calc_manager->print_timings();
+    proposal_calc_manager->print_timings();
+    if (target_calc_manager != proposal_calc_manager) target_calc_manager->print_timings();
     if (integrator->particles->neighbor_list_used) {
         printf("time for Neighbor list builds: %g s\n",particles->neighbor_list->time_list_build);
     }
@@ -351,11 +353,11 @@ void HMC_class::run_VolumeMoveHMC() {
 
     double max_delta_lnV = params->volume_step;
 
-    double Vi = calc_manager->compute_potential();
+    double Vi = target_calc_manager->compute_potential();
     printf("INITIAL V: %f \n", Vi*tokcal);
 
     double beta = integrator->particles->get_beta();
-    calc_manager->compute_force();
+    proposal_calc_manager->compute_force();
 
     Kokkos::fence();
 
@@ -374,7 +376,7 @@ void HMC_class::run_VolumeMoveHMC() {
         double Ki = integrator->particles->compute_kinetic_E();
         integrator->integrate();
 
-        double Vf = calc_manager->compute_potential();
+        double Vf = target_calc_manager->compute_potential();
         double Kf = integrator->particles->compute_kinetic_E();
         double dh = beta * (Kf + Vf - Ki - Vi);
         double exp_mdh = exp(-dh);
@@ -488,7 +490,7 @@ void HMC_class::run_VolumeMoveHMC() {
             integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
         }
         // accept/reject volume move
-        double V_trial = calc_manager->compute_potential();
+        double V_trial = target_calc_manager->compute_potential();
         double dH_vol = beta * (V_trial - Vi + P_ext * (V_new - V_old))
                       - double(n_mol + 1) * log(V_new / V_old);
         double exp_mdH_vol = exp(-dH_vol);
@@ -523,7 +525,7 @@ void HMC_class::run_VolumeMoveHMC() {
         // print info
         if ((i % params->print_info_every == 0)) {
             double K_now = integrator->particles->compute_kinetic_E();
-            double V_now = calc_manager->compute_potential();
+            double V_now = target_calc_manager->compute_potential();
             double V_box = integrator->particles->L[0]
                          * integrator->particles->L[1]
                          * integrator->particles->L[2];
@@ -540,7 +542,7 @@ void HMC_class::run_VolumeMoveHMC() {
         // print configuration
         if ((i % params->save_every == 0)) {
             double K_now = integrator->particles->compute_kinetic_E();
-            double V_now = calc_manager->compute_potential();
+            double V_now = target_calc_manager->compute_potential();
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
             integrator->particles->print_xyz(*params, i, K_now, V_now);
         }
@@ -549,7 +551,8 @@ void HMC_class::run_VolumeMoveHMC() {
     printf("Acceptance: %g\n", acceptance / ((double)(params->Ntrajectories - params->thermalization_steps)));
     printf("Volume acceptance: %g\n", volume_attempts > 0 ? volume_acceptance / double(volume_attempts) : 0.0);
     printf("time for HMC NPT: %g  s\n", timer.seconds());
-    calc_manager->print_timings();
+    proposal_calc_manager->print_timings();
+    if (target_calc_manager != proposal_calc_manager) target_calc_manager->print_timings();
 
     if (integrator->particles->neighbor_list_used) {
         printf("time for Neighbor list builds: %g s\n",particles->neighbor_list->time_list_build);
@@ -561,11 +564,11 @@ void HMC_class::run_MD() {
     Kokkos::Timer timer;
     double tokcal = 1.0/kcaltointernal;
 
-    double Vi = calc_manager->compute_potential();
+    double Vi = proposal_calc_manager->compute_potential();
     printf("INITIAL V: %f \n", Vi*tokcal);
 
     double beta = integrator->particles->get_beta();
-    calc_manager->compute_force();
+    proposal_calc_manager->compute_force();
 
     Kokkos::fence();
 
@@ -581,18 +584,18 @@ void HMC_class::run_MD() {
         integrator->integrate();
         Kokkos::deep_copy(integrator->particles->h_x,integrator->particles->x);
         if ((i % params->print_info_every == 0)) {
-            double Vf = calc_manager->compute_potential();
+            double Vf = proposal_calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();
             printf("step %d: K = %.12g  V = %.12g H = %.12g \n", i, Kf*tokcal, Vf*tokcal, (Kf+Vf)*tokcal);
         }
         Kokkos::fence();
         if ((i % params->save_every == 0)) {
-            double Vf = calc_manager->compute_potential();
+            double Vf = proposal_calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();
             Kokkos::deep_copy(integrator->particles->h_x, integrator->particles->x);
             integrator->particles->print_xyz(*params, i, Kf, Vf);
         }
     }
     printf("time for MD: %g  s\n", timer.seconds());
-    calc_manager->print_timings();
+    proposal_calc_manager->print_timings();
 }

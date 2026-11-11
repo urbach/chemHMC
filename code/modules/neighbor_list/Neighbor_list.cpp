@@ -16,14 +16,16 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
     // Set cutoff
     double coul_cutoff = 0.0;
     double lj_cutoff = 0.0;
-    if (doc["coulomb"]["cutoff"]) {
-        coul_cutoff = check_and_assign_value<double>(doc["coulomb"], "cutoff");
+    YAML::Node hamiltonian = doc["Hamiltonian"];
+    if (hamiltonian["coulomb"]["cutoff"]) {
+        coul_cutoff = check_and_assign_value<double>(hamiltonian["coulomb"], "cutoff");
     }
-    if (doc["LJ"]["cutoff"]) {
-        lj_cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
+    if (hamiltonian["LJ"]["cutoff"]) {
+        lj_cutoff = check_and_assign_value<double>(hamiltonian["LJ"], "cutoff");
     }
-    if (doc["MLIAP"]["cutoff"]) {
-        lj_cutoff = check_and_assign_value<double>(doc["MLIAP"], "cutoff");
+    if (hamiltonian["MLIAP"]["cutoff"]) {
+        double cutoff = check_and_assign_value<double>(hamiltonian["MLIAP"], "cutoff");
+        if (cutoff > lj_cutoff) lj_cutoff = cutoff;
     }
     if (coul_cutoff > lj_cutoff) neighbor_cutoff = coul_cutoff;
     else neighbor_cutoff = lj_cutoff;

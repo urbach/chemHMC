@@ -9,9 +9,12 @@ MBX::MBX(const YAML::Node& config)
 void MBX::init(const particles_instance& particles) 
 {
     x_mbx = Kokkos::View<double**, Kokkos::HostSpace>("x_mbx", particles.N, 3);
+    // We need a host-view of the forces since the MBX library currently only runs on CPU
     h_f = Kokkos::View<double**, Kokkos::HostSpace>("h_f", particles.N, 3);
 
     Kokkos::deep_copy(x_mbx, particles.x);
+    // MBX needs a specific ordering of water atoms, which is enforced in
+    // build_molecule_map
     build_molecule_map(particles);
 
     // The json (settings) and nrg (monomers and coordinates) files
@@ -29,6 +32,7 @@ void MBX::init(const particles_instance& particles)
     systems.emplace_back();
     for (std::size_t i = 0; i < water_molecules.size(); ++i) {
         std::vector<double> xyz(coordinates.begin() + 9 * i, coordinates.begin() + 9 * (i + 1));
+         
         std::vector<std::string> atom_names = {"O", "H", "H"};
         systems[0].AddMonomer(xyz, atom_names, "h2o");
     }
