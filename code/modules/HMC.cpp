@@ -601,7 +601,7 @@ void HMC_class::run_MD() {
         integrator->integrate();
         Kokkos::deep_copy(integrator->particles->h_x,integrator->particles->x);
         if ((i % params->print_info_every == 0)) {
-            double Vf = proposal_calc_manager->compute_potential();
+            double Vf = target_calc_manager->compute_potential();
             double Kf = integrator->particles->compute_kinetic_E();
             printf("step %d: K = %.12g  V = %.12g H = %.12g \n", i, Kf*tokcal, Vf*tokcal, (Kf+Vf)*tokcal);
         }
