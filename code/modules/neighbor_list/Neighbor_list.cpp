@@ -84,13 +84,13 @@ void Neighbor_list::build_verlet_list(particles_instance& particles) {
             dz -= int(dz * ihL2) * L2;
 
             double d2 = dx*dx + dy*dy + dz*dz;
-            disp(i) += d2;
+            disp(i) = d2;
             lmax = (lmax < disp(i)) ? disp(i) : lmax;
         },
         Kokkos::Max<double>(max_disp2)
     );
 
-    if (max_disp2 >= skin_distance_squared) {
+    if (max_disp2 >= 0.25 * skin_distance_squared) {
         build(particles);
         Kokkos::deep_copy(x_last, x);
         Kokkos::deep_copy(disp2, 0.0);

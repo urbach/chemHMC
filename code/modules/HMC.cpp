@@ -97,6 +97,9 @@ void HMC_class::run() {
             }
             else {
                 Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
+                if (integrator->particles->neighbor_list_used) {
+                    integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
+                }
             }
             // save
             if ((i % params->save_every == 0)) {
@@ -175,6 +178,9 @@ void HMC_class::run_umbrella_sampling() {
             }
             else {
                 Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
+                if (integrator->particles->neighbor_list_used) {
+                    integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
+                }
                 umbrella_sampling->reject_trial();
             }
             if (!volume_moves && (i % params->save_every == 0)) {
@@ -399,6 +405,9 @@ void HMC_class::run_VolumeMoveHMC() {
             }
             else {
                 Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
+                if (integrator->particles->neighbor_list_used) {
+                    integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
+                }
             }
         }
 
