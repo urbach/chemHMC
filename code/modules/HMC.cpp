@@ -39,8 +39,8 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
     if (simulation_type == SimulationType::MD) {
         integrator->set_calc_manager(*target_calc_manager);
         if (doc["Proposal_Hamiltonian"]) {
-            printf("WARNING: Proposal Hamiltonian defined in input but simulation type is MD.
-                Program will ignore this and use the target Hamiltonian.");
+            printf("WARNING: Proposal Hamiltonian defined in input but simulation type is MD." 
+                " Program will ignore this and use the target Hamiltonian.\n");
         }
     } else {
         integrator->set_calc_manager(*proposal_calc_manager);
