@@ -46,6 +46,9 @@ void HMC_class::init(int argc, char** argv, bool check_overwrite) {
         integrator->set_calc_manager(*proposal_calc_manager);
     }
     if (doc["minimization"]) target_calc_manager->minimize_energy(doc);
+    if (particles->neighbor_list_used) {
+        particles->neighbor_list->build_verlet_list(*particles);
+    }
     if (doc["umbrella_sampling"]) {
         umbrella_sampling = new Umbrella_Sampling(doc["umbrella_sampling"]);
         umbrella_sampling->init(*particles);
@@ -216,6 +219,7 @@ void HMC_class::run_umbrella_sampling() {
             size_t n_mol = integrator->particles->number_of_molecules;
 
             std::vector<double> com(3 * n_mol, 0.0);
+            std::vector<double> x_unwrapped(3 * integrator->particles->N);
             std::vector<double> mol_mass(n_mol, 0.0);
             std::vector<size_t> first_atom(n_mol, integrator->particles->N);
 
@@ -236,6 +240,10 @@ void HMC_class::run_umbrella_sampling() {
                 dx -= round(dx / L_old[0]) * L_old[0];
                 dy -= round(dy / L_old[1]) * L_old[1];
                 dz -= round(dz / L_old[2]) * L_old[2];
+
+                x_unwrapped[3*a + 0] = integrator->particles->h_x(first_atom[mol], 0) + dx;
+                x_unwrapped[3*a + 1] = integrator->particles->h_x(first_atom[mol], 1) + dy;
+                x_unwrapped[3*a + 2] = integrator->particles->h_x(first_atom[mol], 2) + dz;
 
                 com[3*mol + 0] += m * dx;
                 com[3*mol + 1] += m * dy;
@@ -266,9 +274,9 @@ void HMC_class::run_umbrella_sampling() {
             for (size_t a = 0; a < integrator->particles->N; a++) {
                 int mol = integrator->particles->h_mol_id(a);
 
-                double dx = integrator->particles->h_x(a, 0) - com[3*mol + 0];
-                double dy = integrator->particles->h_x(a, 1) - com[3*mol + 1];
-                double dz = integrator->particles->h_x(a, 2) - com[3*mol + 2];
+                double dx = x_unwrapped[3*a + 0] - com[3*mol + 0];
+                double dy = x_unwrapped[3*a + 1] - com[3*mol + 1];
+                double dz = x_unwrapped[3*a + 2] - com[3*mol + 2];
 
                 integrator->particles->h_x(a, 0) = scale * com[3*mol + 0] + dx;
                 integrator->particles->h_x(a, 1) = scale * com[3*mol + 1] + dy;
@@ -441,6 +449,7 @@ void HMC_class::run_VolumeMoveHMC() {
         size_t n_mol = integrator->particles->number_of_molecules; 
 
         std::vector<double> com(3 * n_mol, 0.0);
+        std::vector<double> x_unwrapped(3 * integrator->particles->N);
         std::vector<double> mol_mass(n_mol, 0.0);
         std::vector<size_t> first_atom(n_mol, integrator->particles->N);
 
@@ -461,6 +470,10 @@ void HMC_class::run_VolumeMoveHMC() {
             dx -= round(dx / L_old[0]) * L_old[0];
             dy -= round(dy / L_old[1]) * L_old[1];
             dz -= round(dz / L_old[2]) * L_old[2];
+
+            x_unwrapped[3*a + 0] = integrator->particles->h_x(first_atom[mol], 0) + dx;
+            x_unwrapped[3*a + 1] = integrator->particles->h_x(first_atom[mol], 1) + dy;
+            x_unwrapped[3*a + 2] = integrator->particles->h_x(first_atom[mol], 2) + dz;
 
             com[3*mol + 0] += m * dx;
             com[3*mol + 1] += m * dy;
@@ -492,9 +505,9 @@ void HMC_class::run_VolumeMoveHMC() {
         for (size_t a = 0; a < integrator->particles->N; a++) {
             int mol = integrator->particles->h_mol_id(a);
 
-            double dx = integrator->particles->h_x(a, 0) - com[3*mol + 0];
-            double dy = integrator->particles->h_x(a, 1) - com[3*mol + 1];
-            double dz = integrator->particles->h_x(a, 2) - com[3*mol + 2];
+            double dx = x_unwrapped[3*a + 0] - com[3*mol + 0];
+            double dy = x_unwrapped[3*a + 1] - com[3*mol + 1];
+            double dz = x_unwrapped[3*a + 2] - com[3*mol + 2];
 
             integrator->particles->h_x(a, 0) = scale * com[3*mol + 0] + dx;
             integrator->particles->h_x(a, 1) = scale * com[3*mol + 1] + dy;
