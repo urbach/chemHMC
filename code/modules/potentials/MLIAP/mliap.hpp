@@ -21,6 +21,7 @@ private:
     torch::Device device_{"cuda"};
     torch::jit::script::Module module_;
     int64_t N_at = 0;
+    type_x::HostMirror evaluation_x_;
 
     double L[dim_space];
     double inverse_L[dim_space];

@@ -29,6 +29,7 @@ torch::Tensor labels_to_species(const std::vector<std::string>& labels, torch::D
 
 void MLIAP::init(const particles_instance& particles) {
     N_at = particles.N;
+    evaluation_x_ = Kokkos::create_mirror(particles.x);
 
     // Load module
     device_ = torch::Device(device_str);
@@ -51,13 +52,14 @@ void MLIAP::init(const particles_instance& particles) {
 double MLIAP::potential(const particles_instance& particles) {
     try
     {
+        Kokkos::deep_copy(evaluation_x_, particles.x);
         auto dtype = torch::kFloat32;
         torch::Tensor coordinates_cpu = torch::empty({N_at, 3}, torch::TensorOptions().dtype(dtype).device(torch::kCPU));
         auto accessor = coordinates_cpu.accessor<float, 2>();
 
         for (int i = 0; i < N_at; ++i) {
             for (int j = 0; j < 3; ++j) {
-                accessor[i][j] = static_cast<float>(particles.h_x(i, j));
+                accessor[i][j] = static_cast<float>(evaluation_x_(i, j));
             }
         }
 
@@ -172,6 +174,7 @@ void tensor_forces_to_kokkos(const torch::Tensor& forces_in, type_f& f) {
 void MLIAP::force(const particles_instance& particles, type_f& f) {
     try
     {
+        Kokkos::deep_copy(evaluation_x_, particles.x);
         auto dtype = torch::kFloat32;
         // Coordinates shape: (N_at, 3)
         
@@ -180,7 +183,7 @@ void MLIAP::force(const particles_instance& particles, type_f& f) {
             auto acc = coordinates_cpu.accessor<float,2>();
             for (int i=0;i<N_at;++i)
                 for (int j=0;j<3;++j)
-                    acc[i][j] = static_cast<float>(particles.h_x(i,j));
+                    acc[i][j] = static_cast<float>(evaluation_x_(i,j));
         }
         torch::Tensor coordinates = coordinates_cpu.to(device_);
 
