@@ -24,6 +24,7 @@ set(chemHMC_header
     ../modules/neighbor_list/Neighbor_list.hpp
     ../modules/potentials/MLIAP/mliap.hpp
     ../modules/potentials/MBX/MBX.hpp
+    ../modules/potentials/DeePMD/DeePMD.hpp
 )
 
 set(chemHMC_scr 
@@ -49,7 +50,10 @@ set(chemHMC_scr
     ../modules/neighbor_list/Neighbor_list_cell.cpp
     ../modules/potentials/MLIAP/mliap.cpp
     ../modules/potentials/MBX/MBX.cpp
+    ../modules/potentials/DeePMD/DeePMD.cpp
 )
 add_library(chemHMC STATIC ${chemHMC_header} ${chemHMC_scr})
 target_link_libraries(chemHMC PUBLIC ${YAML_CPP_LIBRARIES} Kokkos::kokkos)
+find_package(DeePMD REQUIRED)
+target_link_libraries(chemHMC PRIVATE DeePMD::deepmd_c)
 set_target_properties(chemHMC PROPERTIES LINKER_LANGUAGE CXX)

@@ -10,6 +10,7 @@
 #include "potentials/non_bonded_interactions/coulomb_direct.hpp"
 #include "potentials/MLIAP/mliap.hpp"
 #include "potentials/MBX/MBX.hpp"
+#include "potentials/DeePMD/DeePMD.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -635,6 +636,11 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         target_calc_manager_ptr->addCalc(mbxCalc);
     }
 
+    if (hamiltonian["DeePMD"]) {
+        std::shared_ptr<Calc> deepmdCalc = std::make_shared<DeePMD>(hamiltonian["DeePMD"]);
+        target_calc_manager_ptr->addCalc(deepmdCalc);
+    }
+
     double target_cutoff = particles_ptr->cutoff;
     double proposal_cutoff = target_cutoff;
     if (!doc["Proposal_Hamiltonian"]) {
@@ -732,6 +738,11 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         if (proposal_hamiltonian["MBX"]) {
             std::shared_ptr<Calc> mbxCalc = std::make_shared<MBX>(proposal_hamiltonian["MBX"]);
             proposal_calc_manager_ptr->addCalc(mbxCalc);
+        }
+
+        if (proposal_hamiltonian["DeePMD"]) {
+            std::shared_ptr<Calc> deepmdCalc = std::make_shared<DeePMD>(proposal_hamiltonian["DeePMD"]);
+            proposal_calc_manager_ptr->addCalc(deepmdCalc);
         }
         proposal_cutoff = particles_ptr->cutoff;
     }
