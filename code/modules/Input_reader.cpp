@@ -66,6 +66,8 @@ void Input_reader::parse_input(int argc, char** argv) {
     parse_simulation_parameters(doc);
     parse_integrator_options(doc);
     get_number_of_particles();
+    params_ptr->N = particles_ptr->N;
+    std::cout << "Number of particles (N): " << particles_ptr->N << std::endl;
     parse_particles_options(doc);
     particles_ptr->InitX();
     assign_ids();
@@ -102,17 +104,8 @@ void Input_reader::parse_simulation_parameters(YAML::Node& doc) {
     std::string simulation_type = check_and_assign_value<std::string>(doc, "simulation_type");
     if (simulation_type == "MD") MD = true;
 
-    // Read number of particles from the starting configuration
-    std::ifstream xyz_file(params_ptr->nameout);
-    std::string line;
-    if (std::getline(xyz_file, line)) {
-        params_ptr->N = std::atoi(line.c_str());
-        std::cout << "Number of particles (N) read from .xyz file: " << params_ptr->N << std::endl;
-    } else {
-        std::cerr << "Error: Could not read the first line of file " << params_ptr->nameout << std::endl;
-        throw std::runtime_error("File read error");
-    }
-    xyz_file.close();
+    // The number of particles is read from the start configuration (or LAMMPS data file)
+    // in get_number_of_particles(); the output file does not need to exist beforehand.
     // Check output file
     params_ptr->fileout = fopen(params_ptr->nameout.c_str(), "ab");
     if (params_ptr->fileout == NULL || params_ptr->nameout.length() <= 0 || params_ptr->nameout.compare("null") == 0) {
@@ -135,8 +128,16 @@ void Input_reader::parse_integrator_options(YAML::Node& doc) {
             integrator_ptr = new VELOCITY_VERLET(doc, *params_ptr);
         } else if (name == "VELOCITY_VERLET_SHAKE") {
             integrator_ptr = new VELOCITY_VERLET_SHAKE(doc, *params_ptr);
+        } else if (name == "GENERAL_AB") {
+            // drift first: Q(a0) P(b0) ... P(b_{q-1}) Q(a_q), a = drifts, b = kicks
+            integrator_ptr = new GENERAL_AB(doc, *params_ptr);
+        } else if (name == "GENERAL_BA") {
+            // kick first: P(b0) Q(a0) ... Q(a_{q-1}) P(b_q), a = drifts, b = kicks
+            integrator_ptr = new GENERAL_BA(doc, *params_ptr);
         } else if (name == "GENERAL") {
-            integrator_ptr = new GENERAL(doc, *params_ptr);
+            throw std::runtime_error("Error: GENERAL has been replaced by GENERAL_AB (drift first) and GENERAL_BA (kick first). "
+                                     "a now holds the drift and b the kick coefficients: an old GENERAL input is "
+                                     "GENERAL_BA with a and b swapped.");
         }  else {
             throw std::runtime_error("Error: Invalid integrator name: " + name);
         }
@@ -450,7 +451,7 @@ void Input_reader::populate_calc_list(YAML::Node& doc) {
         std::string algorithm = check_and_assign_value<std::string>(doc["LJ"], "algorithm");
         if (algorithm.compare("cutoff") == 0) {
             particles_ptr->algorithm = "cutoff";
-            std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>();
+            std::shared_ptr<Calc> ljCalc = std::make_shared<LJ>(doc);
             particles_ptr->cutoff = check_and_assign_value<double>(doc["LJ"], "cutoff");
             particles_ptr->cutoff_squared = particles_ptr->cutoff * particles_ptr->cutoff;
             calc_manager_ptr->addCalc(ljCalc);

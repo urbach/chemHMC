@@ -83,6 +83,10 @@ void HMC_class::run() {
             }
             else {
                 Kokkos::deep_copy(integrator->particles->x, integrator->particles->h_x);
+                // positions jumped back: the neighbour list may no longer cover them
+                if (integrator->particles->neighbor_list_used) {
+                    integrator->particles->neighbor_list->build_verlet_list(*integrator->particles);
+                }
             }
             // save
             if ((i % params->save_every == 0)) {

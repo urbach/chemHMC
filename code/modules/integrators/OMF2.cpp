@@ -14,23 +14,26 @@ void OMF2::integrate() {
     particles->update_momenta(lambda * dt);
 
     // nsteps-1 full steps
-    for (size_t i = 0; i < steps - 1; i++) {
+    for (int i = 0; i < steps - 1; i++) {
         particles->update_positions(dt / 2.);
+        update_neighbor_list();
         calc_manager->compute_force();
         Kokkos::fence();
         particles->update_momenta(oneminus2lambda * dt);
         particles->update_positions(dt / 2.);
-        particles->neighbor_list->build_verlet_list(*particles);
+        update_neighbor_list();
         calc_manager->compute_force();
         Kokkos::fence();
         particles->update_momenta(2. * lambda * dt);
     }
     // final step
     particles->update_positions(dt / 2.);
+    update_neighbor_list();
     calc_manager->compute_force();
     Kokkos::fence();
     particles->update_momenta(oneminus2lambda * dt);
     particles->update_positions(dt / 2.);
+    update_neighbor_list();
     calc_manager->compute_force();
     Kokkos::fence();
     particles->update_momenta(lambda * dt);

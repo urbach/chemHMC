@@ -101,6 +101,7 @@ double Calc_Manager::conjugate_gradient_minimzation(YAML::Node& doc) {
         Kokkos::deep_copy(particles->f, h);
         particles->update_momenta(dt);
         particles->update_positions(dt);
+        if (particles->neighbor_list_used) particles->neighbor_list->build_verlet_list(*particles);
         // Compute new potential
         V_new = compute_potential();
         // Check for convergence
@@ -153,6 +154,7 @@ double Calc_Manager::gradient_descent_minimzation(YAML::Node& doc) {
         particles->update_momenta(dt);
         Kokkos::deep_copy(particles->h_p,particles->p);
         particles->update_positions(dt);
+        if (particles->neighbor_list_used) particles->neighbor_list->build_verlet_list(*particles);
         Kokkos::deep_copy(particles->h_x,particles->x);
         V_new = compute_potential();
         printf("%d: V: %f V_new:%f\n", i, V*tokcal, V_new*tokcal);

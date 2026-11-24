@@ -25,6 +25,14 @@ public:
     virtual void integrate() = 0;
 
     void set_calc_manager(Calc_Manager& calc_manager_ref);
+
+protected:
+    /// Must be called after every position update: rebuilds the neighbour list if atoms moved too far.
+    void update_neighbor_list() {
+        if (particles->neighbor_list_used) {
+            particles->neighbor_list->build_verlet_list(*particles);
+        }
+    }
 };
 
 #endif

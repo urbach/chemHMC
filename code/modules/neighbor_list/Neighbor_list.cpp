@@ -57,7 +57,9 @@ void Neighbor_list::init_verlet_list(YAML::Node& doc, particles_instance& partic
 void Neighbor_list::build_verlet_list(particles_instance& particles) {
     Kokkos::Timer neighbor_timer;
     // First check if atoms have moved sufficiently since last build, if not,
-    // we can skip a new build
+    // we can skip a new build. The list contains all pairs closer than cutoff + skin
+    // at build time, so it stays complete as long as no atom has moved more than
+    // skin/2 since then (two atoms approaching each other close at most 2 * skin/2).
     const int N  = particles.N;
     const double L0 = particles.L[0], L1 = particles.L[1], L2 = particles.L[2];
     const double ihL0 = particles.inverse_halved_L[0];
@@ -81,14 +83,14 @@ void Neighbor_list::build_verlet_list(particles_instance& particles) {
             double dz = x(i,2) - xlast(i,2);
             dz -= int(dz * ihL2) * L2;
 
-            double d2 = dx*dx + dy*dy + dz*dz;
-            disp(i) += d2;
-            lmax = (lmax < disp(i)) ? disp(i) : lmax;
+            double d2 = dx*dx + dy*dy + dz*dz; // squared displacement since the last build
+            disp(i) = d2;
+            lmax = (lmax < d2) ? d2 : lmax;
         },
         Kokkos::Max<double>(max_disp2)
     );
 
-    if (max_disp2 >= skin_distance_squared) {
+    if (max_disp2 >= 0.25 * skin_distance_squared) {
         build(particles);
         Kokkos::deep_copy(x_last, x);
         Kokkos::deep_copy(disp2, 0.0);

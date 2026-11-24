@@ -9,6 +9,76 @@
 #include <iomanip>
 #include "particles.hpp"
 #include <cmath> // For potential calculations
+#include <stdexcept>
+
+//////////////////////////////
+//   CUTOFF TREATMENT       //
+//////////////////////////////
+
+void LJ_cutoff::parse(YAML::Node lj) {
+    if (lj["cutoff_scheme"]) {
+        const std::string s = lj["cutoff_scheme"].as<std::string>();
+        if (s == "none") scheme = LJ_CUT_NONE;
+        else if (s == "shift") scheme = LJ_CUT_SHIFT;
+        else if (s == "force_shift") scheme = LJ_CUT_FORCE_SHIFT;
+        else if (s == "switch") scheme = LJ_CUT_SWITCH;
+        else throw std::runtime_error("Error: LJ: unknown cutoff_scheme '" + s + "' (use none, shift, force_shift or switch)");
+        if (lj["shift_potential"]) {
+            printf("Warning: LJ: both cutoff_scheme and shift_potential are given, shift_potential is ignored\n");
+        }
+    } else if (lj["shift_potential"]) {
+        // Legacy key. An empty value ("shift_potential:") means true, as in the existing input files.
+        const YAML::Node sp = lj["shift_potential"];
+        scheme = (sp.IsNull() || sp.as<bool>()) ? LJ_CUT_SHIFT : LJ_CUT_NONE;
+    }
+    if (scheme == LJ_CUT_SWITCH) {
+        if (!lj["switch_on"]) throw std::runtime_error("Error: LJ: cutoff_scheme 'switch' requires switch_on (distance where the switch starts)");
+        r_on = lj["switch_on"].as<double>();
+    }
+}
+
+void LJ_cutoff::init(const Kokkos::View<double**>::HostMirror& h_epsilon_mat,
+                     const Kokkos::View<double**>::HostMirror& h_sigma_mat, double cutoff_squared) {
+    r_c = std::sqrt(cutoff_squared);
+    if (scheme == LJ_CUT_SWITCH && !(r_on > 0.0 && r_on < r_c)) {
+        throw std::runtime_error("Error: LJ: switch_on must satisfy 0 < switch_on < cutoff");
+    }
+    v_shift = Kokkos::View<double**>("LJ_v_shift", h_sigma_mat.extent(0), h_sigma_mat.extent(1));
+    dv_shift = Kokkos::View<double**>("LJ_dv_shift", h_sigma_mat.extent(0), h_sigma_mat.extent(1));
+    auto h_v_shift = Kokkos::create_mirror_view(v_shift);
+    auto h_dv_shift = Kokkos::create_mirror_view(dv_shift);
+    for (size_t i = 0; i < h_sigma_mat.extent(0); ++i) {
+        for (size_t j = 0; j < h_sigma_mat.extent(1); ++j) {
+            const double sigma = h_sigma_mat(i, j);
+            const double epsilon = h_epsilon_mat(i, j);
+            const double sr2 = sigma * sigma / cutoff_squared;
+            const double sr6 = sr2 * sr2 * sr2;
+            h_v_shift(i, j) = epsilon * sr6 * (sr6 - 1.0);                   // V(r_c)/4
+            h_dv_shift(i, j) = -24.0 * epsilon / r_c * sr6 * (2.0 * sr6 - 1.0); // dV/dr(r_c)
+        }
+    }
+    Kokkos::deep_copy(v_shift, h_v_shift);
+    Kokkos::deep_copy(dv_shift, h_dv_shift);
+    printf("LJ: cutoff = %g A, cutoff_scheme = %s\n", r_c, name().c_str());
+}
+
+std::string LJ_cutoff::name() const {
+    switch (scheme) {
+        case LJ_CUT_NONE: return "none (plain truncation: energy and force jump at r_c)";
+        case LJ_CUT_SHIFT: return "shift (energy shifted: force jumps at r_c)";
+        case LJ_CUT_FORCE_SHIFT: return "force_shift (energy and force continuous at r_c)";
+        case LJ_CUT_SWITCH: return "switch (C^4 switch from " + std::to_string(r_on) + " A to r_c)";
+    }
+    return "unknown";
+}
+
+//////////////////////////////
+//   ALL PAIRS (CUTOFF)     //
+//////////////////////////////
+
+LJ::LJ(YAML::Node doc) {
+    cutoff.parse(doc["LJ"]);
+}
 
 void LJ::init(const particles_instance& particles) {
     std::cout << particles.N << std::endl;
@@ -30,6 +100,7 @@ void LJ::init(const particles_instance& particles) {
     inverse_halved_L[1] = particles.inverse_halved_L[1];
     inverse_halved_L[2] = particles.inverse_halved_L[2];
     cutoff_squared = particles.cutoff_squared;
+    cutoff.init(h_epsilon_mat, h_sigma_mat, cutoff_squared);
 }
 
 double LJ::potential(const particles_instance& particles) {
@@ -44,6 +115,10 @@ double LJ::potential(const particles_instance& particles) {
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
+    const int scheme = cutoff.scheme;
+    const double r_c = cutoff.r_c, r_on = cutoff.r_on;
+    auto v_shift = cutoff.v_shift;
+    auto dv_shift = cutoff.dv_shift;
 
     // Outer parallel_reduce
     Kokkos::parallel_reduce(
@@ -76,11 +151,8 @@ double LJ::potential(const particles_instance& particles) {
                         r2 += rij * rij;
 
                         if (r2 < cutoff_squared) {
-                            double sigma = sigma_mat(type_i, type_j);
-                            double epsilon = epsilon_mat(type_i, type_j);
-                            double sr2 = sigma * sigma / r2;
-                            double sr6 = sr2 * sr2 * sr2;
-                            innerV += epsilon * sr6 * (sr6 - 1.0);
+                            innerV += lj_pair_energy_quarter(scheme, epsilon_mat(type_i, type_j), sigma_mat(type_i, type_j),
+                                                             r2, r_c, r_on, v_shift(type_i, type_j), dv_shift(type_i, type_j));
                         }
                     }
                 },
@@ -107,6 +179,9 @@ void LJ::force(const particles_instance& particles, type_f& f) {
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
+    const int scheme = cutoff.scheme;
+    const double r_c = cutoff.r_c, r_on = cutoff.r_on;
+    auto dv_shift = cutoff.dv_shift;
 
     typedef Kokkos::TeamPolicy<Tag_force_AMIC_inner_parallel> team_policy;
     // Launch the parallel kernel
@@ -136,10 +211,8 @@ void LJ::force(const particles_instance& particles, type_f& f) {
                     r2 += rz * rz;
 
                     if (r2 < cutoff_squared) {
-                        double sr2 = sigma_mat(type_i, type_j) * sigma_mat(type_i, type_j) / r2;
-                        double sr6 = sr2 * sr2 * sr2;
-                        sr2 = sr6 * (-sr6 + 0.5) / r2;
-                        double force = 48.0 * epsilon_mat(type_i, type_j) * sr2;
+                        const double force = lj_pair_dvdr_over_r(scheme, epsilon_mat(type_i, type_j), sigma_mat(type_i, type_j),
+                                                                 r2, r_c, r_on, dv_shift(type_i, type_j));
                         // Add forces for particle i
                         Kokkos::atomic_add(&f(i, 0), force * rx);
                         Kokkos::atomic_add(&f(i, 1), force * ry);
@@ -160,21 +233,7 @@ void LJ::force(const particles_instance& particles, type_f& f) {
 //////////////////////////////
 
 LJ_verlet::LJ_verlet(YAML::Node doc) {
-    if (doc["LJ"]["shift_potential"]) shift_potential = true;
-}
-
-void LJ_verlet::compute_potential_shifts(double cutoff_squared) {
-    for (size_t i = 0; i < h_shift_mat.extent(0); ++i) {
-        for (size_t j = 0; j < h_shift_mat.extent(1); ++j) {
-            const double sigma = h_sigma_mat(i, j);
-            const double epsilon = h_epsilon_mat(i, j);
-            const double sr2 = sigma * sigma / cutoff_squared;
-            const double sr6 = sr2 * sr2 * sr2;
-            // factor of 4 is added later in potential()
-            h_shift_mat(i, j) = epsilon * sr6 * (sr6 - 1.0);
-        }
-    }
-    Kokkos::deep_copy(shift_mat, h_shift_mat);
+    cutoff.parse(doc["LJ"]);
 }
 
 void LJ_verlet::init(const particles_instance& particles) {
@@ -188,12 +247,6 @@ void LJ_verlet::init(const particles_instance& particles) {
     Kokkos::deep_copy(epsilon_mat, h_epsilon_mat); 
     Kokkos::deep_copy(sigma_mat, h_sigma_mat);
 
-    // If shift mat is requested we set it up now and compute its values
-    if (shift_potential) {
-        shift_mat = Kokkos::View<double**>("h_LJ_shift_mat", particles.h_sigma_mat.extent(0), particles.h_sigma_mat.extent(1));
-        h_shift_mat = Kokkos::create_mirror(shift_mat);
-        compute_potential_shifts(particles.cutoff_squared);
-    }
     L[0] = particles.L[0];
     L[1] = particles.L[1];
     L[2] = particles.L[2];
@@ -204,6 +257,7 @@ void LJ_verlet::init(const particles_instance& particles) {
     inverse_halved_L[1] = particles.inverse_halved_L[1];
     inverse_halved_L[2] = particles.inverse_halved_L[2];
     cutoff_squared = particles.cutoff_squared;
+    cutoff.init(h_epsilon_mat, h_sigma_mat, cutoff_squared);
 }
 
 double LJ_verlet::potential(const particles_instance& particles) {
@@ -221,7 +275,10 @@ double LJ_verlet::potential(const particles_instance& particles) {
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
-    auto& shift_mat = this->shift_mat;
+    const int scheme = cutoff.scheme;
+    const double r_c = cutoff.r_c, r_on = cutoff.r_on;
+    auto v_shift = cutoff.v_shift;
+    auto dv_shift = cutoff.dv_shift;
 
     // Outer parallel_reduce
     Kokkos::parallel_reduce(
@@ -254,12 +311,8 @@ double LJ_verlet::potential(const particles_instance& particles) {
                     r2 += rz * rz;
 
                     if (r2 < cutoff_squared) {
-                        double sigma = sigma_mat(type_i, type_j);
-                        double epsilon = epsilon_mat(type_i, type_j);
-                        double sr2 = sigma * sigma / r2;
-                        double sr6 = sr2 * sr2 * sr2;
-                        innerV += epsilon * sr6 * (sr6 - 1.0);
-                        if (shift_potential) innerV -= shift_mat(type_i, type_j);
+                        innerV += lj_pair_energy_quarter(scheme, epsilon_mat(type_i, type_j), sigma_mat(type_i, type_j),
+                                                         r2, r_c, r_on, v_shift(type_i, type_j), dv_shift(type_i, type_j));
                     }
                 },
                 tmpV);
@@ -288,6 +341,9 @@ void LJ_verlet::force(const particles_instance& particles, type_f& f) {
     auto& cutoff_squared = this->cutoff_squared;
     auto& sigma_mat = this->sigma_mat;
     auto& epsilon_mat = this->epsilon_mat;
+    const int scheme = cutoff.scheme;
+    const double r_c = cutoff.r_c, r_on = cutoff.r_on;
+    auto dv_shift = cutoff.dv_shift;
 
     // Outer parallel_for
     typedef Kokkos::TeamPolicy<Tag_force_verlet> team_policy;
@@ -320,12 +376,8 @@ void LJ_verlet::force(const particles_instance& particles, type_f& f) {
                     r2 += rz * rz;
 
                     if (r2 < cutoff_squared) {
-                        double sigma = sigma_mat(type_i, type_j);
-                        double epsilon = epsilon_mat(type_i, type_j);
-                        double sr2 = sigma * sigma / r2;
-                        double sr6 = sr2 * sr2 * sr2;
-                        sr2 = sr6 * (-sr6 + 0.5) / r2;
-                        double force = 48.0 * epsilon * sr2;
+                        const double force = lj_pair_dvdr_over_r(scheme, epsilon_mat(type_i, type_j), sigma_mat(type_i, type_j),
+                                                                 r2, r_c, r_on, dv_shift(type_i, type_j));
 
                         // Use atomic add to update forces
                         Kokkos::atomic_add(&f(i, 0), force * rx);

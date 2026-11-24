@@ -14,10 +14,10 @@ void VELOCITY_VERLET_SHAKE::integrate() {
     calc_manager->compute_force();
     Kokkos::fence();
     apply_SHAKE();
-    for (size_t i = 0; i < steps; i++) {
+    for (int i = 0; i < steps; i++) {
         particles->update_momenta(dt / 2.);
         particles->update_positions(dt);
-        particles->neighbor_list->build_verlet_list(*particles);
+        update_neighbor_list();
         
         calc_manager->compute_force();
         Kokkos::fence();

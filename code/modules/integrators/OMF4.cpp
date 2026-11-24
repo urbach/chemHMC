@@ -22,7 +22,7 @@ void OMF4::integrate() {
     particles->update_momenta(0.5 * eps[9]);
 
     // nsteps-1 full steps
-    for (size_t i = 1; i < steps - 1; i++) {
+    for (int i = 1; i < steps; i++) {
         for (size_t j = 0; j < 5; j++) {
             particles->update_positions(eps[2 * j]);
             if (particles->neighbor_list_used) {
