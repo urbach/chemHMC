@@ -9,4 +9,4 @@ cmake ../../ \
   -DKokkos_ENABLE_OPENMP=ON \
   -DKokkos_ENABLE_CUDA=OFF \
   -DKokkos_ENABLE_SERIAL=ON \
-  -DCMAKE_PREFIX_PATH="/usr/include/yaml-cpp/"  
+  -DCMAKE_PREFIX_PATH="/home/marko/Faks/PhD/Projects/Symplectic_integrators/chemHMC/code/external/yaml-cpp/install_dir/"
