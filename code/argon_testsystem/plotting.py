@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 def get_data(filename):
   # Lists to store the data
   trajectories = []
-  kinetic = []
-  potential = []
   deltaE = []
 
   # Regular expression to match the trajectory lines
@@ -23,8 +21,11 @@ def get_data(filename):
         deltaE.append(float(match.group(2)))
 
   return np.array(trajectories), np.array(deltaE)
+  return np.array(trajectories), np.array(deltaE)
 
 def plot_data(dt, filename, title):
+  trajectories, deltaE = get_data(filename)
+def plot_single(dt, filename, title, savefile):
   trajectories, deltaE = get_data(filename)
 
   # Set up plot parameters
@@ -57,12 +58,12 @@ with open(dt_file_path, "r") as dt_file:
 dt = "0.00001"
 data_dir = "/home/marko/Faks/PhD/Projects/Symplectic_integrators/chemHMC/code/argon_testsystem/low_dens/leapfrog2/"
 filename = data_dir + f"argon_dt-{dt}_leapfrog2.xyz"
-#plot_data(float(dt), filename, rf"$\textrm{{Low density, Leapfrog with }} dt = {dt}$")
+#plot_single(float(dt), filename, rf"$\textrm{{Low density, Leapfrog with }} dt = {dt}$")
 
 dt = "0.0001"
 data_dir = "/home/marko/Faks/PhD/Projects/Symplectic_integrators/chemHMC/code/argon_testsystem/low_dens/omelyan2/"
 filename = data_dir + f"argon_dt-{dt}_omelyan2.xyz"
-#plot_data(float(dt), filename, rf"$\textrm{{Low density, Omelyan2 with }} dt = {dt}$")
+#plot_single(float(dt), filename, rf"$\textrm{{Low density, Omelyan2 with }} dt = {dt}$")
 
 dt = "0.0001"
 data_dir = "/home/marko/Faks/PhD/Projects/Symplectic_integrators/chemHMC/code/argon_testsystem/low_dens/forest_ruth4/"
@@ -72,4 +73,4 @@ filename = data_dir + f"argon_dt-{dt}_forest_ruth4.xyz"
 dt = "0.0001"
 data_dir = "/home/marko/Faks/PhD/Projects/Symplectic_integrators/chemHMC/code/argon_testsystem/low_dens/OMF4/"
 filename = data_dir + f"argon_dt-{dt}_OMF4.xyz"
-#plot_data(float(dt), filename, rf"$\textrm{{Low density, OMF4 with }} dt = {dt}$")
+#plot_single(float(dt), filename, rf"$\textrm{{Low density, OMF4 with }} dt = {dt}$")
